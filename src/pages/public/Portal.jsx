@@ -287,14 +287,47 @@ export default function Portal() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Header negocio */}
-      <div className="py-8 px-4 text-center" style={{ backgroundColor: color }}>
-        <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-3 text-white text-2xl font-bold">
-          {tenant.nombre[0]}
+      {isPsico ? (
+        <div>
+          {/* Topbar info */}
+          <div className="bg-slate-900 px-4 py-2 flex flex-wrap justify-center gap-x-5 gap-y-1">
+            {tenant.direccion && (
+              <span className="flex items-center gap-1.5 text-xs text-white/60">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <strong className="text-white/80">{tenant.direccion}</strong>
+              </span>
+            )}
+            {tenant.whatsapp && (
+              <span className="flex items-center gap-1.5 text-xs text-white/60">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                <strong className="text-white/80">{tenant.whatsapp}</strong>
+              </span>
+            )}
+            <span className="flex items-center gap-1.5 text-xs text-white/60">
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <strong className="text-white/80">Lun–Vie 8am–6pm</strong>
+            </span>
+          </div>
+          {/* Hero */}
+          <div className="px-4 pt-10 pb-16 text-center" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)' }}>
+            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs text-white/70 uppercase tracking-widest mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"/>
+              Neuropsicología · Psicología Clínica
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">{tenant.nombre}</h1>
+            {tenant.descripcion && <p className="text-white/70 text-sm max-w-sm mx-auto leading-relaxed">{tenant.descripcion}</p>}
+          </div>
         </div>
-        <h1 className="text-xl font-bold text-white">{tenant.nombre}</h1>
-        {tenant.descripcion && <p className="text-white/80 text-sm mt-1 max-w-xs mx-auto">{tenant.descripcion}</p>}
-        {tenant.ciudad && <p className="text-white/60 text-xs mt-1">{tenant.ciudad}</p>}
-      </div>
+      ) : (
+        <div className="py-8 px-4 text-center" style={{ backgroundColor: color }}>
+          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-3 text-white text-2xl font-bold">
+            {tenant.nombre[0]}
+          </div>
+          <h1 className="text-xl font-bold text-white">{tenant.nombre}</h1>
+          {tenant.descripcion && <p className="text-white/80 text-sm mt-1 max-w-xs mx-auto">{tenant.descripcion}</p>}
+          {tenant.ciudad && <p className="text-white/60 text-xs mt-1">{tenant.ciudad}</p>}
+        </div>
+      )}
 
       <div className="max-w-lg mx-auto px-4 py-6">
 
