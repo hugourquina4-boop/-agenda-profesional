@@ -2,30 +2,48 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const VERTICAL_LABEL = { psicologo: 'Psicólogo', peluqueria: 'Peluquería', sso: 'SSO', otro: 'Otro' }
+const BASE_URL = window.location.origin
 
-const NUEVO_NEGOCIO = {
+const NEGOCIO_VACIO = {
   nombre: '', slug: '', vertical: 'psicologo',
   email: '', whatsapp: '', telefono: '',
   ciudad: 'Cali', direccion: '', descripcion: '',
-  color_primario: '#3b82f6',
+  color_primario: '#3b82f6', notas_admin: '',
+  links: { instagram: '', web: '', google_calendar: '', otro: '' },
 }
 
-function slugify(text) {
-  return text.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
+function slugify(t) {
+  return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+function copiar(texto) {
+  navigator.clipboard.writeText(texto).catch(() => {})
+}
+
+function Campo({ label, children }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block font-medium">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const inp = `w-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700
+             rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white
+             focus:outline-none focus:border-blue-500 transition-colors`
+
+// ─── Componente principal ──────────────────────────────────────────────────────
 export default function Negocios() {
   const [negocios, setNegocios]   = useState([])
   const [loading, setLoading]     = useState(true)
-  const [modal, setModal]         = useState(null)   // { tipo: 'plan' | 'nuevo', ...datos }
+  const [modal, setModal]         = useState(null)
   const [saving, setSaving]       = useState(false)
   const [busqueda, setBusqueda]   = useState('')
   const [error, setError]         = useState('')
-  const [nuevo, setNuevo]         = useState({ ...NUEVO_NEGOCIO })
+  const [form, setForm]           = useState({ ...NEGOCIO_VACIO })
   const [slugManual, setSlugManual] = useState(false)
+  const [copiado, setCopiado]     = useState(null)
 
   useEffect(() => { cargar() }, [])
 
@@ -36,134 +54,157 @@ export default function Negocios() {
     setLoading(false)
   }
 
+  function setF(key, value) {
+    setForm(p => {
+      const next = { ...p, [key]: value }
+      if (key === 'nombre' && !slugManual) next.slug = slugify(value)
+      return next
+    })
+  }
+  function setLink(key, value) {
+    setForm(p => ({ ...p, links: { ...(p.links || {}), [key]: value } }))
+  }
+
   function abrirNuevo() {
-    setNuevo({ ...NUEVO_NEGOCIO })
+    setForm({ ...NEGOCIO_VACIO })
     setSlugManual(false)
     setError('')
     setModal({ tipo: 'nuevo' })
   }
 
-  function campoNuevo(key, value) {
-    setNuevo(p => {
-      const next = { ...p, [key]: value }
-      // auto-slug desde nombre si el usuario no lo ha tocado manualmente
-      if (key === 'nombre' && !slugManual) {
-        next.slug = slugify(value)
-      }
-      return next
+  function abrirEditar(n) {
+    setForm({
+      id:             n.id,
+      nombre:         n.nombre || '',
+      slug:           n.slug || '',
+      vertical:       n.vertical || 'psicologo',
+      email:          n.email || '',
+      whatsapp:       n.whatsapp || '',
+      telefono:       n.telefono || '',
+      ciudad:         n.ciudad || '',
+      direccion:      n.direccion || '',
+      descripcion:    n.descripcion || '',
+      color_primario: n.color_primario || '#3b82f6',
+      notas_admin:    n.notas_admin || '',
+      links:          n.links || { instagram: '', web: '', google_calendar: '', otro: '' },
     })
+    setError('')
+    setModal({ tipo: 'editar', ...n })
   }
 
+  function abrirPlan(n) {
+    setModal({ tipo: 'plan', ...n })
+  }
+
+  // ── Crear negocio ──────────────────────────────────────────────────────────
   async function crearNegocio() {
-    if (!nuevo.nombre.trim() || !nuevo.slug.trim()) return
-    setSaving(true)
-    setError('')
+    if (!form.nombre.trim() || !form.slug.trim()) return
+    setSaving(true); setError('')
 
-    const { data: tenant, error: errTenant } = await supabase
-      .from('tenants')
-      .insert({
-        nombre:          nuevo.nombre.trim(),
-        slug:            nuevo.slug.trim(),
-        vertical:        nuevo.vertical,
-        email:           nuevo.email || null,
-        whatsapp:        nuevo.whatsapp || null,
-        telefono:        nuevo.telefono || null,
-        ciudad:          nuevo.ciudad || 'Cali',
-        direccion:       nuevo.direccion || null,
-        descripcion:     nuevo.descripcion || null,
-        color_primario:  nuevo.color_primario,
-        activo:          true,
-        verificado:      false,
-      })
-      .select('id')
-      .single()
+    const { data: tenant, error: err } = await supabase.from('tenants').insert({
+      nombre: form.nombre.trim(), slug: form.slug.trim(),
+      vertical: form.vertical, email: form.email || null,
+      whatsapp: form.whatsapp || null, telefono: form.telefono || null,
+      ciudad: form.ciudad || 'Cali', direccion: form.direccion || null,
+      descripcion: form.descripcion || null, color_primario: form.color_primario,
+      notas_admin: form.notas_admin || null, links: form.links || {},
+      activo: true, verificado: false,
+    }).select('id').single()
 
-    if (errTenant) {
+    if (err) {
       setSaving(false)
-      setError(errTenant.message.includes('slug') ? 'Ese slug ya está en uso, elige otro.' : errTenant.message)
+      setError(err.message.includes('slug') ? 'Ese slug ya está en uso.' : err.message)
       return
     }
 
-    // Suscripción trial gratuita por defecto
-    const { data: planFree } = await supabase
-      .from('planes')
-      .select('id')
-      .eq('tipo', 'free')
-      .single()
-
+    const { data: planFree } = await supabase.from('planes').select('id').eq('tipo', 'free').single()
     if (planFree) {
       await supabase.from('suscripciones').insert({
-        tenant_id:         tenant.id,
-        plan_id:           planFree.id,
-        estado:            'trial',
+        tenant_id: tenant.id, plan_id: planFree.id, estado: 'trial',
         fecha_inicio:      new Date().toISOString().split('T')[0],
-        fecha_vencimiento: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        fecha_vencimiento: new Date(Date.now() + 14*86400000).toISOString().split('T')[0],
       })
     }
-
-    setSaving(false)
-    setModal(null)
-    cargar()
+    setSaving(false); setModal(null); cargar()
   }
 
+  // ── Guardar edición ────────────────────────────────────────────────────────
+  async function guardarEdicion() {
+    setSaving(true); setError('')
+    const { error: err } = await supabase.from('tenants').update({
+      nombre:         form.nombre.trim(),
+      slug:           form.slug.trim(),
+      vertical:       form.vertical,
+      email:          form.email || null,
+      whatsapp:       form.whatsapp || null,
+      telefono:       form.telefono || null,
+      ciudad:         form.ciudad || null,
+      direccion:      form.direccion || null,
+      descripcion:    form.descripcion || null,
+      color_primario: form.color_primario,
+      notas_admin:    form.notas_admin || null,
+      links:          form.links || {},
+    }).eq('id', form.id)
+
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setModal(null); cargar()
+  }
+
+  // ── Toggle activo / verificado ─────────────────────────────────────────────
   async function toggleActivo(id, activo) {
     await supabase.from('tenants').update({ activo: !activo }).eq('id', id)
     cargar()
   }
-
   async function toggleVerificado(id, verificado) {
     await supabase.from('tenants').update({ verificado: !verificado }).eq('id', id)
     cargar()
   }
 
-  async function guardarPlan(tenantId, planTipo) {
+  // ── Gestión plan + fechas ──────────────────────────────────────────────────
+  async function guardarPlan(tenantId, planTipo, fechaInicio, fechaVenc) {
     setSaving(true)
     const { data: plan } = await supabase.from('planes').select('id').eq('tipo', planTipo).single()
     if (!plan) { setSaving(false); return }
 
-    const { data: suscExistente } = await supabase
-      .from('suscripciones').select('id')
+    const { data: suscEx } = await supabase.from('suscripciones').select('id')
       .eq('tenant_id', tenantId).in('estado', ['activa', 'trial']).maybeSingle()
 
     const payload = {
       tenant_id: tenantId, plan_id: plan.id, estado: 'activa',
-      fecha_inicio:      new Date().toISOString().split('T')[0],
-      fecha_vencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      fecha_inicio:      fechaInicio || new Date().toISOString().split('T')[0],
+      fecha_vencimiento: fechaVenc   || new Date(Date.now() + 30*86400000).toISOString().split('T')[0],
     }
 
-    if (suscExistente) {
-      await supabase.from('suscripciones').update(payload).eq('id', suscExistente.id)
-    } else {
-      await supabase.from('suscripciones').insert(payload)
-    }
-    setSaving(false)
-    setModal(null)
-    cargar()
+    if (suscEx) await supabase.from('suscripciones').update(payload).eq('id', suscEx.id)
+    else        await supabase.from('suscripciones').insert(payload)
+
+    setSaving(false); setModal(null); cargar()
+  }
+
+  function handleCopiar(texto, key) {
+    copiar(texto)
+    setCopiado(key)
+    setTimeout(() => setCopiado(null), 2000)
   }
 
   const filtrados = negocios.filter(n =>
-    n.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    n.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
     n.slug?.toLowerCase().includes(busqueda.toLowerCase())
   )
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Negocios</h1>
         <div className="flex gap-3">
-          <input
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            placeholder="Buscar..."
-            className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                       rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                       placeholder-gray-400 dark:placeholder-slate-500
-                       focus:outline-none focus:border-blue-500 w-48"
-          />
-          <button
-            onClick={abrirNuevo}
-            className="text-xs px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors whitespace-nowrap"
-          >
+          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar..."
+            className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700
+                       rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white w-48
+                       focus:outline-none focus:border-blue-500"/>
+          <button onClick={abrirNuevo}
+            className="text-xs px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors whitespace-nowrap">
             + Nuevo negocio
           </button>
         </div>
@@ -171,257 +212,319 @@ export default function Negocios() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
         </div>
       ) : (
         <div className="space-y-3">
-          {filtrados.map(n => (
-            <div key={n.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{n.nombre}</h3>
-                    <span className="text-xs text-gray-400 dark:text-slate-500">/{n.slug}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      n.verificado
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'
-                    }`}>
-                      {n.verificado ? 'Verificado' : 'Sin verificar'}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      n.activo
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
-                        : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
-                    }`}>
-                      {n.activo ? 'Activo' : 'Suspendido'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-slate-400 flex-wrap">
-                    <span>{VERTICAL_LABEL[n.vertical]}</span>
-                    <span>Plan: <b className="text-gray-800 dark:text-white capitalize">{n.plan || 'Sin plan'}</b></span>
-                    <span>Suscripción: <b className={`capitalize ${
-                      n.suscripcion_estado === 'activa' ? 'text-emerald-600 dark:text-emerald-400' :
-                      n.suscripcion_estado === 'trial'  ? 'text-blue-600 dark:text-blue-400' : 'text-red-500 dark:text-red-400'
-                    }`}>{n.suscripcion_estado || '—'}</b></span>
-                    <span>Citas 30d: <b className="text-gray-800 dark:text-white">{n.citas_30d || 0}</b></span>
-                    {n.whatsapp && <span>{n.whatsapp}</span>}
-                  </div>
-                </div>
+          {filtrados.map(n => {
+            const portalUrl = `${BASE_URL}/agenda/${n.slug}`
+            return (
+              <div key={n.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
 
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => toggleVerificado(n.id, n.verificado)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700
-                               text-gray-600 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600
-                               dark:hover:text-emerald-400 transition-colors"
-                  >
-                    {n.verificado ? 'Desverificar' : 'Verificar'}
-                  </button>
-                  <button
-                    onClick={() => toggleActivo(n.id, n.activo)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700
-                               text-gray-600 dark:text-slate-300 hover:border-red-500 hover:text-red-500
-                               dark:hover:text-red-400 transition-colors"
-                  >
-                    {n.activo ? 'Suspender' : 'Activar'}
-                  </button>
-                  <button
-                    onClick={() => setModal({ tipo: 'plan', ...n })}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-                  >
-                    Gestionar plan
-                  </button>
+                  {/* Info principal */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: n.color_primario || '#3b82f6' }}/>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{n.nombre}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        n.verificado ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                                     : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'}`}>
+                        {n.verificado ? 'Verificado' : 'Sin verificar'}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        n.activo ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                                 : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'}`}>
+                        {n.activo ? 'Activo' : 'Suspendido'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-slate-400 mb-2">
+                      <span>{VERTICAL_LABEL[n.vertical] || n.vertical}</span>
+                      <span>Plan: <b className="text-gray-800 dark:text-white capitalize">{n.plan || '—'}</b></span>
+                      <span className={`font-medium capitalize ${
+                        n.suscripcion_estado === 'activa' ? 'text-emerald-600 dark:text-emerald-400' :
+                        n.suscripcion_estado === 'trial'  ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'
+                      }`}>{n.suscripcion_estado || 'sin suscripción'}</span>
+                      {n.susc_vencimiento && (
+                        <span>Vence: <b className="text-gray-700 dark:text-slate-300">{new Date(n.susc_vencimiento).toLocaleDateString('es-CO')}</b></span>
+                      )}
+                      <span>Citas 30d: <b className="text-gray-800 dark:text-white">{n.citas_30d || 0}</b></span>
+                      {n.ciudad && <span>{n.ciudad}</span>}
+                      {n.whatsapp && <span>{n.whatsapp}</span>}
+                    </div>
+
+                    {/* Link del portal */}
+                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 rounded-xl px-3 py-2 max-w-sm">
+                      <span className="text-xs text-gray-400 dark:text-slate-500 truncate flex-1 font-mono">{portalUrl}</span>
+                      <button onClick={() => handleCopiar(portalUrl, n.id)}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-500 flex-shrink-0 font-medium">
+                        {copiado === n.id ? '✓ Copiado' : 'Copiar'}
+                      </button>
+                      <a href={portalUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 flex-shrink-0">↗</a>
+                    </div>
+
+                    {/* Notas admin */}
+                    {n.notas_admin && (
+                      <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-3 py-1.5 rounded-lg">
+                        📌 {n.notas_admin}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Acciones */}
+                  <div className="flex flex-wrap gap-2 flex-shrink-0">
+                    <button onClick={() => abrirEditar(n)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700
+                                 text-gray-700 dark:text-slate-300 font-medium transition-colors">
+                      Editar
+                    </button>
+                    <button onClick={() => toggleVerificado(n.id, n.verificado)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700
+                                 text-gray-600 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-600 transition-colors">
+                      {n.verificado ? 'Desverificar' : 'Verificar'}
+                    </button>
+                    <button onClick={() => toggleActivo(n.id, n.activo)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700
+                                 text-gray-600 dark:text-slate-300 hover:border-red-500 hover:text-red-500 transition-colors">
+                      {n.activo ? 'Suspender' : 'Activar'}
+                    </button>
+                    <button onClick={() => abrirPlan(n)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">
+                      Plan / Fechas
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {filtrados.length === 0 && !loading && (
             <div className="text-center py-20">
               <p className="text-gray-400 dark:text-slate-500 text-sm">
-                {busqueda ? `Sin resultados para "${busqueda}"` : 'Aún no hay negocios — crea el primero'}
+                {busqueda ? `Sin resultados para "${busqueda}"` : 'Aún no hay negocios'}
               </p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Modal: Nuevo negocio ─────────────────────────────── */}
-      {modal?.tipo === 'nuevo' && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 w-full max-w-lg my-4">
-            <h3 className="font-bold text-gray-900 dark:text-white mb-1">Nuevo negocio</h3>
-            <p className="text-gray-500 dark:text-slate-400 text-xs mb-5">
-              Se crea con plan Gratuito en trial (14 días). Puedes cambiarlo después.
-            </p>
+      {/* ── Modal Nuevo / Editar ─────────────────────────────────────────────── */}
+      {(modal?.tipo === 'nuevo' || modal?.tipo === 'editar') && (
+        <div className="fixed inset-0 bg-black/60 flex items-start justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 w-full max-w-2xl my-6">
+            <h3 className="font-bold text-gray-900 dark:text-white mb-5 text-lg">
+              {modal.tipo === 'nuevo' ? 'Nuevo negocio' : `Editar — ${modal.nombre}`}
+            </h3>
 
-            <div className="space-y-3">
-              {/* Nombre */}
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Nombre del negocio *</label>
-                <input
-                  value={nuevo.nombre}
-                  onChange={e => campoNuevo('nombre', e.target.value)}
-                  placeholder="Consultorio Hugo Urquiña"
-                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                             rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                             focus:outline-none focus:border-blue-500"
-                />
-              </div>
+            <div className="space-y-4">
 
-              {/* Slug */}
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">
-                  Identificador único (URL pública del negocio)
-                </label>
-                <input
-                  value={nuevo.slug}
-                  onChange={e => { setSlugManual(true); campoNuevo('slug', slugify(e.target.value)) }}
-                  placeholder="consultorio-hugo"
-                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                             rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white font-mono
-                             focus:outline-none focus:border-blue-500"
-                />
-                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                  Se auto-genera del nombre. Es el "apellido" en la URL: <span className="font-mono">tuagenda.com/<b>{nuevo.slug || 'consultorio-hugo'}</b></span>
-                </p>
-              </div>
+              {/* Sección: Identidad */}
+              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Identidad</p>
 
-              {/* Vertical + Ciudad */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Vertical</label>
-                  <select
-                    value={nuevo.vertical}
-                    onChange={e => campoNuevo('vertical', e.target.value)}
-                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                               rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                               focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="psicologo">Psicólogo</option>
-                    <option value="peluqueria">Peluquería</option>
+                <Campo label="Nombre del negocio *">
+                  <input value={form.nombre} onChange={e => setF('nombre', e.target.value)}
+                    placeholder="Consultorio Neuropsicología" className={inp}/>
+                </Campo>
+                <Campo label={`Color (${form.color_primario})`}>
+                  <div className="flex gap-2">
+                    <input type="color" value={form.color_primario} onChange={e => setF('color_primario', e.target.value)}
+                      className="h-9 w-12 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer bg-transparent p-0.5"/>
+                    <input value={form.color_primario} onChange={e => setF('color_primario', e.target.value)}
+                      className={`${inp} font-mono`} placeholder="#3b82f6"/>
+                  </div>
+                </Campo>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Slug (URL del portal) *">
+                  <input value={form.slug}
+                    onChange={e => { setSlugManual(true); setF('slug', slugify(e.target.value)) }}
+                    placeholder="consultorio-neuropsicologia" className={`${inp} font-mono`}/>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">/agenda/<b>{form.slug || '...'}</b></p>
+                </Campo>
+                <Campo label="Vertical">
+                  <select value={form.vertical} onChange={e => setF('vertical', e.target.value)} className={inp}>
+                    <option value="psicologo">Psicólogo / Terapeuta</option>
+                    <option value="peluqueria">Peluquería / Estética</option>
                     <option value="sso">SSO</option>
                     <option value="otro">Otro</option>
                   </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Ciudad</label>
-                  <input
-                    value={nuevo.ciudad}
-                    onChange={e => campoNuevo('ciudad', e.target.value)}
-                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                               rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                               focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                </Campo>
               </div>
 
-              {/* Email + WhatsApp */}
+              <Campo label="Descripción">
+                <input value={form.descripcion} onChange={e => setF('descripcion', e.target.value)}
+                  placeholder="Visible en el portal público" className={inp}/>
+              </Campo>
+
+              {/* Sección: Contacto */}
+              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider pt-2">Contacto y ubicación</p>
+
+              <div className="grid grid-cols-3 gap-3">
+                <Campo label="Email">
+                  <input type="email" value={form.email} onChange={e => setF('email', e.target.value)}
+                    placeholder="correo@email.com" className={inp}/>
+                </Campo>
+                <Campo label="WhatsApp">
+                  <input value={form.whatsapp} onChange={e => setF('whatsapp', e.target.value)}
+                    placeholder="3001234567" className={inp}/>
+                </Campo>
+                <Campo label="Teléfono fijo">
+                  <input value={form.telefono} onChange={e => setF('telefono', e.target.value)}
+                    placeholder="6021234567" className={inp}/>
+                </Campo>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Email</label>
-                  <input
-                    type="email"
-                    value={nuevo.email}
-                    onChange={e => campoNuevo('email', e.target.value)}
-                    placeholder="cliente@email.com"
-                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                               rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                               focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">WhatsApp</label>
-                  <input
-                    value={nuevo.whatsapp}
-                    onChange={e => campoNuevo('whatsapp', e.target.value)}
-                    placeholder="3001234567"
-                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                               rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                               focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                <Campo label="Ciudad">
+                  <input value={form.ciudad} onChange={e => setF('ciudad', e.target.value)}
+                    placeholder="Cali" className={inp}/>
+                </Campo>
+                <Campo label="Dirección">
+                  <input value={form.direccion} onChange={e => setF('direccion', e.target.value)}
+                    placeholder="Cl 9 C #49-45" className={inp}/>
+                </Campo>
               </div>
 
-              {/* Descripción */}
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Descripción (opcional)</label>
-                <input
-                  value={nuevo.descripcion}
-                  onChange={e => campoNuevo('descripcion', e.target.value)}
-                  placeholder="Visible en el portal público del negocio"
-                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                             rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                             focus:outline-none focus:border-blue-500"
-                />
+              {/* Sección: Links */}
+              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider pt-2">Links y redes</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Instagram">
+                  <input value={form.links?.instagram || ''} onChange={e => setLink('instagram', e.target.value)}
+                    placeholder="https://instagram.com/..." className={inp}/>
+                </Campo>
+                <Campo label="Sitio web">
+                  <input value={form.links?.web || ''} onChange={e => setLink('web', e.target.value)}
+                    placeholder="https://..." className={inp}/>
+                </Campo>
+                <Campo label="Google Calendar ID">
+                  <input value={form.links?.google_calendar || ''} onChange={e => setLink('google_calendar', e.target.value)}
+                    placeholder="email@gmail.com" className={inp}/>
+                </Campo>
+                <Campo label="Otro enlace">
+                  <input value={form.links?.otro || ''} onChange={e => setLink('otro', e.target.value)}
+                    placeholder="https://..." className={inp}/>
+                </Campo>
               </div>
 
-              {error && (
-                <p className="text-xs text-red-500 bg-red-50 dark:bg-red-500/10 px-3 py-2 rounded-xl">{error}</p>
-              )}
+              {/* Sección: Notas */}
+              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider pt-2">Notas internas</p>
+
+              <Campo label="Anotaciones del superadmin (solo visible aquí)">
+                <textarea value={form.notas_admin} onChange={e => setF('notas_admin', e.target.value)}
+                  rows={3} placeholder="Observaciones, acuerdos, pendientes..."
+                  className={`${inp} resize-none`}/>
+              </Campo>
+
+              {error && <p className="text-xs text-red-500 bg-red-50 dark:bg-red-500/10 px-3 py-2 rounded-xl">{error}</p>}
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => { setModal(null); setError('') }}
+              <button onClick={() => { setModal(null); setError('') }}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700
-                           text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm"
-              >
+                           text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white text-sm transition-colors">
                 Cancelar
               </button>
               <button
-                onClick={crearNegocio}
-                disabled={saving || !nuevo.nombre.trim() || !nuevo.slug.trim()}
+                onClick={modal.tipo === 'nuevo' ? crearNegocio : guardarEdicion}
+                disabled={saving || !form.nombre.trim() || !form.slug.trim()}
                 className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500
-                           text-white font-medium transition-colors text-sm disabled:opacity-50"
-              >
-                {saving ? 'Creando...' : 'Crear negocio'}
+                           text-white font-medium text-sm disabled:opacity-50 transition-colors">
+                {saving ? 'Guardando...' : modal.tipo === 'nuevo' ? 'Crear negocio' : 'Guardar cambios'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Modal: Gestión de plan ───────────────────────────── */}
+      {/* ── Modal Plan + Fechas ──────────────────────────────────────────────── */}
       {modal?.tipo === 'plan' && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 w-full max-w-sm">
-            <h3 className="font-bold text-gray-900 dark:text-white mb-1">{modal.nombre}</h3>
-            <p className="text-gray-500 dark:text-slate-400 text-sm mb-5">Selecciona el plan a asignar</p>
+        <ModalPlan negocio={modal} saving={saving} onClose={() => setModal(null)} onGuardar={guardarPlan}/>
+      )}
+    </div>
+  )
+}
 
-            <div className="space-y-2">
-              {[
-                { tipo: 'free',       nombre: 'Gratuito',   precio: '$0/mes' },
-                { tipo: 'basico',     nombre: 'Básico',     precio: '$49.000/mes' },
-                { tipo: 'pro',        nombre: 'Pro',        precio: '$99.000/mes' },
-                { tipo: 'enterprise', nombre: 'Enterprise', precio: '$199.000/mes' },
-              ].map(p => (
-                <button
-                  key={p.tipo}
-                  onClick={() => guardarPlan(modal.id, p.tipo)}
-                  disabled={saving}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
-                    modal.plan === p.tipo
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
-                      : 'border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-blue-500 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <span className="font-medium text-sm">{p.nombre}</span>
-                  <span className="text-xs text-gray-400 dark:text-slate-400">{p.precio}</span>
-                </button>
-              ))}
-            </div>
+// ─── Modal Plan separado ───────────────────────────────────────────────────────
+function ModalPlan({ negocio, saving, onClose, onGuardar }) {
+  const [planSel, setPlanSel] = useState(negocio.plan || 'free')
+  const [fechaIni, setFechaIni] = useState(negocio.susc_inicio?.split('T')[0] || new Date().toISOString().split('T')[0])
+  const [fechaVenc, setFechaVenc] = useState(
+    negocio.susc_vencimiento?.split('T')[0] ||
+    new Date(Date.now() + 30*86400000).toISOString().split('T')[0]
+  )
 
-            <button
-              onClick={() => setModal(null)}
-              className="mt-4 w-full text-sm text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white transition-colors py-2"
-            >
-              Cancelar
+  const PLANES = [
+    { tipo: 'free',       nombre: 'Gratuito',   precio: '$0 / mes' },
+    { tipo: 'basico',     nombre: 'Básico',      precio: '$49.000 / mes' },
+    { tipo: 'pro',        nombre: 'Pro',         precio: '$99.000 / mes' },
+    { tipo: 'enterprise', nombre: 'Enterprise',  precio: '$199.000 / mes' },
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 w-full max-w-sm">
+        <h3 className="font-bold text-gray-900 dark:text-white mb-1">{negocio.nombre}</h3>
+        <p className="text-gray-500 dark:text-slate-400 text-xs mb-5">Plan y fechas de suscripción</p>
+
+        {/* Selección plan */}
+        <div className="space-y-2 mb-5">
+          {PLANES.map(p => (
+            <button key={p.tipo} onClick={() => setPlanSel(p.tipo)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                planSel === p.tipo
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                  : 'border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-blue-400'
+              }`}>
+              <span className="font-medium text-sm">{p.nombre}</span>
+              <span className="text-xs text-gray-400 dark:text-slate-500">{p.precio}</span>
             </button>
+          ))}
+        </div>
+
+        {/* Fechas */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Fecha inicio</label>
+            <input type="date" value={fechaIni} onChange={e => setFechaIni(e.target.value)}
+              className={inp}/>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Fecha vencimiento</label>
+            <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
+              className={inp}/>
           </div>
         </div>
-      )}
+
+        {/* Accesos rápidos de fechas */}
+        <div className="flex gap-2 flex-wrap mb-5">
+          {[
+            { label: '+30 días', dias: 30 },
+            { label: '+3 meses', dias: 90 },
+            { label: '+1 año',   dias: 365 },
+          ].map(({ label, dias }) => (
+            <button key={label}
+              onClick={() => setFechaVenc(new Date(Date.now() + dias*86400000).toISOString().split('T')[0])}
+              className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300
+                         hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 transition-colors">
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={() => onGuardar(negocio.id, planSel, fechaIni, fechaVenc)} disabled={saving}
+          className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm disabled:opacity-50 transition-colors mb-2">
+          {saving ? 'Guardando...' : 'Guardar plan y fechas'}
+        </button>
+        <button onClick={onClose}
+          className="w-full py-2 text-sm text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white transition-colors">
+          Cancelar
+        </button>
+      </div>
     </div>
   )
 }
