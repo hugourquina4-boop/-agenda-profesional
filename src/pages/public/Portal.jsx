@@ -126,10 +126,10 @@ export default function Portal() {
   const servSel  = servs.find(s => s.id === servId)
   const color    = tenant?.color_primario || '#3b82f6'
   const isPsico  = tenant?.vertical === 'psicologo'
+  const isPelu   = tenant?.vertical === 'peluqueria'
   const soloProf = profs.length === 1
 
-  // Color de acento: el teal del logo cuando el primario es muy oscuro
-  const accent   = isPsico ? '#0d9488' : color
+  const accent = isPsico ? '#0d9488' : isPelu ? '#db2777' : color
 
   const servsP = useMemo(() =>
     servs.filter(s => s.profesional_servicios?.some(x => x.profesional_id === profId)),
@@ -205,7 +205,7 @@ export default function Portal() {
   function reiniciar() {
     setStep(soloProf ? 2 : 1)
     setProfId(soloProf ? profs[0].id : null)
-    setServId(null); setModalidad(null); setFecha(null); setHora(null); setMOff(0)
+    setServId(null); setModalidad(isPelu ? 'Presencial' : null); setFecha(null); setHora(null); setMOff(0)
     setNombre(''); setEdad(''); setTel(''); setMail('')
     setMotivo(''); setAsiste('El mismo paciente'); setNotas('')
     setConfirmada(false); setErr('')
@@ -215,10 +215,13 @@ export default function Portal() {
     ? fecha.toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
     : ''
 
-  const LABELS = soloProf
-    ? ['Servicio','Modalidad','Horario','Datos','Confirmar']
-    : ['Profesional','Servicio','Modalidad','Horario','Datos','Confirmar']
-  const displayStep = soloProf ? step-1 : step
+  const LABELS_BASE = isPelu
+    ? ['Servicio','Horario','Datos','Confirmar']
+    : ['Servicio','Modalidad','Horario','Datos','Confirmar']
+  const LABELS = soloProf ? LABELS_BASE : ['Profesional', ...LABELS_BASE]
+  const displayStep = isPelu
+    ? (soloProf ? (step === 2 ? 1 : step - 2) : (step <= 2 ? step : step - 1))
+    : (soloProf ? step - 1 : step)
   const totalSteps  = LABELS.length
 
   // ── Estilos base input ──────────────────────────────────────────────────────
@@ -302,10 +305,10 @@ export default function Portal() {
                 { icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', label:'Servicio', value: servSel?.nombre },
                 { icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', label:'Fecha', value: fLbl },
                 { icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label:'Hora', value: hora },
-                { icon: modalidad==='Presencial'
+                ...(!isPelu ? [{ icon: modalidad==='Presencial'
                     ? 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z'
                     : 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
-                  label:'Modalidad', value: modalidad },
+                  label:'Modalidad', value: modalidad }] : []),
                 ...(servSel?.precio > 0 ? [{ icon:'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', label:'Valor', value:`$${Number(servSel.precio).toLocaleString('es-CO')}` }] : []),
               ].map(({ icon, label, value }) => (
                 <div key={label} className="flex items-center gap-3 py-2 border-b border-dashed border-slate-100 last:border-0">
@@ -510,7 +513,7 @@ export default function Portal() {
                   </div>
                 ) : servsP.map(s => (
                   <button key={s.id}
-                    onClick={() => { setServId(s.id); setFecha(null); setHora(null); setStep(3) }}
+                    onClick={() => { setServId(s.id); setFecha(null); setHora(null); if (isPelu) { setModalidad('Presencial'); setStep(4) } else setStep(3) }}
                     className="w-full flex items-start gap-3 p-4 rounded-2xl border-2 transition-all text-left hover:shadow-sm active:scale-[0.99]"
                     style={{
                       borderColor: servId === s.id ? accent : '#f1f5f9',
@@ -604,7 +607,7 @@ export default function Portal() {
               <StepHeader
                 icon="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                 title="Elige fecha y hora"
-                subtitle={`${servSel?.nombre} · ${servSel?.duracion_min} min · ${modalidad}`}
+                subtitle={`${servSel?.nombre} · ${servSel?.duracion_min} min${!isPelu && modalidad ? ` · ${modalidad}` : ''}`}
                 accent={accent}
               />
 
@@ -704,7 +707,7 @@ export default function Portal() {
               <ContinueBtn onClick={() => setStep(5)} disabled={!fecha || !hora} accent={accent}>
                 Continuar
               </ContinueBtn>
-              <BackBtn onClick={() => setStep(3)}>Cambiar modalidad</BackBtn>
+              <BackBtn onClick={() => setStep(isPelu ? 2 : 3)}>{isPelu ? 'Cambiar servicio' : 'Cambiar modalidad'}</BackBtn>
             </div>
           )}
 
@@ -726,23 +729,31 @@ export default function Portal() {
                     autoFocus maxLength={200} className={inputCls} />
                 </Field>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Rango de edad"
-                    icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857">
-                    <div className="relative">
-                      <select value={edad} onChange={e => setEdad(e.target.value)} className={selectCls}>
-                        <option value="">Selecciona...</option>
-                        {EDADES.map(e => <option key={e}>{e}</option>)}
-                      </select>
-                      <Icon d="M19 9l-7 7-7-7" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
-                  </Field>
+                {!isPelu ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Rango de edad"
+                      icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857">
+                      <div className="relative">
+                        <select value={edad} onChange={e => setEdad(e.target.value)} className={selectCls}>
+                          <option value="">Selecciona...</option>
+                          {EDADES.map(e => <option key={e}>{e}</option>)}
+                        </select>
+                        <Icon d="M19 9l-7 7-7-7" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </Field>
+                    <Field label="WhatsApp" required
+                      icon="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
+                      <input value={tel} onChange={e => setTel(e.target.value)}
+                        placeholder="3XX XXX XXXX" type="tel" maxLength={20} className={inputCls} />
+                    </Field>
+                  </div>
+                ) : (
                   <Field label="WhatsApp" required
                     icon="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
                     <input value={tel} onChange={e => setTel(e.target.value)}
                       placeholder="3XX XXX XXXX" type="tel" maxLength={20} className={inputCls} />
                   </Field>
-                </div>
+                )}
 
                 <Field label="Email"
                   icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
@@ -750,7 +761,7 @@ export default function Portal() {
                     placeholder="tu@email.com" type="email" maxLength={200} className={inputCls} />
                 </Field>
 
-                {isPsico ? (
+                {isPsico && (
                   <Field label="Motivo de consulta"
                     icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
                     <div className="relative">
@@ -760,12 +771,6 @@ export default function Portal() {
                       </select>
                       <Icon d="M19 9l-7 7-7-7" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
-                  </Field>
-                ) : (
-                  <Field label="Motivo de la visita"
-                    icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                    <input value={motivo} onChange={e => setMotivo(e.target.value)}
-                      placeholder="¿En qué te podemos ayudar?" className={inputCls} />
                   </Field>
                 )}
 
@@ -840,7 +845,7 @@ export default function Portal() {
                 <div className="divide-y divide-slate-50">
                   {[
                     { icon:'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label:'Fecha y hora', value:`${fechaLbl} · ${hora}` },
-                    { icon:'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', label:'Modalidad', value: modalidad },
+                    ...(!isPelu ? [{ icon:'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', label:'Modalidad', value: modalidad }] : []),
                     { icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', label:'Paciente', value: nombre },
                     { icon:'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z', label:'WhatsApp', value: tel },
                     ...(motivo ? [{ icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label:'Motivo', value: motivo }] : []),
@@ -891,7 +896,7 @@ export default function Portal() {
       </div>
 
       <div className="text-center pb-8 text-[11px] text-slate-300 tracking-wide">
-        Agendas Pro · Soluciones digitales para profesionales de la salud
+        Agendas Pro · Plataforma de agendamiento profesional
       </div>
     </div>
   )

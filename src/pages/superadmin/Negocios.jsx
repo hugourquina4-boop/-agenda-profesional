@@ -210,6 +210,23 @@ export default function Negocios() {
         </div>
       </div>
 
+      {/* Métricas resumen */}
+      {!loading && negocios.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: 'Total negocios',  value: negocios.length,                                              color: 'text-gray-900 dark:text-white' },
+            { label: 'Activos',         value: negocios.filter(n => n.activo).length,                        color: 'text-emerald-600 dark:text-emerald-400' },
+            { label: 'En trial',        value: negocios.filter(n => n.suscripcion_estado === 'trial').length, color: 'text-blue-600 dark:text-blue-400' },
+            { label: 'Vencidos',        value: negocios.filter(n => n.suscripcion_estado === 'vencida').length, color: 'text-red-500 dark:text-red-400' },
+          ].map(s => (
+            <div key={s.label} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 px-4 py-3">
+              <p className="text-xs text-gray-400 dark:text-slate-500">{s.label}</p>
+              <p className={`text-2xl font-black mt-0.5 ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>

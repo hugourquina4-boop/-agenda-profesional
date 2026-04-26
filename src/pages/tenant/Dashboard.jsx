@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
+const BASE_URL = window.location.origin
+
 const ESTADO_COLOR = {
   pendiente:  'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400',
   confirmada: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
@@ -42,8 +44,40 @@ export default function TenantDashboard() {
   const proximas = citas.filter(c => new Date(c.fecha_inicio) > ahora)
   const enCurso  = citas.filter(c => new Date(c.fecha_inicio) <= ahora && new Date(c.fecha_fin) >= ahora)
 
+  const portalUrl = tenant?.slug ? `${BASE_URL}/agenda/${tenant.slug}` : null
+  const [copiado, setCopiado] = useState(false)
+
+  function copiarLink() {
+    if (!portalUrl) return
+    navigator.clipboard.writeText(portalUrl).catch(() => {})
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
+
+      {/* Tarjeta link público */}
+      {portalUrl && (
+        <div className="mb-6 bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap shadow-lg shadow-blue-500/20">
+          <div>
+            <p className="text-xs font-bold text-blue-100 uppercase tracking-widest mb-1">Tu link de agenda</p>
+            <p className="text-white font-mono text-sm truncate max-w-xs">{portalUrl}</p>
+            <p className="text-blue-200 text-xs mt-1">Comparte este link con tus clientes para que agenden</p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button onClick={copiarLink}
+              className="px-4 py-2 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white text-sm font-semibold transition-colors">
+              {copiado ? '✓ Copiado' : 'Copiar link'}
+            </button>
+            <a href={portalUrl} target="_blank" rel="noopener noreferrer"
+              className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-semibold transition-colors">
+              Ver portal ↗
+            </a>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
