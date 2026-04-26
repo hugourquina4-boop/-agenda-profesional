@@ -4,7 +4,8 @@ ALTER TABLE tenants
   ADD COLUMN IF NOT EXISTS links       JSONB DEFAULT '{}';
 
 -- Actualizar la vista superadmin para incluir nuevos campos
-CREATE OR REPLACE VIEW v_superadmin_negocios AS
+DROP VIEW IF EXISTS v_superadmin_negocios;
+CREATE VIEW v_superadmin_negocios AS
 SELECT
   t.id, t.nombre, t.slug, t.vertical, t.activo, t.verificado,
   t.email, t.whatsapp, t.telefono, t.ciudad, t.direccion,

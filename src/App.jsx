@@ -14,6 +14,7 @@ import TenantDashboard from './pages/tenant/Dashboard'
 import Profesionales from './pages/tenant/Profesionales'
 import Servicios from './pages/tenant/Servicios'
 import Horarios from './pages/tenant/Horarios'
+import Agenda from './pages/tenant/Agenda'
 import Citas from './pages/tenant/Citas'
 import Clientes from './pages/tenant/Clientes'
 
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="profesionales" element={<Profesionales />} />
             <Route path="servicios" element={<Servicios />} />
             <Route path="horarios" element={<Horarios />} />
+            <Route path="agenda" element={<Agenda />} />
             <Route path="citas" element={<Citas />} />
             <Route path="clientes" element={<Clientes />} />
           </Route>
