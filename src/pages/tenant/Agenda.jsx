@@ -84,7 +84,7 @@ function CitaBloque({ cita, onClick, isSelected, dark }) {
         <div>
           <p className="font-semibold leading-tight truncate"
              style={{ color: dark ? meta.dk_text : meta.text, fontSize: compact ? 11 : 12 }}>
-            {cita.clientes_agenda?.nombre || 'Paciente'}
+            {cita.clientes_agenda?.nombre || lblCliente}
           </p>
           {!compact && (
             <p className="text-xs leading-tight truncate mt-0.5 opacity-75"
@@ -354,7 +354,7 @@ function DrawerDetalle({ cita, onClose, onEstado, updatingId }) {
 
           {/* Nombre */}
           <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-0.5">
-            {cita.clientes_agenda?.nombre || 'Paciente'}
+            {cita.clientes_agenda?.nombre || lblCliente}
           </h2>
           {cita.clientes_agenda?.telefono && (
             <a href={`tel:${cita.clientes_agenda.telefono}`}
@@ -371,8 +371,10 @@ function DrawerDetalle({ cita, onClose, onEstado, updatingId }) {
                       label="Hora" value={`${hhmm(cita.fecha_inicio)} – ${hhmm(cita.fecha_fin)}`} />
             <InfoCard icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                       label="Servicio" value={cita.servicios?.nombre || '—'} />
-            <InfoCard icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                      label="Modalidad" value={cita.modalidad || 'Presencial'} />
+            {!isPelu && (
+              <InfoCard icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                        label="Modalidad" value={cita.modalidad || 'Presencial'} />
+            )}
           </div>
 
           {/* Campos psicología */}
@@ -483,6 +485,8 @@ function Row({ icon, label, value }) {
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function Agenda() {
   const { tenant }    = useTenant()
+  const isPelu = tenant?.vertical === 'peluqueria'
+  const lblCliente = isPelu ? 'Cliente' : 'Paciente'
   const [profs, setProfs]         = useState([])
   const [profSel, setProfSel]     = useState(null)
   const [fechaSel, setFechaSel]   = useState(new Date())

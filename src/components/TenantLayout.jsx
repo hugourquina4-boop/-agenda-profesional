@@ -3,6 +3,13 @@ import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
 import { useTenant } from '../context/TenantContext'
 
+const VERTICAL_LABEL = {
+  psicologo:  'Psicología',
+  peluqueria: 'Peluquería',
+  sso:        'SSO',
+  otro:       'Negocio',
+}
+
 const NAV = [
   { to: '/panel',              label: 'Dashboard',     exact: true, icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   { to: '/panel/agenda',       label: 'Agenda',        icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
@@ -43,7 +50,7 @@ export default function TenantLayout() {
               <p className="text-sm font-bold text-gray-900 dark:text-white leading-none truncate">
                 {tenant?.nombre || 'Mi negocio'}
               </p>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 capitalize">{tenant?.vertical || ''}</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{VERTICAL_LABEL[tenant?.vertical] || tenant?.vertical || ''}</p>
             </div>
           </div>
         </div>

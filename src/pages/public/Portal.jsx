@@ -405,6 +405,45 @@ export default function Portal() {
             </div>
           </div>
         </div>
+      ) : isPelu ? (
+        <div>
+          {(tenant.direccion || tenant.whatsapp) && (
+            <div className="px-5 py-2.5 flex flex-wrap justify-center gap-x-6 gap-y-1.5"
+                 style={{ backgroundColor: `${accent}15` }}>
+              {tenant.direccion && (
+                <span className="flex items-center gap-1.5 text-[11px]" style={{ color: `${accent}cc` }}>
+                  <Icon d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" size={11} style={{ color: accent }} />
+                  {tenant.direccion}
+                </span>
+              )}
+              {tenant.whatsapp && (
+                <a href={`https://wa.me/57${tenant.whatsapp}`} target="_blank" rel="noopener noreferrer"
+                   className="flex items-center gap-1.5 text-[11px] transition-opacity hover:opacity-80"
+                   style={{ color: `${accent}cc` }}>
+                  <Icon d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" size={11} style={{ color: accent }} />
+                  {tenant.whatsapp}
+                </a>
+              )}
+            </div>
+          )}
+          <div className="px-5 pt-10 pb-14 text-center relative overflow-hidden"
+               style={{ background: `linear-gradient(160deg, #1a0a1e 0%, #2d0a2e 50%, #1a0a1e 100%)` }}>
+            <div className="absolute inset-0 opacity-10"
+                 style={{ backgroundImage: `radial-gradient(circle at 70% 50%, ${accent} 0%, transparent 60%)` }} />
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-5"
+                 style={{ borderColor: `${accent}40`, backgroundColor: `${accent}15` }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
+              <span className="text-xs tracking-widest uppercase font-medium" style={{ color: `${accent}99` }}>
+                Peluquería & Estética
+              </span>
+            </div>
+            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">{tenant.nombre}</h1>
+            {tenant.descripcion && (
+              <p className="text-white/55 text-sm max-w-sm mx-auto leading-relaxed">{tenant.descripcion}</p>
+            )}
+            {tenant.ciudad && <p className="text-white/30 text-xs mt-2">{tenant.ciudad}</p>}
+          </div>
+        </div>
       ) : (
         <div className="py-10 px-4 text-center relative overflow-hidden"
              style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)` }}>
