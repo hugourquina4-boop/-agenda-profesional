@@ -8,7 +8,8 @@ ALTER TABLE citas
   ADD COLUMN IF NOT EXISTS modalidad    TEXT DEFAULT 'Presencial',
   ADD COLUMN IF NOT EXISTS edad         TEXT,
   ADD COLUMN IF NOT EXISTS motivo       TEXT,
-  ADD COLUMN IF NOT EXISTS quien_asiste TEXT;
+  ADD COLUMN IF NOT EXISTS quien_asiste TEXT,
+  ADD COLUMN IF NOT EXISTS notas        TEXT;
 
 -- 2. Campo direccion en tenants (opcional pero útil para presencial)
 ALTER TABLE tenants
