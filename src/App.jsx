@@ -33,6 +33,14 @@ function RequireAuth({ children }) {
   return children
 }
 
+// Guard que verifica rol superadmin en la BD — no solo autenticación
+function RequireSuperadmin({ children }) {
+  const { user, isSuperadmin, loading } = useAuth()
+  if (loading) return <Spinner />
+  if (!user || !isSuperadmin) return <Navigate to="/login" replace />
+  return children
+}
+
 function RequireTenant({ children }) {
   const { tenant, loading } = useTenant()
   if (loading) return <Spinner />
@@ -59,7 +67,7 @@ export default function App() {
           {/* Panel superadmin */}
           <Route
             path="/superadmin"
-            element={<RequireAuth><SuperadminLayout /></RequireAuth>}
+            element={<RequireSuperadmin><SuperadminLayout /></RequireSuperadmin>}
           >
             <Route index element={<SuperDashboard />} />
             <Route path="negocios" element={<Negocios />} />

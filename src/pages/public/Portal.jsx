@@ -723,7 +723,7 @@ export default function Portal() {
                   icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
                   <input value={nombre} onChange={e => setNombre(e.target.value)}
                     placeholder="Nombres y apellidos completos"
-                    autoFocus className={inputCls} />
+                    autoFocus maxLength={200} className={inputCls} />
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -740,14 +740,14 @@ export default function Portal() {
                   <Field label="WhatsApp" required
                     icon="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
                     <input value={tel} onChange={e => setTel(e.target.value)}
-                      placeholder="3XX XXX XXXX" type="tel" className={inputCls} />
+                      placeholder="3XX XXX XXXX" type="tel" maxLength={20} className={inputCls} />
                   </Field>
                 </div>
 
                 <Field label="Email"
                   icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
                   <input value={mail} onChange={e => setMail(e.target.value)}
-                    placeholder="tu@email.com" type="email" className={inputCls} />
+                    placeholder="tu@email.com" type="email" maxLength={200} className={inputCls} />
                 </Field>
 
                 {isPsico ? (
@@ -792,7 +792,7 @@ export default function Portal() {
                   icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
                   <textarea value={notas} onChange={e => setNotas(e.target.value)}
                     placeholder="Ej: remitido por neurólogo, usa silla de ruedas, alguna alergia..."
-                    rows={3} className={`${inputCls} resize-none`} />
+                    rows={3} maxLength={2000} className={`${inputCls} resize-none`} />
                 </Field>
               </div>
 

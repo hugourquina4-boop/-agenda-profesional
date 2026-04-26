@@ -13,7 +13,7 @@ export default function SuperadminDashboard() {
 
   async function cargar() {
     setLoading(true)
-    const { data } = await supabase.from('v_superadmin_negocios').select('*')
+    const { data } = await supabase.rpc('get_superadmin_negocios')
     setNegocios(data || [])
     setLoading(false)
   }
