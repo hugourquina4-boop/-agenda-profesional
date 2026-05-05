@@ -117,6 +117,8 @@
     .action-btn-suspend:hover { opacity:.75; }
     .action-btn-activate { background:rgba(16,185,129,.1); color:var(--success); border-color:var(--success); }
     .action-btn-activate:hover { opacity:.75; }
+    .action-btn-delete { background:rgba(239,68,68,.08); color:#f87171; border-color:rgba(239,68,68,.4); }
+    .action-btn-delete:hover { background:rgba(239,68,68,.18); border-color:var(--danger); color:var(--danger); }
 
     .sa-empty { text-align:center; padding:48px 16px; color:var(--txt3); font-size:14px; }
 
@@ -375,6 +377,27 @@
   </div>
 </div>
 
+<!-- MODAL CONFIRMAR ELIMINACIÓN -->
+<div class="sa-modal-ov" id="modal-confirm-ov">
+  <div class="sa-modal" style="max-width:400px">
+    <div class="sa-modal-header">
+      <div class="sa-modal-title" style="color:var(--danger)">⚠️ Eliminar negocio</div>
+      <button class="sa-modal-close" onclick="document.getElementById('modal-confirm-ov').classList.remove('open')">×</button>
+    </div>
+    <div class="sa-modal-body">
+      <p style="font-size:14px;color:var(--txt2);line-height:1.6">
+        Vas a eliminar permanentemente <strong id="confirm-nombre" style="color:var(--txt1)"></strong> y
+        <strong style="color:var(--danger)">todos sus datos</strong>: citas, clientes, profesionales, servicios e historial.<br><br>
+        Esta acción <strong>no se puede deshacer.</strong>
+      </p>
+    </div>
+    <div class="sa-modal-footer">
+      <button class="btn-cancel" onclick="document.getElementById('modal-confirm-ov').classList.remove('open')">Cancelar</button>
+      <button id="confirm-ok" style="padding:10px 22px;background:var(--danger);border:none;border-radius:var(--radius-sm);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Sí, eliminar</button>
+    </div>
+  </div>
+</div>
+
 <div id="sa-toast"></div>
 
 <script>
@@ -535,6 +558,7 @@ function renderTabla() {
         <button class="action-btn action-btn-view" onclick="verAcceso('${t.slug}')">Ver</button>
         <button class="action-btn action-btn-edit" onclick="abrirModal('${t.id}')">Editar</button>
         ${toggleBtn}
+        <button class="action-btn action-btn-delete" onclick="eliminarNegocio('${t.id}','${esc(t.nombre)}')">Eliminar</button>
       </td>
     </tr>`
   }).join('')
@@ -736,6 +760,21 @@ function copiarAcceso() {
 }
 function abrirEnTab() {
   window.open(`${location.origin}/salon?tenant=${accesoSlug}`, '_blank')
+}
+
+// ── ELIMINAR ──────────────────────────────────────────────────────────
+function eliminarNegocio(id, nombre) {
+  const ov = document.getElementById('modal-confirm-ov')
+  document.getElementById('confirm-nombre').textContent = nombre
+  document.getElementById('confirm-ok').onclick = async () => {
+    ov.classList.remove('open')
+    const { error } = await db.from('tenants').delete().eq('id', id)
+    if (error) { toast('Error al eliminar: ' + error.message, 'error'); return }
+    toast('Negocio eliminado permanentemente', 'success')
+    await cargarNegocios()
+    cargarKpis()
+  }
+  ov.classList.add('open')
 }
 
 // ── TOGGLE ESTADO ─────────────────────────────────────────────────────
