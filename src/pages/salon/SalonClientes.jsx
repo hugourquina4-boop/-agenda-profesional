@@ -13,6 +13,42 @@ function Ico({ d, size = 18 }) {
 
 const COLORS = ['#f43f5e','#a855f7','#3b82f6','#22c55e','#f59e0b','#06b6d4','#ec4899']
 
+const SEGMENTO = {
+  vip:        { label:'VIP',        color:'#f59e0b', bg:'rgba(245,158,11,0.14)'  },
+  recurrente: { label:'Recurrente', color:'#22c55e', bg:'rgba(34,197,94,0.12)'   },
+  en_riesgo:  { label:'En riesgo',  color:'#f43f5e', bg:'rgba(244,63,94,0.12)'   },
+  inactivo:   { label:'Inactivo',   color:'#94a3b8', bg:'rgba(148,163,184,0.12)' },
+  nuevo:      { label:'Nuevo',      color:'#3b82f6', bg:'rgba(59,130,246,0.12)'  },
+}
+
+const TIER = {
+  oro:    { label:'Oro',    color:'#f59e0b', emoji:'🥇' },
+  plata:  { label:'Plata',  color:'#9ca3af', emoji:'🥈' },
+  bronce: { label:'Bronce', color:'#cd7f32', emoji:'🥉' },
+}
+
+const FILTROS = [
+  { key:'todos',      label:'Todos'      },
+  { key:'vip',        label:'VIP'        },
+  { key:'recurrente', label:'Recurrentes'},
+  { key:'en_riesgo',  label:'En riesgo'  },
+  { key:'inactivo',   label:'Inactivos'  },
+  { key:'nuevo',      label:'Nuevos'     },
+]
+
+function SegBadge({ segmento }) {
+  const cfg = SEGMENTO[segmento]
+  if (!cfg) return null
+  return (
+    <span style={{
+      padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:700,
+      background: cfg.bg, color: cfg.color, whiteSpace:'nowrap', flexShrink:0,
+    }}>
+      {cfg.label}
+    </span>
+  )
+}
+
 function cumpleProximo(fechaNac) {
   if (!fechaNac) return false
   const hoy = new Date()
@@ -22,42 +58,67 @@ function cumpleProximo(fechaNac) {
   return diff >= 0 && diff <= 7
 }
 
+function fmtCOP(n) {
+  if (!n || n <= 0) return '—'
+  return '$' + Number(n).toLocaleString('es-CO')
+}
+
 export default function SalonClientes() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [clientes, setClientes]   = useState([])
-  const [busq,     setBusq]       = useState('')
-  const [loading,  setLoading]    = useState(true)
-  const [sel,      setSel]        = useState(null)
-  const [historial,setHistorial]  = useState([])
-  const [loadHist, setLoadHist]   = useState(false)
+  const [clientes,   setClientes]  = useState([])
+  const [busq,       setBusq]      = useState('')
+  const [loading,    setLoading]   = useState(true)
+  const [filtroSeg,  setFiltroSeg] = useState('todos')
+  const [sel,        setSel]       = useState(null)
+  const [saldo,      setSaldo]     = useState(null)
+  const [historial,  setHistorial] = useState([])
+  const [loadHist,   setLoadHist]  = useState(false)
 
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
     const q = supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, email, notas, puntos_fidelizacion, fecha_nacimiento, created_at')
+      .select('id, nombre, telefono, email, notas, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento')
       .eq('tenant_id', tenant.id)
       .order('nombre')
     if (busq.trim()) q.ilike('nombre', `%${busq}%`)
-    const { data } = await q.limit(50)
+    const { data } = await q.limit(100)
     setClientes(data || [])
     setLoading(false)
   }, [tenant, busq])
 
   useEffect(() => { cargar() }, [cargar])
 
+  const clientesFiltrados = filtroSeg === 'todos'
+    ? clientes
+    : clientes.filter(c => c.segmento === filtroSeg)
+
+  // Conteo por segmento para los filtros
+  const conteos = clientes.reduce((acc, c) => {
+    acc[c.segmento || 'nuevo'] = (acc[c.segmento || 'nuevo'] || 0) + 1
+    return acc
+  }, {})
+
   async function abrirCliente(cli) {
     setSel(cli)
+    setSaldo(null)
     setLoadHist(true)
-    const { data } = await supabase
-      .from('citas')
-      .select('id, fecha_inicio, estado, servicios(nombre, precio), profesionales(nombre)')
-      .eq('cliente_id', cli.id)
-      .order('fecha_inicio', { ascending: false })
-      .limit(10)
-    setHistorial(data || [])
+    const [{ data: hist }, { data: sp }] = await Promise.all([
+      supabase.from('citas')
+        .select('id, fecha_inicio, estado, precio_cobrado, servicios(nombre, precio), profesionales(nombre)')
+        .eq('cliente_id', cli.id)
+        .order('fecha_inicio', { ascending: false })
+        .limit(10),
+      supabase.from('saldo_puntos')
+        .select('saldo, total_ganado, tier')
+        .eq('tenant_id', tenant.id)
+        .eq('cliente_id', cli.id)
+        .maybeSingle(),
+    ])
+    setHistorial(hist || [])
+    setSaldo(sp || null)
     setLoadHist(false)
   }
 
@@ -65,12 +126,21 @@ export default function SalonClientes() {
     return new Date(iso).toLocaleDateString('es-CO', { day:'numeric', month:'short', year:'numeric' })
   }
 
+  function fmtFechaCorta(iso) {
+    return new Date(iso).toLocaleDateString('es-CO', { day:'numeric', month:'short' })
+  }
+
+  const ESTADO_COLOR = {
+    completada:  '#22c55e', confirmada: '#3b82f6',
+    pendiente:   '#f59e0b', cancelada:  '#6b7280', no_asistio: '#f43f5e',
+  }
+
   return (
     <div style={{ padding:'0 0 16px' }}>
 
       {/* Search */}
-      <div style={{ padding:'0 16px 16px', position:'sticky', top:0, background:'var(--bg)', zIndex:10, paddingTop:4 }}>
-        <div style={{ position:'relative' }}>
+      <div style={{ padding:'0 16px 12px', position:'sticky', top:0, background:'var(--bg)', zIndex:10, paddingTop:4 }}>
+        <div style={{ position:'relative', marginBottom:10 }}>
           <div style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)' }}>
             <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={17} />
           </div>
@@ -79,23 +149,47 @@ export default function SalonClientes() {
             style={{ paddingLeft:42 }}
           />
         </div>
+
+        {/* Filtros por segmento */}
+        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:2 }}>
+          {FILTROS.map(f => {
+            const activo = filtroSeg === f.key
+            const cnt = f.key === 'todos' ? clientes.length : (conteos[f.key] || 0)
+            const cfg = SEGMENTO[f.key]
+            return (
+              <button key={f.key} onClick={() => setFiltroSeg(f.key)}
+                style={{
+                  flexShrink:0, padding:'5px 11px', borderRadius:8, fontSize:12,
+                  fontWeight:700, cursor:'pointer', border:'1px solid',
+                  whiteSpace:'nowrap',
+                  background: activo ? (cfg ? cfg.bg : `${col}18`) : 'transparent',
+                  borderColor: activo ? (cfg ? cfg.color : col) : 'var(--border)',
+                  color: activo ? (cfg ? cfg.color : col) : 'var(--text-3)',
+                }}>
+                {f.label} {cnt > 0 && <span style={{ opacity:0.7 }}>· {cnt}</span>}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {loading ? (
         <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10 }}>
           {[1,2,3,4,5].map(i => (
-            <div key={i} className="sp-skeleton" style={{ height:70, borderRadius:16 }} />
+            <div key={i} className="sp-skeleton" style={{ height:72, borderRadius:16 }} />
           ))}
         </div>
-      ) : clientes.length === 0 ? (
+      ) : clientesFiltrados.length === 0 ? (
         <div className="sp-empty">
           <span className="sp-empty-icon">👥</span>
           <p className="sp-empty-title">Sin clientes</p>
-          <p className="sp-empty-sub">{busq ? 'No se encontraron resultados' : 'Aún no hay clientes registrados'}</p>
+          <p className="sp-empty-sub">
+            {busq ? 'No se encontraron resultados' : filtroSeg !== 'todos' ? `Sin clientes ${SEGMENTO[filtroSeg]?.label?.toLowerCase()}s` : 'Aún no hay clientes registrados'}
+          </p>
         </div>
       ) : (
         <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:8 }}>
-          {clientes.map((c, i) => {
+          {clientesFiltrados.map((c, i) => {
             const color = COLORS[i % COLORS.length]
             const cumple = cumpleProximo(c.fecha_nacimiento)
             return (
@@ -114,22 +208,28 @@ export default function SalonClientes() {
                   {c.nombre[0]}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:2, display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:2, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                     {c.nombre}
                     {cumple && <span title="Cumpleaños próximo">🎂</span>}
                   </div>
-                  <div style={{ fontSize:12, color:'var(--text-3)' }}>
-                    {c.telefono || c.email || 'Sin contacto'}
+                  <div style={{ fontSize:12, color:'var(--text-3)', display:'flex', gap:8, alignItems:'center' }}>
+                    {c.num_visitas > 0
+                      ? <span>{c.num_visitas} visita{c.num_visitas !== 1 ? 's' : ''} · {fmtCOP(c.ticket_promedio)} ticket</span>
+                      : <span>{c.telefono || c.email || 'Sin contacto'}</span>
+                    }
                   </div>
                 </div>
-                {c.puntos_fidelizacion > 0 && (
-                  <div style={{
-                    padding:'4px 10px', borderRadius:8, background:`${col}20`,
-                    fontSize:12, fontWeight:700, color:col,
-                  }}>
-                    ⭐ {c.puntos_fidelizacion}
-                  </div>
-                )}
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
+                  <SegBadge segmento={c.segmento} />
+                  {c.puntos_fidelizacion > 0 && (
+                    <span style={{
+                      padding:'2px 7px', borderRadius:6, background:`${col}20`,
+                      fontSize:11, fontWeight:700, color:col,
+                    }}>
+                      ⭐ {c.puntos_fidelizacion}
+                    </span>
+                  )}
+                </div>
                 <Ico d="M9 5l7 7-7 7" size={16} />
               </button>
             )
@@ -140,12 +240,12 @@ export default function SalonClientes() {
       {/* Sheet detalle cliente */}
       {sel && (
         <>
-          <div className="sp-sheet-overlay" onClick={() => setSel(null)} />
+          <div className="sp-sheet-overlay" onClick={() => { setSel(null); setSaldo(null) }} />
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
 
-            {/* Avatar + nombre */}
-            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
+            {/* Avatar + nombre + segmento */}
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
               <div style={{
                 width:56, height:56, borderRadius:18, background:`${col}25`,
                 display:'flex', alignItems:'center', justifyContent:'center',
@@ -153,18 +253,40 @@ export default function SalonClientes() {
               }}>
                 {sel.nombre[0]}
               </div>
-              <div>
+              <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>{sel.nombre}</div>
-                <div style={{ fontSize:13, color:'var(--text-3)', marginTop:2 }}>
-                  Cliente desde {fmtFecha(sel.created_at)}
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                  <SegBadge segmento={sel.segmento} />
+                  <span style={{ fontSize:12, color:'var(--text-3)' }}>
+                    desde {fmtFecha(sel.created_at)}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Info */}
+            {/* Stats LTV */}
+            {sel.num_visitas >= 0 && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+                {[
+                  { label:'Visitas',   value: sel.num_visitas || 0             },
+                  { label:'Gastado',   value: fmtCOP(sel.total_gastado)        },
+                  { label:'Ticket',    value: fmtCOP(sel.ticket_promedio)      },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background:'var(--card)', border:'1px solid var(--border)',
+                    borderRadius:12, padding:'10px 12px', textAlign:'center',
+                  }}>
+                    <div style={{ fontSize:15, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>{s.value}</div>
+                    <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:600, letterSpacing:0.3, marginTop:2 }}>{s.label.toUpperCase()}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Info de contacto */}
             <div style={{
               background:'var(--card)', border:'1px solid var(--border)',
-              borderRadius:16, padding:'14px 16px', marginBottom:16,
+              borderRadius:16, padding:'14px 16px', marginBottom:14,
               display:'flex', flexDirection:'column', gap:10,
             }}>
               {sel.telefono && (
@@ -182,16 +304,29 @@ export default function SalonClientes() {
                   {sel.email}
                 </div>
               )}
-              {sel.puntos_fidelizacion > 0 && (
-                <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'#fbbf24' }}>
-                  <Ico d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" size={16} />
-                  {sel.puntos_fidelizacion} puntos de fidelización
+              {sel.ultima_visita && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'var(--text-2)' }}>
+                  <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={16} />
+                  Última visita: {fmtFecha(sel.ultima_visita)}
+                </div>
+              )}
+              {saldo && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:14 }}>
+                  <span style={{ fontSize:18 }}>{TIER[saldo.tier]?.emoji || '⭐'}</span>
+                  <div>
+                    <span style={{ fontWeight:700, color: TIER[saldo.tier]?.color || '#f59e0b' }}>
+                      {TIER[saldo.tier]?.label || 'Bronce'}
+                    </span>
+                    <span style={{ color:'var(--text-3)', marginLeft:6 }}>
+                      · {saldo.saldo} pts disponibles · {saldo.total_ganado} ganados
+                    </span>
+                  </div>
                 </div>
               )}
               {sel.fecha_nacimiento && (
                 <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'var(--text-2)' }}>
                   <span style={{ fontSize:16 }}>🎂</span>
-                  Cumpleaños: {new Date(sel.fecha_nacimiento + 'T12:00:00').toLocaleDateString('es-CO', { day:'numeric', month:'long' })}
+                  {new Date(sel.fecha_nacimiento + 'T12:00:00').toLocaleDateString('es-CO', { day:'numeric', month:'long' })}
                   {cumpleProximo(sel.fecha_nacimiento) && (
                     <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:6,
                       background:'rgba(251,191,36,0.15)', color:'#fbbf24' }}>Próximo</span>
@@ -204,7 +339,7 @@ export default function SalonClientes() {
             {sel.telefono && (
               <button onClick={() => window.open(`https://wa.me/${sel.telefono.replace(/\D/g,'')}`, '_blank')}
                 style={{
-                  width:'100%', padding:'14px', borderRadius:14, marginBottom:16,
+                  width:'100%', padding:'14px', borderRadius:14, marginBottom:14,
                   background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.25)',
                   color:'#4ade80', fontWeight:700, fontSize:14, cursor:'pointer',
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
@@ -236,13 +371,20 @@ export default function SalonClientes() {
                       <span style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>
                         {c.servicios?.nombre || '—'}
                       </span>
-                      <span style={{ fontSize:11, color:'var(--text-3)' }}>
-                        {new Date(c.fecha_inicio).toLocaleDateString('es-CO', { day:'numeric', month:'short' })}
-                      </span>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{
+                          width:7, height:7, borderRadius:'50%', flexShrink:0,
+                          background: ESTADO_COLOR[c.estado] || '#6b7280',
+                          display:'inline-block',
+                        }} />
+                        <span style={{ fontSize:11, color:'var(--text-3)' }}>
+                          {fmtFechaCorta(c.fecha_inicio)}
+                        </span>
+                      </div>
                     </div>
                     <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
                       {c.profesionales?.nombre?.split(' ')[0] || '—'}
-                      {c.servicios?.precio > 0 ? ` · $${Number(c.servicios.precio).toLocaleString('es-CO')}` : ''}
+                      {c.precio_cobrado > 0 ? ` · $${Number(c.precio_cobrado).toLocaleString('es-CO')}` : ''}
                     </div>
                   </div>
                 ))}

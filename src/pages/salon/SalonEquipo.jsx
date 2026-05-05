@@ -39,18 +39,19 @@ export default function SalonEquipo() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [profs,   setProfs]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [toast,   setToast]   = useState(null)
+  const [profs,       setProfs]       = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [toast,       setToast]       = useState(null)
 
   // Sheet editar profesional
-  const [sel,    setSel]    = useState(null)
-  const [form,   setForm]   = useState({})
-  const [saving, setSaving] = useState(false)
-  const [nuevo,  setNuevo]  = useState(false)
+  const [sel,         setSel]         = useState(null)
+  const [form,        setForm]        = useState({})
+  const [saving,      setSaving]      = useState(false)
+  const [nuevo,       setNuevo]       = useState(false)
+  const [elimConfirm, setElimConfirm] = useState(false)
 
   // Sheet horarios
-  const [profH,    setProfH]    = useState(null)   // profesional activo en horarios
+  const [profH,    setProfH]    = useState(null)
   const [horarios, setHorarios] = useState([])
   const [savingH,  setSavingH]  = useState(false)
 
@@ -69,6 +70,11 @@ export default function SalonEquipo() {
   }, [tenant])
 
   useEffect(() => { cargar() }, [cargar])
+
+  function cerrarSheet() {
+    setSel(null)
+    setElimConfirm(false)
+  }
 
   // ── Horarios ─────────────────────────────────────────────────
   async function abrirHorarios(prof) {
@@ -111,12 +117,22 @@ export default function SalonEquipo() {
     setSel(prof)
     setForm({ nombre: prof.nombre, especialidad: prof.especialidad || '', telefono: prof.telefono || '', foto_url: prof.foto_url || '', activo: prof.activo })
     setNuevo(false)
+    setElimConfirm(false)
   }
 
   function abrirNuevo() {
     setSel({ id: null })
     setForm({ nombre:'', especialidad:'', telefono:'', foto_url:'', activo:true })
     setNuevo(true)
+    setElimConfirm(false)
+  }
+
+  async function toggleActivo(prof) {
+    const { error } = await supabase.from('profesionales')
+      .update({ activo: !prof.activo }).eq('id', prof.id)
+    if (error) { showToast(error.message, false); return }
+    showToast(prof.activo ? 'Marcado inactivo' : 'Marcado activo')
+    cargar()
   }
 
   async function guardar() {
@@ -129,7 +145,21 @@ export default function SalonEquipo() {
     setSaving(false)
     if (error) { showToast(error.message, false); return }
     showToast(nuevo ? 'Profesional creado' : 'Cambios guardados')
-    setSel(null)
+    cerrarSheet()
+    cargar()
+  }
+
+  async function eliminar() {
+    setSaving(true)
+    const { error } = await supabase.from('profesionales').delete().eq('id', sel.id)
+    setSaving(false)
+    if (error) {
+      showToast('No se puede eliminar: tiene citas asociadas', false)
+      setElimConfirm(false)
+      return
+    }
+    showToast('Profesional eliminado')
+    cerrarSheet()
     cargar()
   }
 
@@ -195,14 +225,18 @@ export default function SalonEquipo() {
                   )}
                 </div>
 
-                {/* Badge activo */}
-                <div style={{
-                  padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700, flexShrink:0,
-                  background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
-                  color:       p.activo ? '#4ade80' : '#f87171',
-                }}>
+                {/* Badge activo — clic para toggle rápido */}
+                <button
+                  onClick={() => toggleActivo(p)}
+                  title={p.activo ? 'Clic para desactivar' : 'Clic para activar'}
+                  style={{
+                    padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700, flexShrink:0,
+                    background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
+                    color:       p.activo ? '#4ade80' : '#f87171',
+                    border:'none', cursor:'pointer',
+                  }}>
                   {p.activo ? 'Activo' : 'Inactivo'}
-                </div>
+                </button>
 
                 {/* Botón horarios */}
                 <button onClick={() => abrirHorarios(p)} title="Gestionar horarios" style={{
@@ -230,7 +264,7 @@ export default function SalonEquipo() {
       {/* ── Sheet editar profesional ── */}
       {sel && (
         <>
-          <div className="sp-sheet-overlay" onClick={() => setSel(null)} />
+          <div className="sp-sheet-overlay" onClick={cerrarSheet} />
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">{nuevo ? 'Nuevo profesional' : 'Editar profesional'}</p>
@@ -286,6 +320,43 @@ export default function SalonEquipo() {
             }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
+
+            {/* Eliminar (solo en edición) */}
+            {!nuevo && (
+              <div style={{ marginTop:14, borderTop:'1px solid var(--border)', paddingTop:14 }}>
+                {!elimConfirm ? (
+                  <button onClick={() => setElimConfirm(true)} style={{
+                    width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
+                    background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
+                    color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
+                  }}>
+                    Eliminar profesional
+                  </button>
+                ) : (
+                  <div>
+                    <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
+                      ¿Confirmar eliminación? Esta acción es irreversible.
+                    </p>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => setElimConfirm(false)} style={{
+                        flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                        background:'var(--surface)', border:'1px solid var(--border)',
+                        color:'var(--text-2)', fontWeight:600, fontSize:14,
+                      }}>
+                        Cancelar
+                      </button>
+                      <button onClick={eliminar} disabled={saving} style={{
+                        flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                        background:'#ef4444', border:'none', color:'#fff',
+                        fontWeight:700, fontSize:14, opacity: saving ? 0.7 : 1,
+                      }}>
+                        {saving ? 'Eliminando…' : 'Sí, eliminar'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

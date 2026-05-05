@@ -11,17 +11,35 @@ function Ico({ d, size = 18 }) {
   )
 }
 
+const CATEGORIAS = [
+  'Cortes',
+  'Color',
+  'Tratamientos',
+  'Manicura',
+  'Pedicura',
+  'Uñas Acrílicas / Gel',
+  'Maquillaje',
+  'Cejas y Pestañas',
+  'Masajes',
+  'Barba y Afeitado',
+  'Depilación',
+  'Spa',
+  'Extensiones',
+  'Alisado / Keratina',
+]
+
 export default function SalonServicios() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [servicios, setServicios] = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [sel,       setSel]       = useState(null)
-  const [form,      setForm]      = useState({})
-  const [saving,    setSaving]    = useState(false)
-  const [toast,     setToast]     = useState(null)
-  const [nuevo,     setNuevo]     = useState(false)
+  const [servicios,    setServicios]    = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [sel,          setSel]          = useState(null)
+  const [form,         setForm]         = useState({})
+  const [saving,       setSaving]       = useState(false)
+  const [toast,        setToast]        = useState(null)
+  const [nuevo,        setNuevo]        = useState(false)
+  const [elimConfirm,  setElimConfirm]  = useState(false)
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
@@ -47,6 +65,11 @@ export default function SalonServicios() {
     porCategoria[cat].push(s)
   })
 
+  function cerrarSheet() {
+    setSel(null)
+    setElimConfirm(false)
+  }
+
   function abrir(serv) {
     setSel(serv)
     setForm({
@@ -55,12 +78,14 @@ export default function SalonServicios() {
       descripcion: serv.descripcion || '', activo: serv.activo,
     })
     setNuevo(false)
+    setElimConfirm(false)
   }
 
   function abrirNuevo() {
     setSel({ id: null })
     setForm({ nombre:'', categoria:'', precio:'', duracion_min:30, descripcion:'', activo:true })
     setNuevo(true)
+    setElimConfirm(false)
   }
 
   async function guardar() {
@@ -85,7 +110,21 @@ export default function SalonServicios() {
     setSaving(false)
     if (err) { showToast(err.message, false); return }
     showToast(nuevo ? 'Servicio creado' : 'Guardado')
-    setSel(null)
+    cerrarSheet()
+    cargar()
+  }
+
+  async function eliminar() {
+    setSaving(true)
+    const { error } = await supabase.from('servicios').delete().eq('id', sel.id)
+    setSaving(false)
+    if (error) {
+      showToast('No se puede eliminar: tiene citas asociadas', false)
+      setElimConfirm(false)
+      return
+    }
+    showToast('Servicio eliminado')
+    cerrarSheet()
     cargar()
   }
 
@@ -165,24 +204,35 @@ export default function SalonServicios() {
       {/* Sheet edición */}
       {sel && (
         <>
-          <div className="sp-sheet-overlay" onClick={() => setSel(null)} />
+          <div className="sp-sheet-overlay" onClick={cerrarSheet} />
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">{nuevo ? 'Nuevo servicio' : 'Editar servicio'}</p>
 
             <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:20 }}>
-              {[
-                { key:'nombre',       label:'NOMBRE *',    placeholder:'Ej: Corte de cabello' },
-                { key:'categoria',    label:'CATEGORÍA',   placeholder:'Ej: Cortes, Color, Tratamientos' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
-                    {f.label}
-                  </label>
-                  <input className="sp-input" placeholder={f.placeholder}
-                    value={form[f.key] || ''} onChange={e => setForm(p => ({...p, [f.key]:e.target.value}))} />
-                </div>
-              ))}
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                  NOMBRE *
+                </label>
+                <input className="sp-input" placeholder="Ej: Corte de cabello"
+                  value={form.nombre || ''} onChange={e => setForm(p => ({...p, nombre:e.target.value}))} />
+              </div>
+
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                  CATEGORÍA
+                </label>
+                <input
+                  className="sp-input"
+                  list="cats-list"
+                  placeholder="Selecciona o escribe una categoría"
+                  value={form.categoria || ''}
+                  onChange={e => setForm(p => ({...p, categoria: e.target.value}))}
+                />
+                <datalist id="cats-list">
+                  {CATEGORIAS.map(c => <option key={c} value={c} />)}
+                </datalist>
+              </div>
 
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                 <div>
@@ -233,6 +283,43 @@ export default function SalonServicios() {
             }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
+
+            {/* Eliminar (solo en edición) */}
+            {!nuevo && (
+              <div style={{ marginTop:14, borderTop:'1px solid var(--border)', paddingTop:14 }}>
+                {!elimConfirm ? (
+                  <button onClick={() => setElimConfirm(true)} style={{
+                    width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
+                    background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
+                    color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
+                  }}>
+                    Eliminar servicio
+                  </button>
+                ) : (
+                  <div>
+                    <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
+                      ¿Confirmar eliminación? Esta acción es irreversible.
+                    </p>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => setElimConfirm(false)} style={{
+                        flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                        background:'var(--surface)', border:'1px solid var(--border)',
+                        color:'var(--text-2)', fontWeight:600, fontSize:14,
+                      }}>
+                        Cancelar
+                      </button>
+                      <button onClick={eliminar} disabled={saving} style={{
+                        flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                        background:'#ef4444', border:'none', color:'#fff',
+                        fontWeight:700, fontSize:14, opacity: saving ? 0.7 : 1,
+                      }}>
+                        {saving ? 'Eliminando…' : 'Sí, eliminar'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

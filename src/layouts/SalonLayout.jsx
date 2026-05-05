@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTenant } from '../context/TenantContext'
+import { supabase } from '../lib/supabase'
 import '../salon.css'
 
 function Ico({ d, size = 20 }) {
@@ -27,6 +28,7 @@ const IC = {
   menu:      'M4 6h16M4 12h16M4 18h7',
   sun:       'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
   moon:      'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z',
+  logout:    'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
 }
 
 const NAV_PRINCIPAL = [
@@ -67,6 +69,11 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
 
   useEffect(() => { localStorage.setItem('sp-theme', theme) }, [theme])
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+
+  async function logout() {
+    await supabase.auth.signOut()
+    window.location.href = '/salon'
+  }
 
   const col    = tenant?.color_primario || '#f43f5e'
   const logo   = tenant?.logo_url
@@ -170,7 +177,12 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
                 <div style={{ fontSize:10,color:'var(--text-3)',fontWeight:500 }}>Administrador</div>
               </div>
             </div>
-            {themeBtn}
+            <div style={{ display:'flex',gap:4 }}>
+              {themeBtn}
+              <button className="sp-theme-btn" onClick={logout} title="Cerrar sesión">
+                <Ico d={IC.logout} size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -240,6 +252,17 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
                 </button>
               ))}
             </div>
+
+            {/* Logout móvil */}
+            <button onClick={logout} style={{
+              width:'100%', display:'flex', alignItems:'center', gap:10,
+              padding:'13px 16px', borderRadius:14, cursor:'pointer',
+              background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.18)',
+              color:'#f87171', fontSize:14, fontWeight:600, fontFamily:'Plus Jakarta Sans,sans-serif',
+            }}>
+              <Ico d={IC.logout} size={17} />
+              Cerrar sesión
+            </button>
           </div>
         </>
       )}

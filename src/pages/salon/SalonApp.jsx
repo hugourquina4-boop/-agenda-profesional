@@ -14,6 +14,7 @@ const SalonNuevaCita  = lazy(() => import('./SalonNuevaCita'))
 const SalonConfig     = lazy(() => import('./SalonConfig'))
 const SalonComisiones = lazy(() => import('./SalonComisiones'))
 const SalonAnalytics  = lazy(() => import('./SalonAnalytics'))
+const SalonAccesos    = lazy(() => import('./SalonAccesos'))
 
 // Lazy stubs for sections not yet built
 function Placeholder({ titulo }) {
@@ -59,7 +60,7 @@ export default function SalonApp() {
       case 'caja':       return <SalonCaja />
       case 'comisiones': return <SalonComisiones />
       case 'analytics':  return <SalonAnalytics />
-      case 'accesos':    return <Placeholder titulo="Accesos" />
+      case 'accesos':    return <SalonAccesos />
       case 'config':     return <SalonConfig />
       default:           return <SalonDashboard key={refreshKey} />
     }

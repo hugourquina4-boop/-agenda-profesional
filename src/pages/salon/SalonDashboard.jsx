@@ -141,6 +141,17 @@ export default function SalonDashboard() {
       .map(c=>c.profesionales?.id).filter(Boolean)
   )
 
+  // Minutos agendados por profesional hoy (para barra de ocupación)
+  const profMinutos = {}
+  citas.filter(c=>!['cancelada','no_asistio'].includes(c.estado)).forEach(c => {
+    const id = c.profesionales?.id
+    if (id) profMinutos[id] = (profMinutos[id] || 0) + (c.servicios?.duracion_min || 0)
+  })
+  // Ocupación global: total minutos agendados / (profs × 8h)
+  const totalMin  = Object.values(profMinutos).reduce((s,m)=>s+m, 0)
+  const capMin    = equipo.length * 480  // 8h por profesional
+  const ocupPct   = capMin > 0 ? Math.min(100, Math.round(totalMin / capMin * 100)) : 0
+
   if (loading) return (
     <div className="sp-loader">
       <div className="sp-spinner" style={{ borderTopColor:col }} />
@@ -234,10 +245,13 @@ export default function SalonDashboard() {
 
         <div className="sp-bento-card c-blue">
           <div className="sp-bento-icon" style={{ background:'rgba(59,130,246,0.18)' }}>
-            <Ico d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" size={18} />
+            <Ico d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" size={18} />
           </div>
-          <div className="sp-bento-val" style={{ color:'#60a5fa' }}>{equipo.length}</div>
-          <div className="sp-bento-lbl">Profesionales</div>
+          <div className="sp-bento-val" style={{ color:'#60a5fa' }}>{ocupPct}%</div>
+          <div className="sp-bento-lbl">Ocupación hoy</div>
+          <div style={{ marginTop:8, height:4, borderRadius:2, background:'rgba(96,165,250,0.15)', overflow:'hidden' }}>
+            <div style={{ height:'100%', width:`${ocupPct}%`, background:'#60a5fa', borderRadius:2, transition:'width 0.5s' }} />
+          </div>
         </div>
 
       </div>
@@ -297,6 +311,15 @@ export default function SalonDashboard() {
                   </div>
                   <span className="sp-team-name">{prof.nombre.split(' ')[0]}</span>
                   <span className="sp-team-specialty">{citasN} cita{citasN!==1?'s':''}</span>
+                  {profMinutos[prof.id] > 0 && (
+                    <div style={{ width:'100%', height:3, borderRadius:2, background:'rgba(128,128,128,0.15)', marginTop:4, overflow:'hidden' }}>
+                      <div style={{
+                        height:'100%',
+                        width:`${Math.min(100, Math.round((profMinutos[prof.id]||0)/480*100))}%`,
+                        background: color, borderRadius:2,
+                      }} />
+                    </div>
+                  )}
                 </div>
               )
             })}

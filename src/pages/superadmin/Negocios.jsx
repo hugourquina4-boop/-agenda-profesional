@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 
 const VERTICAL_LABEL = { psicologo:'Psicólogo', peluqueria:'Peluquería', sso:'SSO', otro:'Otro' }
@@ -35,14 +34,6 @@ const inp = `w-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:bo
              rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white
              focus:outline-none focus:border-blue-500 transition-colors`
 
-// Cliente Supabase auxiliar para crear usuarios sin pisar la sesión del superadmin
-function crearClienteTemp() {
-  return createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY,
-    { auth: { storageKey: 'sp_tmp_create', persistSession: false } }
-  )
-}
 
 export default function Negocios() {
   const [negocios,    setNegocios]    = useState([])
@@ -165,26 +156,24 @@ export default function Negocios() {
     setModal(null); cargar()
   }
 
-  // ── Crear acceso (usuario Supabase Auth + link a tenant) ─────────────────────
+  // ── Crear acceso (Edge Function con service_role — email pre-confirmado) ──────
   async function crearAcceso() {
     if (!accesoEmail.trim() || !accesoPass.trim()) { setAccesoError('Email y contraseña requeridos'); return }
     setSaving(true); setAccesoError('')
-    const tmp = crearClienteTemp()
-    const { data: authData, error: authErr } = await tmp.auth.signUp({
-      email:    accesoEmail.trim(),
-      password: accesoPass.trim(),
-    })
-    if (authErr) { setSaving(false); setAccesoError(authErr.message); return }
-    const userId = authData.user?.id
-    if (!userId) { setSaving(false); setAccesoError('No se recibió ID de usuario'); return }
-    const { error: utErr } = await supabase.from('usuarios_tenant').insert({
-      tenant_id: modal.id,
-      user_id:   userId,
-      rol:       'admin',
-      activo:    true,
+    const { data, error: fnErr } = await supabase.functions.invoke('admin-crear-usuario', {
+      body: {
+        email:     accesoEmail.trim(),
+        password:  accesoPass.trim(),
+        tenant_id: modal.id,
+        rol:       'admin',
+      },
     })
     setSaving(false)
-    if (utErr) { setAccesoError(utErr.message.includes('duplicate') ? 'Este email ya tiene acceso' : utErr.message); return }
+    if (fnErr || data?.error) {
+      const msg = data?.error || fnErr?.message || 'Error al crear el acceso'
+      setAccesoError(msg.includes('already') || msg.includes('duplicate') ? 'Este email ya tiene acceso' : msg)
+      return
+    }
     setAccesoCreado(true)
     cargar()
   }
