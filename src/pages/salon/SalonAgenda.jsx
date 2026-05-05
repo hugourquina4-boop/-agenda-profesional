@@ -1,0 +1,512 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../../lib/supabase'
+import { useTenant } from '../../context/TenantContext'
+
+function Ico({ d, size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  )
+}
+
+const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio',
+               'Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+const ESTADO_COLOR = {
+  pendiente:  '#f59e0b',
+  confirmada: '#3b82f6',
+  completada: '#22c55e',
+  cancelada:  '#ef4444',
+  no_asistio: '#71717a',
+}
+const ESTADO_LABEL = {
+  pendiente: 'Pendiente', confirmada: 'Confirmada', completada: 'Completada',
+  cancelada: 'Cancelada', no_asistio: 'No asistió',
+}
+
+const ACCIONES = {
+  pendiente:  [
+    { estado:'confirmada', label:'Confirmar',  color:'#3b82f6' },
+    { estado:'completada', label:'Completar',  color:'#22c55e' },
+    { estado:'cancelada',  label:'Cancelar',   color:'#ef4444' },
+    { estado:'no_asistio', label:'No asistió', color:'#71717a' },
+  ],
+  confirmada: [
+    { estado:'completada', label:'Completar',  color:'#22c55e' },
+    { estado:'cancelada',  label:'Cancelar',   color:'#ef4444' },
+    { estado:'no_asistio', label:'No asistió', color:'#71717a' },
+  ],
+  completada: [],
+  cancelada:  [],
+  no_asistio: [],
+}
+
+function fmtHora(iso) {
+  if (!iso) return ''
+  const [h, m] = iso.substring(11, 16).split(':')
+  const hh = parseInt(h)
+  return `${hh > 12 ? hh - 12 : hh || 12}:${m}${hh < 12 ? 'am' : 'pm'}`
+}
+
+export default function SalonAgenda() {
+  const { tenant } = useTenant()
+  const col = tenant?.color_primario || '#f43f5e'
+
+  const today = new Date()
+  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selDay,   setSelDay]   = useState(today.toISOString().slice(0, 10))
+  const [citas,    setCitas]    = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [selCita,  setSelCita]  = useState(null)
+  const [actualizando, setActualizando] = useState(false)
+  const [esperaDia, setEsperaDia] = useState(0)
+
+  // Pagos
+  const [pago,         setPago]         = useState(null)
+  const [loadPago,     setLoadPago]     = useState(false)
+  const [pagoForm,     setPagoForm]     = useState(false)
+  const [pagoMonto,    setPagoMonto]    = useState('')
+  const [pagoMetodo,   setPagoMetodo]   = useState('efectivo')
+  const [pagoRef,      setPagoRef]      = useState('')
+  const [guardandoPago,setGuardandoPago]= useState(false)
+
+  const cargarMes = useCallback(async () => {
+    if (!tenant) { setLoading(false); return }
+    setLoading(true)
+    const y = viewDate.getFullYear()
+    const m = String(viewDate.getMonth() + 1).padStart(2, '0')
+    try {
+      const { data } = await supabase
+        .from('citas')
+        .select('id, fecha_inicio, fecha_fin, estado, clientes_agenda(nombre,telefono), servicios(nombre,precio,duracion_min), profesionales(nombre)')
+        .eq('tenant_id', tenant.id)
+        .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
+        .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
+        .order('fecha_inicio')
+      setCitas(data || [])
+    } catch (e) {
+      console.error('[SalonAgenda]', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [tenant, viewDate])
+
+  useEffect(() => { cargarMes() }, [cargarMes])
+
+  useEffect(() => {
+    if (!selCita) { setPago(null); setPagoForm(false); return }
+    setLoadPago(true)
+    supabase.from('pagos').select('*').eq('cita_id', selCita.id).maybeSingle()
+      .then(({ data }) => { setPago(data || null); setLoadPago(false) })
+    setPagoMonto(selCita.servicios?.precio ? String(Math.round(selCita.servicios.precio)) : '')
+    setPagoMetodo('efectivo')
+    setPagoRef('')
+    setPagoForm(false)
+  }, [selCita])
+
+  useEffect(() => {
+    if (!tenant || !selDay) return
+    supabase.from('lista_espera')
+      .select('id', { count:'exact', head:true })
+      .eq('tenant_id', tenant.id)
+      .eq('activo', true)
+      .eq('notificado', false)
+      .eq('fecha_preferida', selDay)
+      .then(({ count }) => setEsperaDia(count || 0))
+  }, [tenant, selDay])
+
+  async function cambiarEstado(nuevoEstado) {
+    if (!selCita) return
+    setActualizando(true)
+    await supabase.from('citas').update({ estado: nuevoEstado }).eq('id', selCita.id)
+    setActualizando(false)
+    setSelCita(null)
+    cargarMes()
+  }
+
+  async function registrarPago() {
+    if (!pagoMonto || isNaN(parseFloat(pagoMonto))) return
+    setGuardandoPago(true)
+    const { data, error } = await supabase.from('pagos').insert({
+      tenant_id:  tenant.id,
+      cita_id:    selCita.id,
+      monto:      parseFloat(pagoMonto),
+      metodo:     pagoMetodo,
+      estado:     'pagado',
+      referencia: pagoRef.trim() || null,
+    }).select().single()
+    if (!error && data) {
+      setPago(data)
+      setPagoForm(false)
+      // Marcar cita como completada automáticamente
+      if (['pendiente','confirmada'].includes(selCita.estado)) {
+        await supabase.from('citas').update({ estado:'completada' }).eq('id', selCita.id)
+        setSelCita(c => ({ ...c, estado:'completada' }))
+        cargarMes()
+      }
+    }
+    setGuardandoPago(false)
+  }
+
+  // Mapa día → citas
+  const citasPorDia = {}
+  citas.forEach(c => {
+    const d = c.fecha_inicio.slice(0, 10)
+    if (!citasPorDia[d]) citasPorDia[d] = []
+    citasPorDia[d].push(c)
+  })
+
+  // Grilla del mes
+  const year  = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const firstDow    = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells = []
+  for (let i = 0; i < firstDow; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  const citasDia  = citasPorDia[selDay] || []
+  const accionesCita = selCita ? (ACCIONES[selCita.estado] || []) : []
+
+  return (
+    <div style={{ padding:'0 0 16px' }}>
+
+      {/* ── Navegación mes ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', marginBottom:12 }}>
+        <button onClick={() => setViewDate(new Date(year, month - 1, 1))} style={{
+          width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
+          background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <Ico d="M15 19l-7-7 7-7" size={18} />
+        </button>
+        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>
+          {MESES[month]} {year}
+        </h2>
+        <button onClick={() => setViewDate(new Date(year, month + 1, 1))} style={{
+          width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
+          background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <Ico d="M9 5l7 7-7 7" size={18} />
+        </button>
+      </div>
+
+      {/* Cabecera días semana */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', padding:'0 8px', marginBottom:6 }}>
+        {DIAS.map(d => (
+          <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700,
+            color:'var(--text-3)', padding:'4px 0', letterSpacing:0.5 }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grilla días */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', padding:'0 8px', gap:2 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`} />
+          const iso    = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const isToday = iso === today.toISOString().slice(0, 10)
+          const isSel   = iso === selDay
+          const dc      = citasPorDia[iso] || []
+          return (
+            <button key={day} onClick={() => setSelDay(iso)} style={{
+              display:'flex', flexDirection:'column', alignItems:'center',
+              padding:'8px 2px 10px', borderRadius:12, cursor:'pointer', border:'none',
+              background: isSel ? col : isToday ? `${col}20` : 'transparent',
+              color: isSel ? '#fff' : isToday ? col : 'var(--text)',
+              transition:'all 0.15s',
+            }}>
+              <span style={{ fontFamily:'Outfit', fontWeight: isToday ? 800 : 600, fontSize:16 }}>{day}</span>
+              {dc.length > 0 && (
+                <div style={{ display:'flex', gap:2, marginTop:4 }}>
+                  {dc.slice(0, 3).map((c, ci) => (
+                    <span key={ci} style={{
+                      width:5, height:5, borderRadius:'50%',
+                      background: isSel ? 'rgba(255,255,255,0.7)' : (ESTADO_COLOR[c.estado] || col),
+                    }} />
+                  ))}
+                  {dc.length > 3 && (
+                    <span style={{ fontSize:8, color: isSel ? 'rgba(255,255,255,0.7)' : 'var(--text-3)', fontWeight:700 }}>
+                      +{dc.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ margin:'16px 16px 0', borderTop:'1px solid var(--border)' }} />
+
+      {/* Leyenda */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 14px', padding:'10px 16px 0' }}>
+        {Object.entries(ESTADO_LABEL).map(([e, label]) => (
+          <div key={e} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text-3)' }}>
+            <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
+            {label}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Citas del día seleccionado ── */}
+      <div style={{ padding:'16px 16px 0' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <h3 style={{ fontFamily:'Outfit', fontWeight:700, fontSize:16, color:'var(--text)' }}>
+            {new Date(selDay + 'T12:00:00').toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })}
+          </h3>
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {esperaDia > 0 && (
+              <span title="Personas en lista de espera" style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:8, background:'rgba(245,158,11,0.15)', color:'#fbbf24' }}>
+                🔔 {esperaDia} en espera
+              </span>
+            )}
+            <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:8, background:`${col}20`, color:col }}>
+              {citasDia.length} cita{citasDia.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:74, borderRadius:14 }} />)}
+          </div>
+        ) : citasDia.length === 0 ? (
+          <div className="sp-empty">
+            <span className="sp-empty-icon">📅</span>
+            <p className="sp-empty-title">Sin citas</p>
+            <p className="sp-empty-sub">No hay citas agendadas para este día</p>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {citasDia.map(c => (
+              <button key={c.id} onClick={() => setSelCita(c)} style={{
+                padding:'14px 16px', borderRadius:14, width:'100%', textAlign:'left',
+                background:'var(--card)', border:'1px solid var(--border)',
+                display:'flex', alignItems:'center', gap:14,
+                position:'relative', overflow:'hidden', cursor:'pointer',
+              }}>
+                <div style={{
+                  position:'absolute', left:0, top:0, bottom:0, width:3,
+                  background: ESTADO_COLOR[c.estado] || col,
+                }} />
+                <div style={{ paddingLeft:8, flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                    <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:15, color:'var(--text)' }}>
+                      {c.clientes_agenda?.nombre || '—'}
+                    </span>
+                    <span style={{
+                      fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6,
+                      background:`${ESTADO_COLOR[c.estado] || col}20`,
+                      color: ESTADO_COLOR[c.estado] || col,
+                      textTransform:'uppercase',
+                    }}>
+                      {ESTADO_LABEL[c.estado] || c.estado}
+                    </span>
+                  </div>
+                  <div style={{ fontSize:13, color:'var(--text-3)', marginTop:3 }}>
+                    {fmtHora(c.fecha_inicio)} · {c.servicios?.nombre || '—'} · {c.profesionales?.nombre?.split(' ')[0] || '—'}
+                  </div>
+                </div>
+                <Ico d="M9 5l7 7-7 7" size={16} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Sheet detalle + cambio de estado ── */}
+      {selCita && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setSelCita(null)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <p className="sp-sheet-title" style={{ margin:0 }}>Detalle cita</p>
+              <span style={{
+                fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:8,
+                background:`${ESTADO_COLOR[selCita.estado] || col}20`,
+                color: ESTADO_COLOR[selCita.estado] || col,
+              }}>
+                {ESTADO_LABEL[selCita.estado] || selCita.estado}
+              </span>
+            </div>
+
+            {/* Info rows */}
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+              {[
+                {
+                  ico: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+                  txt: selCita.clientes_agenda?.nombre || '—',
+                  sub: selCita.clientes_agenda?.telefono,
+                },
+                {
+                  ico: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+                  txt: selCita.servicios?.nombre || '—',
+                  sub: [
+                    selCita.servicios?.duracion_min ? `${selCita.servicios.duracion_min}min` : null,
+                    selCita.servicios?.precio > 0 ? `$${Number(selCita.servicios.precio).toLocaleString('es-CO')}` : null,
+                  ].filter(Boolean).join(' · '),
+                },
+                {
+                  ico: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+                  txt: selCita.profesionales?.nombre || '—',
+                },
+                {
+                  ico: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                  txt: `${fmtHora(selCita.fecha_inicio)}${selCita.fecha_fin ? ' – ' + fmtHora(selCita.fecha_fin) : ''}`,
+                  sub: new Date(selCita.fecha_inicio).toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' }),
+                },
+              ].map((row, i) => (
+                <div key={i} style={{
+                  display:'flex', alignItems:'center', gap:12, padding:'12px 14px',
+                  borderRadius:12, background:'var(--card)', border:'1px solid var(--border)',
+                }}>
+                  <div style={{ color:col, flexShrink:0 }}><Ico d={row.ico} size={17} /></div>
+                  <div>
+                    <div style={{ fontSize:14, color:'var(--text)', fontWeight:600 }}>{row.txt}</div>
+                    {row.sub && <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>{row.sub}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Acciones */}
+            {accionesCita.length > 0 ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+                {accionesCita.map(a => (
+                  <button key={a.estado} onClick={() => cambiarEstado(a.estado)} disabled={actualizando}
+                    style={{
+                      width:'100%', padding:'14px', borderRadius:13, cursor:'pointer',
+                      background:`${a.color}12`, border:`1px solid ${a.color}40`,
+                      color:a.color, fontWeight:700, fontSize:14,
+                      opacity: actualizando ? 0.6 : 1,
+                      fontFamily:'Plus Jakarta Sans',
+                    }}>
+                    {actualizando ? '…' : a.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ marginBottom:16 }} />
+            )}
+
+            {/* ── Sección de pago ── */}
+            {!['cancelada','no_asistio'].includes(selCita.estado) && (
+              <div>
+                <div style={{ height:1, background:'var(--border)', marginBottom:16 }} />
+
+                {loadPago ? (
+                  <div style={{ display:'flex', justifyContent:'center', padding:'12px 0' }}>
+                    <div className="sp-spinner" style={{ width:20, height:20 }} />
+                  </div>
+                ) : pago ? (
+                  /* ── Pago registrado ── */
+                  <div style={{ padding:'14px 16px', borderRadius:14,
+                    background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#4ade80', textTransform:'uppercase', letterSpacing:0.5 }}>
+                        ✓ Pago registrado
+                      </span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text-3)' }}>
+                        {{efectivo:'💵 Efectivo',nequi:'📱 Nequi',daviplata:'📱 Daviplata',
+                          transferencia:'🏦 Transferencia',tarjeta:'💳 Tarjeta',wompi:'🌐 Wompi'}[pago.metodo] || pago.metodo}
+                      </span>
+                    </div>
+                    <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:22, color:'#4ade80' }}>
+                      ${Number(pago.monto).toLocaleString('es-CO')}
+                    </div>
+                    {pago.referencia && (
+                      <div style={{ fontSize:12, color:'var(--text-3)', marginTop:4 }}>Ref: {pago.referencia}</div>
+                    )}
+                  </div>
+                ) : pagoForm ? (
+                  /* ── Formulario de pago ── */
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>Registrar pago</span>
+                      <button onClick={() => setPagoForm(false)}
+                        style={{ background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', fontSize:18, lineHeight:1, padding:4 }}>×</button>
+                    </div>
+
+                    {/* Método de pago — tabs */}
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+                      {[
+                        { k:'efectivo',     label:'💵 Efectivo' },
+                        { k:'nequi',        label:'📱 Nequi' },
+                        { k:'daviplata',    label:'📱 Daviplata' },
+                        { k:'transferencia',label:'🏦 Transf.' },
+                        { k:'tarjeta',      label:'💳 Tarjeta' },
+                      ].map(m => (
+                        <button key={m.k} onClick={() => setPagoMetodo(m.k)} style={{
+                          padding:'7px 12px', borderRadius:9, cursor:'pointer', fontSize:12, fontWeight:600,
+                          background: pagoMetodo === m.k ? `${col}20` : 'var(--card)',
+                          border: `1px solid ${pagoMetodo === m.k ? col : 'var(--border)'}`,
+                          color: pagoMetodo === m.k ? col : 'var(--text-3)',
+                          transition:'all 0.12s',
+                        }}>
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Monto */}
+                    <div style={{ marginBottom:10 }}>
+                      <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, display:'block', marginBottom:6, textTransform:'uppercase' }}>
+                        Monto ($)
+                      </label>
+                      <input className="sp-input" type="number" value={pagoMonto}
+                        onChange={e => setPagoMonto(e.target.value)}
+                        placeholder="0" style={{ fontSize:18, fontFamily:'Outfit', fontWeight:700 }} />
+                    </div>
+
+                    {/* Referencia (opcional) */}
+                    {['transferencia','tarjeta','wompi','nequi','daviplata'].includes(pagoMetodo) && (
+                      <div style={{ marginBottom:14 }}>
+                        <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, display:'block', marginBottom:6, textTransform:'uppercase' }}>
+                          Referencia / comprobante (opcional)
+                        </label>
+                        <input className="sp-input" value={pagoRef}
+                          onChange={e => setPagoRef(e.target.value)}
+                          placeholder="Ej: #123456" />
+                      </div>
+                    )}
+
+                    <button onClick={registrarPago} disabled={guardandoPago || !pagoMonto} style={{
+                      width:'100%', padding:'14px', borderRadius:13,
+                      background:`linear-gradient(135deg,#22c55e,#16a34a)`,
+                      border:'none', color:'#fff', fontWeight:700, fontSize:14,
+                      cursor: (guardandoPago || !pagoMonto) ? 'not-allowed' : 'pointer',
+                      opacity: (guardandoPago || !pagoMonto) ? 0.6 : 1,
+                      fontFamily:'Plus Jakarta Sans', boxShadow:'0 4px 14px rgba(34,197,94,0.3)',
+                    }}>
+                      {guardandoPago ? 'Guardando…' : '✓ Confirmar pago'}
+                    </button>
+                  </div>
+                ) : (
+                  /* ── Botón abrir pago ── */
+                  <button onClick={() => setPagoForm(true)} style={{
+                    width:'100%', padding:'14px', borderRadius:13, cursor:'pointer',
+                    background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.22)',
+                    color:'#4ade80', fontWeight:700, fontSize:14,
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                    fontFamily:'Plus Jakarta Sans',
+                  }}>
+                    <Ico d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={16} />
+                    Registrar pago
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

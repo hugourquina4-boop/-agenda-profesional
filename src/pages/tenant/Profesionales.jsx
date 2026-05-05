@@ -2,9 +2,27 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
-const COLORES = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16']
+const TIPO = {
+  estilista:   { label: 'Estilista',   icon: '✂️' },
+  colorista:   { label: 'Colorista',   icon: '🎨' },
+  manicura:    { label: 'Manicura',    icon: '💅' },
+  pedicura:    { label: 'Pedicura',    icon: '🦶' },
+  barbero:     { label: 'Barbero',     icon: '🪒' },
+  esteticista: { label: 'Esteticista', icon: '✨' },
+  otro:        { label: 'Otro',        icon: '👤' },
+}
 
-const VACIO = { nombre: '', especialidad: '', color: '#3b82f6', activo: true }
+const COLORES = [
+  '#8b5cf6','#3b82f6','#ec4899','#f59e0b',
+  '#10b981','#ef4444','#06b6d4','#f97316','#84cc16','#a855f7'
+]
+
+const VACIO = {
+  nombre: '', especialidad: '', tipo_profesional: 'estilista',
+  color: '#8b5cf6', bio: '', instagram: '', foto_url: '', activo: true
+}
+
+const inp = 'w-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-400 dark:placeholder-slate-500'
 
 export default function Profesionales() {
   const { tenant } = useTenant()
@@ -19,18 +37,15 @@ export default function Profesionales() {
   async function cargar() {
     setLoading(true)
     const { data } = await supabase
-      .from('profesionales')
-      .select('*')
-      .eq('tenant_id', tenant.id)
-      .order('nombre')
+      .from('profesionales').select('*')
+      .eq('tenant_id', tenant.id).order('nombre')
     setLista(data || [])
     setLoading(false)
   }
 
   async function guardar() {
     if (!editando?.nombre?.trim()) return
-    setSaving(true)
-    setError('')
+    setSaving(true); setError('')
     const { id, created_at, updated_at, user_id, ...payload } = editando
     const base = { ...payload, tenant_id: tenant.id }
     const { error: e } = id
@@ -38,161 +53,232 @@ export default function Profesionales() {
       : await supabase.from('profesionales').insert(base)
     setSaving(false)
     if (e) { setError(e.message); return }
-    setEditando(null)
-    cargar()
+    setEditando(null); cargar()
   }
 
-  async function toggleActivo(prof) {
-    await supabase.from('profesionales').update({ activo: !prof.activo }).eq('id', prof.id)
-    cargar()
-  }
+  const col = tenant?.color_primario || '#8b5cf6'
+  const activos  = lista.filter(p => p.activo).length
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Profesionales</h1>
-          <p className="text-gray-500 dark:text-slate-400 text-xs mt-1">
-            Cada profesional tiene su agenda y horario independiente
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Equipo</h1>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+            {activos} activo{activos !== 1 ? 's' : ''} · {lista.length} total
           </p>
         </div>
         <button
           onClick={() => { setEditando({ ...VACIO }); setError('') }}
-          className="text-xs px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+          className="text-sm px-4 py-2 rounded-xl font-medium text-white transition-all hover:opacity-90 active:scale-95 shadow-md"
+          style={{ background: `linear-gradient(135deg, ${col}, ${col}bb)` }}
         >
           + Agregar
         </button>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex justify-center py-24">
+          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+            style={{ borderColor: col, borderTopColor: 'transparent' }} />
         </div>
       ) : lista.length === 0 ? (
-        <div className="text-center py-20 text-gray-400 dark:text-slate-500">
-          <svg className="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <p className="text-sm">Agrega el primer profesional para empezar</p>
+        <div className="text-center py-24">
+          <div className="text-5xl mb-3">✂️</div>
+          <p className="text-gray-400 dark:text-slate-500 text-sm">Agrega el primer profesional para empezar</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {lista.map(p => (
-            <div key={p.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{ backgroundColor: p.color }}
-                >
-                  {p.nombre[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 dark:text-white">{p.nombre}</p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500">{p.especialidad || 'Sin especialidad'}</p>
-                </div>
-                {!p.activo && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400">
-                    Inactivo
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setEditando({ ...p }); setError('') }}
-                  className="flex-1 text-xs py-2 rounded-xl border border-gray-200 dark:border-slate-700
-                             text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white
-                             hover:border-gray-400 dark:hover:border-slate-500 transition-colors"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => toggleActivo(p)}
-                  className={`flex-1 text-xs py-2 rounded-xl border transition-colors ${
-                    p.activo
-                      ? 'border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-red-400 hover:text-red-500'
-                      : 'border-emerald-200 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
-                  }`}
-                >
-                  {p.activo ? 'Desactivar' : 'Activar'}
-                </button>
-              </div>
-            </div>
+            <ProfCard key={p.id} prof={p}
+              onEdit={() => { setEditando({ ...p }); setError('') }}
+              onToggle={async () => {
+                await supabase.from('profesionales').update({ activo: !p.activo }).eq('id', p.id)
+                cargar()
+              }}
+            />
           ))}
         </div>
       )}
 
-      {/* Modal */}
       {editando && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 w-full max-w-sm">
-            <h3 className="font-bold text-gray-900 dark:text-white mb-5">
-              {editando.id ? 'Editar profesional' : 'Nuevo profesional'}
-            </h3>
+        <Modal onClose={() => { setEditando(null); setError('') }}>
+          <div className="w-10 h-1 bg-gray-300 dark:bg-slate-700 rounded-full mx-auto mb-4 sm:hidden" />
+          <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-5">
+            {editando.id ? 'Editar profesional' : 'Nuevo profesional'}
+          </h3>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Nombre completo *</label>
-                <input
-                  value={editando.nombre}
-                  onChange={e => setEditando(p => ({ ...p, nombre: e.target.value }))}
-                  placeholder="Ej: Dr. Carlos Pérez"
-                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                             rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                             focus:outline-none focus:border-blue-500"
-                />
+          <div className="space-y-4">
+            <Field label="Nombre completo *">
+              <input autoFocus value={editando.nombre}
+                onChange={e => setEditando(p => ({ ...p, nombre: e.target.value }))}
+                placeholder="Ej: Valentina Gómez" className={inp} />
+            </Field>
+
+            <Field label="Especialidad">
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(TIPO).map(([key, { label, icon }]) => (
+                  <button key={key} type="button"
+                    onClick={() => setEditando(p => ({ ...p, tipo_profesional: key }))}
+                    className={`text-xs px-3 py-1.5 rounded-xl border transition-all font-medium ${
+                      editando.tipo_profesional === key
+                        ? 'border-transparent text-white shadow-sm'
+                        : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:border-gray-300'
+                    }`}
+                    style={editando.tipo_profesional === key ? { background: editando.color } : {}}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
               </div>
+            </Field>
 
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Especialidad / rol</label>
-                <input
-                  value={editando.especialidad || ''}
-                  onChange={e => setEditando(p => ({ ...p, especialidad: e.target.value }))}
-                  placeholder="Ej: Neuropsicólogo, Estilista senior..."
-                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700
-                             rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white
-                             focus:outline-none focus:border-blue-500"
-                />
+            <Field label="Color en la agenda">
+              <div className="flex gap-2 flex-wrap">
+                {COLORES.map(c => (
+                  <button key={c} type="button"
+                    onClick={() => setEditando(p => ({ ...p, color: c }))}
+                    className="w-8 h-8 rounded-xl transition-transform hover:scale-110 relative flex items-center justify-center"
+                    style={{ backgroundColor: c }}>
+                    {editando.color === c && <span className="text-white text-xs font-bold">✓</span>}
+                  </button>
+                ))}
               </div>
+            </Field>
 
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 mb-2 block">Color en la agenda</label>
-                <div className="flex gap-2 flex-wrap">
-                  {COLORES.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setEditando(p => ({ ...p, color: c }))}
-                      className="w-8 h-8 rounded-lg transition-transform hover:scale-110"
-                      style={{ backgroundColor: c, outline: editando.color === c ? `3px solid ${c}` : 'none', outlineOffset: '2px' }}
-                    />
-                  ))}
-                </div>
-              </div>
+            <Field label="Bio corta (visible en el portal)">
+              <textarea value={editando.bio || ''} rows={2}
+                onChange={e => setEditando(p => ({ ...p, bio: e.target.value }))}
+                placeholder="Especialista en colorimetría con 8 años de experiencia..."
+                className={`${inp} resize-none`} />
+            </Field>
 
-              {error && (
-                <p className="text-xs text-red-500 bg-red-50 dark:bg-red-500/10 px-3 py-2 rounded-xl">{error}</p>
-              )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Instagram">
+                <input value={editando.instagram || ''}
+                  onChange={e => setEditando(p => ({ ...p, instagram: e.target.value }))}
+                  placeholder="@usuario" className={inp} />
+              </Field>
+              <Field label="Foto (URL)">
+                <input value={editando.foto_url || ''}
+                  onChange={e => setEditando(p => ({ ...p, foto_url: e.target.value }))}
+                  placeholder="https://..." className={inp} />
+              </Field>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => { setEditando(null); setError('') }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700
-                           text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={guardar}
-                disabled={saving || !editando.nombre?.trim()}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500
-                           text-white font-medium transition-colors text-sm disabled:opacity-50"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
+            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+              onClick={() => setEditando(p => ({ ...p, activo: !p.activo }))}>
+              <Toggle on={editando.activo} />
+              <span className="text-sm text-gray-700 dark:text-slate-300">Profesional activo</span>
+            </label>
+
+            {error && <p className="text-xs text-red-500 bg-red-50 dark:bg-red-500/10 px-3 py-2 rounded-xl">{error}</p>}
           </div>
-        </div>
+
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => { setEditando(null); setError('') }}
+              className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
+              Cancelar
+            </button>
+            <button onClick={guardar} disabled={saving || !editando.nombre?.trim()}
+              className="flex-1 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90 disabled:opacity-50 text-sm shadow-md"
+              style={{ background: `linear-gradient(135deg, ${col}, ${col}bb)` }}>
+              {saving ? 'Guardando...' : editando.id ? 'Guardar cambios' : 'Crear profesional'}
+            </button>
+          </div>
+        </Modal>
       )}
+    </div>
+  )
+}
+
+function ProfCard({ prof, onEdit, onToggle }) {
+  const tipo = TIPO[prof.tipo_profesional] || TIPO.otro
+  return (
+    <div className={`bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden group transition-all hover:shadow-lg dark:hover:shadow-black/30 ${
+      prof.activo ? 'border-gray-200 dark:border-slate-800' : 'border-dashed border-gray-300 dark:border-slate-700 opacity-60'
+    }`}>
+      {/* Gradient top */}
+      <div className="h-16 relative" style={{ background: `linear-gradient(135deg, ${prof.color}28, ${prof.color}55)` }}>
+        {!prof.activo && (
+          <span className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded-full bg-black/20 text-white/90 backdrop-blur-sm">
+            Inactivo
+          </span>
+        )}
+        {/* Avatar */}
+        <div className="absolute -bottom-6 left-4 w-14 h-14 rounded-2xl border-2 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center text-white font-bold text-xl shadow-md flex-shrink-0"
+          style={{ background: !prof.foto_url ? `linear-gradient(135deg, ${prof.color}, ${prof.color}99)` : undefined }}>
+          {prof.foto_url
+            ? <img src={prof.foto_url} alt={prof.nombre} className="w-full h-full object-cover"
+                onError={e => { e.target.style.display = 'none' }} />
+            : prof.nombre[0]?.toUpperCase()
+          }
+        </div>
+      </div>
+
+      <div className="pt-8 px-4 pb-4">
+        <div className="flex items-start justify-between gap-1 mb-1">
+          <div className="min-w-0">
+            <p className="font-bold text-gray-900 dark:text-white leading-tight truncate">{prof.nombre}</p>
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full mt-1 font-medium"
+              style={{ backgroundColor: `${prof.color}1a`, color: prof.color }}>
+              {tipo.icon} {tipo.label}
+            </span>
+          </div>
+          {prof.instagram && (
+            <a href={`https://instagram.com/${prof.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer"
+              className="text-gray-300 hover:text-pink-500 dark:text-slate-600 dark:hover:text-pink-400 transition-colors mt-0.5 flex-shrink-0">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+              </svg>
+            </a>
+          )}
+        </div>
+        {prof.bio && <p className="text-xs text-gray-500 dark:text-slate-400 mt-2 line-clamp-2">{prof.bio}</p>}
+
+        <div className="flex gap-2 mt-3">
+          <button onClick={onEdit}
+            className="flex-1 text-xs py-2 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+            Editar
+          </button>
+          <button onClick={onToggle}
+            className={`flex-1 text-xs py-2 rounded-xl border transition-colors ${
+              prof.activo
+                ? 'border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 hover:border-red-300 hover:text-red-500'
+                : 'border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+            }`}>
+            {prof.activo ? 'Desactivar' : 'Activar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Modal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-2xl border-0 sm:border border-gray-200 dark:border-slate-800 w-full max-w-md max-h-[92vh] overflow-y-auto px-5 pt-4 pb-6 sm:px-6">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1.5 block">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function Toggle({ on }) {
+  return (
+    <div className={`w-10 h-6 rounded-full relative transition-colors ${on ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-600'}`}>
+      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? 'left-5' : 'left-1'}`} />
     </div>
   )
 }

@@ -2,8 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { TenantProvider, useTenant } from './context/TenantContext'
 import Login from './pages/Login'
+import SalonApp from './pages/salon/SalonApp'
 import Portal from './pages/public/Portal'
 import Registro from './pages/public/Registro'
+import SalonPortal from './pages/public/SalonPortal'
 import SuperadminLayout from './components/SuperadminLayout'
 import TenantLayout from './components/TenantLayout'
 import SuperDashboard from './pages/superadmin/Dashboard'
@@ -17,6 +19,11 @@ import Horarios from './pages/tenant/Horarios'
 import Agenda from './pages/tenant/Agenda'
 import Citas from './pages/tenant/Citas'
 import Clientes from './pages/tenant/Clientes'
+import Monitor from './pages/tenant/Monitor'
+import MiAgenda from './pages/tenant/MiAgenda'
+import Ingresos from './pages/tenant/Ingresos'
+import Accesos from './pages/tenant/Accesos'
+import Configuracion from './pages/tenant/Configuracion'
 
 function Spinner() {
   return (
@@ -33,7 +40,6 @@ function RequireAuth({ children }) {
   return children
 }
 
-// Guard que verifica rol superadmin en la BD — no solo autenticación
 function RequireSuperadmin({ children }) {
   const { user, isSuperadmin, loading } = useAuth()
   if (loading) return <Spinner />
@@ -46,15 +52,20 @@ function RequireTenant({ children }) {
   if (loading) return <Spinner />
   if (!tenant) return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4">
-      <div className="text-center">
-        <p className="text-gray-500 dark:text-slate-400 text-sm">Tu usuario no tiene acceso a ningún negocio.</p>
-        <a href="/superadmin" className="text-blue-500 text-sm mt-2 inline-block hover:underline">
-          Ir al superadmin
-        </a>
-      </div>
+      <p className="text-gray-500 dark:text-slate-400 text-sm text-center">
+        Tu usuario no tiene acceso a ningún negocio.
+      </p>
     </div>
   )
   return children
+}
+
+// Redirige según rol y vertical al entrar al panel
+function PanelIndex() {
+  const { rol, tenant } = useTenant()
+  if (tenant?.vertical === 'peluqueria') return <Navigate to="/salon" replace />
+  if (rol === 'profesional') return <Navigate to="/panel/mi-agenda" replace />
+  return <TenantDashboard />
 }
 
 export default function App() {
@@ -62,36 +73,49 @@ export default function App() {
     <TenantProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login"    element={<Login />} />
+          <Route path="/registro" element={<Registro />} />
+          <Route path="/agenda/:slug" element={<Portal />} />
 
           {/* Panel superadmin */}
-          <Route
-            path="/superadmin"
-            element={<RequireSuperadmin><SuperadminLayout /></RequireSuperadmin>}
-          >
+          <Route path="/superadmin"
+            element={<RequireSuperadmin><SuperadminLayout /></RequireSuperadmin>}>
             <Route index element={<SuperDashboard />} />
-            <Route path="negocios" element={<Negocios />} />
+            <Route path="negocios"      element={<Negocios />} />
             <Route path="suscripciones" element={<Suscripciones />} />
-            <Route path="planes" element={<Planes />} />
+            <Route path="planes"        element={<Planes />} />
           </Route>
 
           {/* Panel tenant */}
-          <Route
-            path="/panel"
-            element={<RequireAuth><RequireTenant><TenantLayout /></RequireTenant></RequireAuth>}
-          >
-            <Route index element={<TenantDashboard />} />
+          <Route path="/panel"
+            element={<RequireAuth><RequireTenant><TenantLayout /></RequireTenant></RequireAuth>}>
+            {/* Index redirige según rol */}
+            <Route index element={<PanelIndex />} />
+
+            {/* Vistas admin + recepción */}
+            <Route path="monitor"       element={<Monitor />} />
+            <Route path="agenda"        element={<Agenda />} />
             <Route path="profesionales" element={<Profesionales />} />
-            <Route path="servicios" element={<Servicios />} />
-            <Route path="horarios" element={<Horarios />} />
-            <Route path="agenda" element={<Agenda />} />
-            <Route path="citas" element={<Citas />} />
-            <Route path="clientes" element={<Clientes />} />
+            <Route path="servicios"     element={<Servicios />} />
+            <Route path="horarios"      element={<Horarios />} />
+            <Route path="citas"         element={<Citas />} />
+            <Route path="clientes"      element={<Clientes />} />
+
+            {/* Solo admin */}
+            <Route path="ingresos"      element={<Ingresos />} />
+            <Route path="accesos"       element={<Accesos />} />
+            <Route path="configuracion" element={<Configuracion />} />
+
+            {/* Vistas profesional */}
+            <Route path="mi-agenda"     element={<MiAgenda />} />
+            <Route path="mis-clientes"  element={<Clientes />} />
           </Route>
 
-          {/* Rutas públicas — sin auth */}
-          <Route path="/registro" element={<Registro />} />
-          <Route path="/agenda/:slug" element={<Portal />} />
+          {/* Panel salón / peluquería — sin auth por ahora */}
+          <Route path="/salon" element={<SalonApp />} />
+
+          {/* Portal público de reservas */}
+          <Route path="/reservar/:slug" element={<SalonPortal />} />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

@@ -38,10 +38,16 @@ Plataforma SaaS multi-tenant de agendamiento profesional. Mismo patrón arquitec
 - Aislamiento por `tenant_id` en todas las políticas
 - Solo `anon` key en frontend; secretos en Edge Functions
 
-## Estado actual (2026-04-25)
-- Scaffolding React+Vite creado
-- Supabase proyecto creado, sin tablas aún
-- Pendiente: definir esquema de BD y arquitectura de auth
+## Estado actual (2026-05-01)
+
+- ✓ React+Vite + Tailwind + Supabase operativo
+- ✓ Todas las tablas con RLS implementadas (schema_v1 → v14)
+- ✓ Auth multi-tenant con roles (superadmin, tenant, professional)
+- ✓ Superadmin panel (Dashboard, Negocios, Suscripciones, Planes)
+- ✓ Salon panel (Agenda, Citas, Clientes, Servicios, Equipo, Analytics, Caja, etc.)
+- ✓ Pagos, comisiones, lista de espera, storage de imágenes
+- ✓ v14 aplicada: owner data + payment alert system
+- Pendiente: Deploy a Vercel + automatización Make + pruebas e2e
 
 ## Cómo trabajar con Claude
 Iniciar con: `Contexto: Agendas SaaS, quiero [objetivo específico hoy]`
