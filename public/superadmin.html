@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Maestro — Salón Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0F172A;
+      --surface:    #1E293B;
+      --surface2:   #263046;
+      --border:     #334155;
+      --txt1:       #F8FAFC;
+      --txt2:       #94A3B8;
+      --txt3:       #64748B;
+      --primary:    #f43f5e;
+      --primary-lt: rgba(244,63,94,.12);
+      --success:    #10B981;
+      --danger:     #EF4444;
+      --warning:    #F59E0B;
+      --radius:     12px;
+      --radius-sm:  8px;
+    }
+    [data-theme="light"] {
+      --bg:         #F1F5F9;
+      --surface:    #FFFFFF;
+      --surface2:   #F8FAFC;
+      --border:     #E2E8F0;
+      --txt1:       #0F172A;
+      --txt2:       #475569;
+      --txt3:       #94A3B8;
+      --primary-lt: rgba(244,63,94,.08);
+    }
+
+    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--txt1); min-height:100vh; transition:background .2s,color .2s; }
+
+    .theme-btn { width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--txt2); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .14s; flex-shrink:0; }
+    .theme-btn:hover { border-color:var(--primary); color:var(--primary); }
+
+    /* ── AUTH ── */
+    #auth-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; background:linear-gradient(145deg,#0F172A,#1E293B); }
+    .auth-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:40px 36px; width:100%; max-width:380px; text-align:center; box-shadow:0 24px 64px rgba(0,0,0,.5); }
+    .auth-logo { width:64px; height:64px; border-radius:16px; margin:0 auto 20px; background:linear-gradient(135deg,#f43f5e,#e11d48); display:flex; align-items:center; justify-content:center; font-size:28px; }
+    .auth-title { font-size:20px; font-weight:800; color:var(--txt1); margin-bottom:4px; }
+    .auth-sub { font-size:13px; color:var(--txt2); margin-bottom:28px; }
+    .auth-input { width:100%; padding:13px 16px; background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-sm); color:var(--txt1); font-family:inherit; font-size:15px; font-weight:600; text-align:center; letter-spacing:.15em; outline:none; margin-bottom:14px; transition:border-color .15s; }
+    .auth-input:focus { border-color:var(--primary); }
+    .auth-input::placeholder { letter-spacing:normal; font-weight:400; color:var(--txt3); }
+    .auth-btn { width:100%; padding:13px; background:linear-gradient(135deg,#f43f5e,#e11d48); color:#fff; border:none; border-radius:var(--radius-sm); font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; transition:opacity .15s; }
+    .auth-btn:hover { opacity:.88; }
+    .auth-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .auth-err { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.4); color:#FCA5A5; border-radius:var(--radius-sm); padding:10px 14px; font-size:12.5px; margin-bottom:14px; display:none; }
+
+    /* ── PANEL ── */
+    #panel { display:none; min-height:100vh; flex-direction:column; }
+    #panel.visible { display:flex; }
+
+    .sa-header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 24px; height:60px; display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:100; }
+    .sa-logo { width:34px; height:34px; border-radius:8px; flex-shrink:0; background:linear-gradient(135deg,#f43f5e,#e11d48); display:flex; align-items:center; justify-content:center; font-size:16px; }
+    .sa-brand { font-size:14px; font-weight:800; color:var(--txt1); }
+    .sa-brand-sub { font-size:11px; color:var(--txt3); }
+    .sa-spacer { flex:1; }
+    .sa-logout-btn { padding:7px 14px; background:transparent; border:1px solid var(--border); border-radius:6px; color:var(--txt2); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .14s; }
+    .sa-logout-btn:hover { border-color:var(--danger); color:var(--danger); }
+
+    .sa-body { flex:1; padding:24px; max-width:1400px; margin:0 auto; width:100%; }
+
+    /* Stats */
+    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+    @media(max-width:768px) { .stats-grid { grid-template-columns:repeat(2,1fr); } }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; display:flex; flex-direction:column; gap:4px; }
+    .stat-label { font-size:11px; font-weight:600; color:var(--txt3); text-transform:uppercase; letter-spacing:.5px; }
+    .stat-value { font-size:28px; font-weight:800; color:var(--txt1); line-height:1; }
+    .stat-sub { font-size:12px; color:var(--txt2); }
+
+    /* Toolbar */
+    .sa-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .search-wrap { position:relative; flex:1; min-width:200px; }
+    .search-ico { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--txt3); pointer-events:none; }
+    .sa-search { width:100%; padding:9px 14px 9px 36px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--txt1); font-family:inherit; font-size:13px; outline:none; transition:border-color .14s; }
+    .sa-search:focus { border-color:var(--primary); }
+    .filter-btn { padding:8px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); background:transparent; color:var(--txt2); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; transition:all .14s; white-space:nowrap; }
+    .filter-btn:hover { border-color:var(--primary); color:var(--primary); }
+    .filter-btn.active { background:var(--primary-lt); border-color:var(--primary); color:var(--primary); }
+    .sa-new-btn { padding:9px 18px; background:var(--primary); border:none; border-radius:var(--radius-sm); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:opacity .14s; white-space:nowrap; }
+    .sa-new-btn:hover { opacity:.85; }
+
+    /* Tabla */
+    .rest-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; overflow-x:auto; }
+    .rest-table { width:100%; border-collapse:collapse; }
+    .rest-table th { text-align:left; font-size:11px; font-weight:700; color:var(--txt3); text-transform:uppercase; letter-spacing:.5px; padding:10px 14px; border-bottom:1px solid var(--border); white-space:nowrap; }
+    .rest-table td { padding:12px 14px; border-bottom:1px solid rgba(51,65,85,.5); font-size:13px; vertical-align:middle; }
+    .rest-table tr:last-child td { border-bottom:none; }
+    .rest-table tr:hover td { background:rgba(244,63,94,.04); }
+
+    /* Color dot */
+    .color-dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; vertical-align:middle; flex-shrink:0; }
+
+    /* Badges */
+    .badge { display:inline-flex; align-items:center; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:700; gap:4px; }
+    .badge-active  { background:rgba(16,185,129,.12); color:#10B981; }
+    .badge-suspend { background:rgba(239,68,68,.12);  color:#EF4444; }
+    .badge-warn    { background:rgba(245,158,11,.12); color:#F59E0B; }
+    .badge-plan    { background:rgba(244,63,94,.12);  color:#f43f5e; }
+
+    /* Acciones */
+    .action-btn { padding:5px 10px; border-radius:6px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .14s; border:1px solid transparent; margin-right:4px; }
+    .action-btn-view    { background:rgba(99,102,241,.1); color:#818cf8; border-color:#818cf8; }
+    .action-btn-view:hover { opacity:.75; }
+    .action-btn-edit    { background:var(--primary-lt); color:var(--primary); border-color:var(--primary); }
+    .action-btn-edit:hover { opacity:.75; }
+    .action-btn-suspend { background:rgba(239,68,68,.1); color:var(--danger); border-color:var(--danger); }
+    .action-btn-suspend:hover { opacity:.75; }
+    .action-btn-activate { background:rgba(16,185,129,.1); color:var(--success); border-color:var(--success); }
+    .action-btn-activate:hover { opacity:.75; }
+
+    .sa-empty { text-align:center; padding:48px 16px; color:var(--txt3); font-size:14px; }
+
+    /* Modal */
+    .sa-modal-ov { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:500; display:none; align-items:center; justify-content:center; padding:16px; }
+    .sa-modal-ov.open { display:flex; }
+    .sa-modal { background:var(--surface); border:1px solid var(--border); border-radius:18px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,0,.6); }
+    .sa-modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--surface); z-index:1; }
+    .sa-modal-title { font-size:16px; font-weight:800; color:var(--txt1); }
+    .sa-modal-close { width:30px; height:30px; background:var(--surface2); border:none; border-radius:6px; color:var(--txt2); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .14s; }
+    .sa-modal-close:hover { background:rgba(239,68,68,.15); color:var(--danger); }
+    .sa-modal-body { padding:20px 24px; }
+    .sa-modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
+
+    .form-group { margin-bottom:16px; }
+    .form-label { display:block; font-size:12px; font-weight:700; color:var(--txt2); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }
+    .form-control { width:100%; padding:10px 13px; background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-sm); color:var(--txt1); font-family:inherit; font-size:13.5px; outline:none; transition:border-color .14s; }
+    .form-control:focus { border-color:var(--primary); }
+    .form-control::placeholder { color:var(--txt3); }
+    select.form-control { cursor:pointer; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .form-divider { font-size:11px; font-weight:700; color:var(--txt3); text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--border); padding-bottom:8px; margin:20px 0 16px; }
+    .form-hint { font-size:11px; color:var(--txt3); margin-top:4px; }
+    .modal-err { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#FCA5A5; border-radius:var(--radius-sm); padding:9px 12px; font-size:12.5px; margin-bottom:14px; display:none; }
+
+    .btn-save { padding:10px 22px; background:var(--primary); border:none; border-radius:var(--radius-sm); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:opacity .14s; }
+    .btn-save:hover { opacity:.85; }
+    .btn-save:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-cancel { padding:10px 16px; background:transparent; border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--txt2); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:all .14s; }
+    .btn-cancel:hover { border-color:var(--txt2); color:var(--txt1); }
+
+    /* Color picker row */
+    .color-options { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+    .color-opt { width:28px; height:28px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:border-color .14s; }
+    .color-opt.selected { border-color:var(--txt1); }
+
+    /* Access link box */
+    .access-box { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 13px; font-size:12px; color:var(--txt2); word-break:break-all; display:flex; align-items:center; gap:8px; cursor:pointer; transition:border-color .14s; }
+    .access-box:hover { border-color:var(--primary); }
+    .copy-icon { flex-shrink:0; color:var(--txt3); }
+
+    /* Tabs */
+    .sa-tabs { display:flex; gap:4px; padding:0; margin-bottom:20px; border-bottom:1px solid var(--border); }
+    .sa-tab { padding:8px 18px; border:none; background:none; color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .14s,border-color .14s; font-family:inherit; }
+    .sa-tab:hover { color:var(--txt1); }
+    .sa-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+
+    /* Spinner + Toast */
+    .sa-spin { width:20px; height:20px; border:2.5px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #sa-toast { position:fixed; bottom:24px; right:24px; z-index:9999; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 18px; font-size:13px; font-weight:600; color:var(--txt1); box-shadow:0 8px 32px rgba(0,0,0,.4); display:none; max-width:320px; }
+    #sa-toast.success { border-color:var(--success); color:var(--success); }
+    #sa-toast.error   { border-color:var(--danger);  color:var(--danger); }
+
+    /* Usuarios tab */
+    .usuarios-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+    .user-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; }
+    .user-name { font-size:14px; font-weight:700; color:var(--txt1); margin-bottom:4px; }
+    .user-meta { font-size:12px; color:var(--txt2); }
+    .user-rol { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; margin-top:6px; }
+    .rol-admin { background:var(--primary-lt); color:var(--primary); }
+    .rol-profesional { background:rgba(99,102,241,.1); color:#818cf8; }
+    .rol-recepcion { background:rgba(16,185,129,.1); color:var(--success); }
+  </style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">✂️</div>
+    <div class="auth-title">Salón Pro</div>
+    <div class="auth-sub">Panel Maestro</div>
+    <div class="auth-err" id="auth-err"></div>
+    <input class="auth-input" type="password" id="auth-key" placeholder="Clave de acceso" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter')doAuth()">
+    <button class="auth-btn" id="auth-btn" onclick="doAuth()">Ingresar</button>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div id="panel">
+  <div class="sa-header">
+    <div class="sa-logo">✂️</div>
+    <div>
+      <div class="sa-brand">Salón Pro</div>
+      <div class="sa-brand-sub">Panel Maestro</div>
+    </div>
+    <div class="sa-spacer"></div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Modo oscuro/claro">🌙</button>
+    <button class="sa-logout-btn" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+
+  <div class="sa-body">
+
+    <!-- KPIs -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Negocios</div>
+        <div class="stat-value" id="kpi-total">—</div>
+        <div class="stat-sub">registrados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Activos</div>
+        <div class="stat-value" id="kpi-activos" style="color:var(--success)">—</div>
+        <div class="stat-sub">con acceso vigente</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Suspendidos</div>
+        <div class="stat-value" id="kpi-suspend" style="color:var(--danger)">—</div>
+        <div class="stat-sub">sin acceso</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Citas Hoy</div>
+        <div class="stat-value" id="kpi-citas" style="color:var(--primary)">—</div>
+        <div class="stat-sub">en todos los negocios</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sa-tabs">
+      <button class="sa-tab active" onclick="switchTab('negocios',this)">Negocios</button>
+      <button class="sa-tab" onclick="switchTab('usuarios',this)">Usuarios</button>
+    </div>
+
+    <!-- TAB: Negocios -->
+    <div id="tab-negocios">
+      <div class="sa-toolbar">
+        <div class="search-wrap">
+          <svg class="search-ico" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="sa-search" type="text" placeholder="Buscar negocio, ciudad, slug..." id="search-input" oninput="renderTabla()">
+        </div>
+        <button class="filter-btn active" data-f="todos"      onclick="setFiltro('todos',this)">Todos</button>
+        <button class="filter-btn"        data-f="activos"    onclick="setFiltro('activos',this)">Activos</button>
+        <button class="filter-btn"        data-f="suspendidos" onclick="setFiltro('suspendidos',this)">Suspendidos</button>
+        <button class="sa-new-btn" onclick="abrirModal(null)">+ Nuevo Negocio</button>
+      </div>
+      <div class="rest-table-wrap" id="tabla-wrap">
+        <div class="sa-empty"><div class="sa-spin"></div></div>
+      </div>
+    </div>
+
+    <!-- TAB: Usuarios -->
+    <div id="tab-usuarios" style="display:none">
+      <div class="sa-toolbar">
+        <div class="search-wrap">
+          <svg class="search-ico" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="sa-search" type="text" placeholder="Buscar usuario..." id="search-user" oninput="renderUsuarios()">
+        </div>
+      </div>
+      <div id="usuarios-wrap" class="usuarios-grid">
+        <div class="sa-empty"><div class="sa-spin"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL NEGOCIO -->
+<div class="sa-modal-ov" id="modal-ov" onclick="if(event.target===this)cerrarModal()">
+  <div class="sa-modal">
+    <div class="sa-modal-header">
+      <div class="sa-modal-title" id="modal-title">Nuevo Negocio</div>
+      <button class="sa-modal-close" onclick="cerrarModal()">×</button>
+    </div>
+    <div class="sa-modal-body">
+      <div class="modal-err" id="modal-err"></div>
+
+      <div class="form-group">
+        <label class="form-label">Nombre del Negocio</label>
+        <input class="form-control" id="f-nombre" placeholder="Ej: Glamour Studio">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Slug (URL)</label>
+          <input class="form-control" id="f-slug" placeholder="glamour-studio" oninput="autoSlug(false)">
+          <div class="form-hint">Solo minúsculas, guiones</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ciudad</label>
+          <input class="form-control" id="f-ciudad" placeholder="Medellín">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">WhatsApp del negocio</label>
+        <input class="form-control" id="f-whatsapp" placeholder="+57 300 000 0000" type="tel">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Color principal</label>
+        <div class="color-options" id="color-options">
+          <!-- generado por JS -->
+        </div>
+        <input class="form-control" id="f-color" placeholder="#f43f5e" style="margin-top:8px;font-family:monospace;" oninput="syncColorManual()">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Plan</label>
+          <select class="form-control" id="f-plan">
+            <option value="basico">Básico</option>
+            <option value="profesional" selected>Profesional</option>
+            <option value="premium">Premium</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vence</label>
+          <input class="form-control" id="f-vencimiento" type="date">
+        </div>
+      </div>
+
+      <div class="form-divider">Acceso del Administrador</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-control" id="f-email" type="email" placeholder="admin@salon.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input class="form-control" id="f-pass" type="password" placeholder="mínimo 6 caracteres">
+        </div>
+      </div>
+      <div class="form-hint" style="margin-bottom:0;margin-top:-8px">El dueño usará estas credenciales para ingresar al sistema.</div>
+
+    </div>
+    <div class="sa-modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-save" id="btn-save" onclick="guardarNegocio()">Crear Negocio</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VER ACCESO -->
+<div class="sa-modal-ov" id="modal-acceso-ov" onclick="if(event.target===this)cerrarModalAcceso()">
+  <div class="sa-modal" style="max-width:440px">
+    <div class="sa-modal-header">
+      <div class="sa-modal-title">Acceso al negocio</div>
+      <button class="sa-modal-close" onclick="cerrarModalAcceso()">×</button>
+    </div>
+    <div class="sa-modal-body">
+      <p style="font-size:13px;color:var(--txt2);margin-bottom:16px;">
+        Comparte este link con el dueño del negocio para que acceda a su plataforma:
+      </p>
+      <div class="access-box" id="access-link-box" onclick="copiarAcceso()">
+        <svg class="copy-icon" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        <span id="access-link-text"></span>
+      </div>
+      <p style="font-size:11px;color:var(--txt3);margin-top:10px;">Clic para copiar. El negocio verá su agenda, equipo, clientes y configuración propia.</p>
+    </div>
+    <div class="sa-modal-footer">
+      <button class="btn-cancel" onclick="cerrarModalAcceso()">Cerrar</button>
+      <button class="btn-save" onclick="abrirEnTab()">Abrir ahora</button>
+    </div>
+  </div>
+</div>
+
+<div id="sa-toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://unpxoamfyushsbyyziyn.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVucHhvYW1meXVzaHNieXl6aXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTUyOTQsImV4cCI6MjA5MjU5MTI5NH0.MvtKlr9QDDc2sgUz6u424eAFiPFEcZvW5xTKbV8STV0'
+const ACCESS_PASS = 'salonpro2026'  // cambia esto
+
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+const COLORES = ['#f43f5e','#e11d48','#a855f7','#8b5cf6','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899']
+
+let todosNegocios = []
+let todosUsuarios = []
+let filtroActivo  = 'todos'
+let editandoId    = null
+let accesoSlug    = ''
+let tema = localStorage.getItem('sa-tema') || 'dark'
+
+// ── INIT ─────────────────────────────────────────────────────────────
+window.onload = () => {
+  aplicarTema()
+  // verificar sesión guardada
+  if (sessionStorage.getItem('sa-auth') === ACCESS_PASS) mostrarPanel()
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────
+function doAuth() {
+  const val = document.getElementById('auth-key').value.trim()
+  const err = document.getElementById('auth-err')
+  if (val !== ACCESS_PASS) {
+    err.textContent = 'Clave incorrecta'
+    err.style.display = 'block'
+    return
+  }
+  sessionStorage.setItem('sa-auth', val)
+  mostrarPanel()
+}
+
+function doLogout() {
+  sessionStorage.removeItem('sa-auth')
+  document.getElementById('panel').classList.remove('visible')
+  document.getElementById('auth-screen').style.display = 'flex'
+  document.getElementById('auth-key').value = ''
+}
+
+function mostrarPanel() {
+  document.getElementById('auth-screen').style.display = 'none'
+  document.getElementById('panel').classList.add('visible')
+  cargarTodo()
+}
+
+// ── TEMA ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  tema = tema === 'dark' ? 'light' : 'dark'
+  localStorage.setItem('sa-tema', tema)
+  aplicarTema()
+}
+function aplicarTema() {
+  document.documentElement.setAttribute('data-theme', tema === 'light' ? 'light' : '')
+  document.getElementById('theme-btn').textContent = tema === 'dark' ? '☀️' : '🌙'
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────
+function switchTab(nombre, btn) {
+  document.querySelectorAll('.sa-tab').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  document.getElementById('tab-negocios').style.display  = nombre === 'negocios'  ? '' : 'none'
+  document.getElementById('tab-usuarios').style.display  = nombre === 'usuarios'  ? '' : 'none'
+  if (nombre === 'usuarios' && todosUsuarios.length === 0) cargarUsuarios()
+}
+
+// ── DATOS ─────────────────────────────────────────────────────────────
+async function cargarTodo() {
+  await cargarNegocios()
+  cargarKpis()
+}
+
+async function cargarNegocios() {
+  const { data, error } = await db.from('tenants').select('*').order('created_at', { ascending: false })
+  if (error) { toast('Error cargando negocios', 'error'); return }
+  todosNegocios = data || []
+  renderTabla()
+}
+
+async function cargarKpis() {
+  const total    = todosNegocios.length
+  const activos  = todosNegocios.filter(t => t.activo).length
+  const suspend  = total - activos
+  document.getElementById('kpi-total').textContent   = total
+  document.getElementById('kpi-activos').textContent = activos
+  document.getElementById('kpi-suspend').textContent = suspend
+
+  const hoy = new Date().toISOString().slice(0,10)
+  const { count } = await db.from('citas')
+    .select('id', { count: 'exact', head: true })
+    .gte('fecha_inicio', hoy + 'T00:00:00')
+    .lte('fecha_inicio', hoy + 'T23:59:59')
+  document.getElementById('kpi-citas').textContent = count ?? '—'
+}
+
+async function cargarUsuarios() {
+  const { data } = await db.from('usuarios_tenant')
+    .select('*, tenants(nombre,slug,color_primario)')
+    .order('created_at', { ascending: false })
+  todosUsuarios = data || []
+  renderUsuarios()
+}
+
+// ── RENDER TABLA ──────────────────────────────────────────────────────
+function setFiltro(f, btn) {
+  filtroActivo = f
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  renderTabla()
+}
+
+function renderTabla() {
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase()
+  let lista = todosNegocios.filter(t => {
+    if (filtroActivo === 'activos'    && !t.activo) return false
+    if (filtroActivo === 'suspendidos' &&  t.activo) return false
+    if (q && !((t.nombre||'').toLowerCase().includes(q) || (t.slug||'').toLowerCase().includes(q) || (t.ciudad||'').toLowerCase().includes(q))) return false
+    return true
+  })
+
+  const wrap = document.getElementById('tabla-wrap')
+  if (lista.length === 0) {
+    wrap.innerHTML = '<div class="sa-empty">No hay negocios que coincidan</div>'
+    return
+  }
+
+  const filas = lista.map(t => {
+    const planBadge = `<span class="badge badge-plan">${t.plan || 'básico'}</span>`
+    const estadoBadge = t.activo
+      ? '<span class="badge badge-active">● Activo</span>'
+      : '<span class="badge badge-suspend">● Suspendido</span>'
+    const vence = t.fecha_vencimiento
+      ? `<span style="font-size:12px;color:var(--txt3)">${fmtFecha(t.fecha_vencimiento)}</span>`
+      : '<span style="color:var(--txt3);font-size:12px">—</span>'
+    const toggleBtn = t.activo
+      ? `<button class="action-btn action-btn-suspend" onclick="toggleEstado('${t.id}',false)">Suspender</button>`
+      : `<button class="action-btn action-btn-activate" onclick="toggleEstado('${t.id}',true)">Activar</button>`
+
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="color-dot" style="background:${t.color_primario||'#f43f5e'}"></span>
+          <span style="font-weight:700">${esc(t.nombre)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--txt3);margin-top:2px">${esc(t.slug)}</div>
+      </td>
+      <td>${esc(t.ciudad||'—')}</td>
+      <td>${planBadge}</td>
+      <td>${estadoBadge}</td>
+      <td>${vence}</td>
+      <td>
+        <button class="action-btn action-btn-view" onclick="verAcceso('${t.slug}')">Ver</button>
+        <button class="action-btn action-btn-edit" onclick="abrirModal('${t.id}')">Editar</button>
+        ${toggleBtn}
+      </td>
+    </tr>`
+  }).join('')
+
+  wrap.innerHTML = `<table class="rest-table">
+    <thead><tr>
+      <th>Negocio</th><th>Ciudad</th><th>Plan</th><th>Estado</th><th>Vence</th><th>Acciones</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>`
+}
+
+function renderUsuarios() {
+  const q = (document.getElementById('search-user')?.value || '').toLowerCase()
+  const lista = todosUsuarios.filter(u =>
+    !q || (u.user_id||'').toLowerCase().includes(q) || (u.tenants?.nombre||'').toLowerCase().includes(q) || (u.rol||'').toLowerCase().includes(q)
+  )
+  const wrap = document.getElementById('usuarios-wrap')
+  if (lista.length === 0) {
+    wrap.innerHTML = '<div class="sa-empty">No hay usuarios registrados</div>'
+    return
+  }
+  wrap.className = 'usuarios-grid'
+  wrap.innerHTML = lista.map(u => {
+    const t = u.tenants
+    const rolClass = u.rol === 'admin' ? 'rol-admin' : u.rol === 'profesional' ? 'rol-profesional' : 'rol-recepcion'
+    return `<div class="user-card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        ${t ? `<span class="color-dot" style="background:${t.color_primario||'#f43f5e'}"></span>` : ''}
+        <div class="user-name">${t ? esc(t.nombre) : 'Sin negocio'}</div>
+      </div>
+      <div class="user-meta">ID: ${u.user_id?.slice(0,8)}…</div>
+      <span class="user-rol ${rolClass}">${u.rol}</span>
+    </div>`
+  }).join('')
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────
+function abrirModal(id) {
+  editandoId = id
+  const m = document.getElementById('modal-title')
+  const btnSave = document.getElementById('btn-save')
+  document.getElementById('modal-err').style.display = 'none'
+
+  // Generar paleta de colores
+  document.getElementById('color-options').innerHTML = COLORES.map(c =>
+    `<div class="color-opt" style="background:${c}" data-color="${c}" onclick="selColor('${c}')"></div>`
+  ).join('')
+
+  // Fecha default: 1 año
+  const defVence = new Date(); defVence.setFullYear(defVence.getFullYear() + 1)
+  document.getElementById('f-vencimiento').value = defVence.toISOString().slice(0,10)
+
+  if (id) {
+    const t = todosNegocios.find(x => x.id === id)
+    if (!t) return
+    m.textContent = 'Editar Negocio'
+    btnSave.textContent = 'Guardar cambios'
+    document.getElementById('f-nombre').value    = t.nombre || ''
+    document.getElementById('f-slug').value      = t.slug || ''
+    document.getElementById('f-ciudad').value    = t.ciudad || ''
+    document.getElementById('f-whatsapp').value  = t.whatsapp || ''
+    document.getElementById('f-color').value     = t.color_primario || '#f43f5e'
+    document.getElementById('f-plan').value      = t.plan || 'profesional'
+    document.getElementById('f-vencimiento').value = t.fecha_vencimiento || defVence.toISOString().slice(0,10)
+    document.getElementById('f-email').value     = ''
+    document.getElementById('f-pass').value      = ''
+    selColor(t.color_primario || '#f43f5e')
+  } else {
+    m.textContent = 'Nuevo Negocio'
+    btnSave.textContent = 'Crear Negocio'
+    document.getElementById('f-nombre').value    = ''
+    document.getElementById('f-slug').value      = ''
+    document.getElementById('f-ciudad').value    = ''
+    document.getElementById('f-whatsapp').value  = ''
+    document.getElementById('f-color').value     = '#f43f5e'
+    document.getElementById('f-plan').value      = 'profesional'
+    document.getElementById('f-email').value     = ''
+    document.getElementById('f-pass').value      = ''
+    selColor('#f43f5e')
+  }
+
+  document.getElementById('modal-ov').classList.add('open')
+  setTimeout(() => document.getElementById('f-nombre').focus(), 100)
+}
+
+function cerrarModal() { document.getElementById('modal-ov').classList.remove('open') }
+
+function selColor(c) {
+  document.querySelectorAll('.color-opt').forEach(el => {
+    el.classList.toggle('selected', el.dataset.color === c)
+  })
+  document.getElementById('f-color').value = c
+}
+function syncColorManual() {
+  const c = document.getElementById('f-color').value
+  document.querySelectorAll('.color-opt').forEach(el => el.classList.remove('selected'))
+  const match = document.querySelector(`.color-opt[data-color="${c}"]`)
+  if (match) match.classList.add('selected')
+}
+
+// auto-slug desde nombre
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('f-nombre')?.addEventListener('input', () => autoSlug(true))
+})
+function autoSlug(soloSiVacio) {
+  const slugEl = document.getElementById('f-slug')
+  if (soloSiVacio && slugEl.value.trim()) return
+  const nombre = document.getElementById('f-nombre').value
+  slugEl.value = nombre.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-')
+}
+
+async function guardarNegocio() {
+  const err = document.getElementById('modal-err')
+  err.style.display = 'none'
+  const btn = document.getElementById('btn-save')
+
+  const nombre   = document.getElementById('f-nombre').value.trim()
+  const slug     = document.getElementById('f-slug').value.trim()
+  const ciudad   = document.getElementById('f-ciudad').value.trim()
+  const whatsapp = document.getElementById('f-whatsapp').value.trim()
+  const color    = document.getElementById('f-color').value.trim() || '#f43f5e'
+  const plan     = document.getElementById('f-plan').value
+  const vence    = document.getElementById('f-vencimiento').value
+  const email    = document.getElementById('f-email').value.trim()
+  const pass     = document.getElementById('f-pass').value
+
+  if (!nombre || !slug) { mostrarErr('Nombre y slug son obligatorios'); return }
+
+  btn.disabled = true
+  btn.textContent = 'Guardando…'
+
+  if (editandoId) {
+    // EDITAR
+    const { error } = await db.from('tenants').update({
+      nombre, slug, ciudad, whatsapp: whatsapp || null,
+      color_primario: color, plan, fecha_vencimiento: vence || null,
+    }).eq('id', editandoId)
+    btn.disabled = false; btn.textContent = 'Guardar cambios'
+    if (error) { mostrarErr(error.message); return }
+    toast('Negocio actualizado', 'success')
+  } else {
+    // CREAR tenant
+    const { data: tenant, error: eT } = await db.from('tenants').insert({
+      nombre, slug, ciudad, whatsapp: whatsapp || null,
+      color_primario: color, plan,
+      fecha_vencimiento: vence || null,
+      vertical: 'peluqueria',
+      activo: true,
+    }).select().single()
+    btn.disabled = false; btn.textContent = 'Crear Negocio'
+    if (eT) { mostrarErr(eT.message); return }
+
+    // Crear usuario en Supabase Auth (solo si se dio email+pass)
+    if (email && pass) {
+      const { data: signUp, error: eU } = await db.auth.signUp({ email, password: pass })
+      if (eU) {
+        toast('Negocio creado. Error al crear usuario: ' + eU.message, 'error')
+      } else if (signUp?.user) {
+        await db.from('usuarios_tenant').insert({
+          user_id: signUp.user.id,
+          tenant_id: tenant.id,
+          rol: 'admin',
+          activo: true,
+        })
+        toast('Negocio y usuario creados', 'success')
+      }
+    } else {
+      toast('Negocio creado. Crea el usuario desde Supabase Auth.', 'success')
+    }
+    accesoSlug = slug
+    setTimeout(() => verAcceso(slug), 400)
+  }
+
+  cerrarModal()
+  await cargarNegocios()
+  cargarKpis()
+}
+
+function mostrarErr(msg) {
+  const el = document.getElementById('modal-err')
+  el.textContent = msg
+  el.style.display = 'block'
+}
+
+// ── ACCESO ────────────────────────────────────────────────────────────
+function verAcceso(slug) {
+  accesoSlug = slug
+  const url = `${location.origin}/salon?tenant=${slug}`
+  document.getElementById('access-link-text').textContent = url
+  document.getElementById('modal-acceso-ov').classList.add('open')
+}
+function cerrarModalAcceso() { document.getElementById('modal-acceso-ov').classList.remove('open') }
+function copiarAcceso() {
+  const url = `${location.origin}/salon?tenant=${accesoSlug}`
+  navigator.clipboard.writeText(url).then(() => toast('Link copiado', 'success'))
+}
+function abrirEnTab() {
+  window.open(`${location.origin}/salon?tenant=${accesoSlug}`, '_blank')
+}
+
+// ── TOGGLE ESTADO ─────────────────────────────────────────────────────
+async function toggleEstado(id, activo) {
+  const { error } = await db.from('tenants').update({ activo }).eq('id', id)
+  if (error) { toast('Error: ' + error.message, 'error'); return }
+  toast(activo ? 'Negocio activado' : 'Negocio suspendido', 'success')
+  await cargarNegocios()
+  cargarKpis()
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+function fmtFecha(f) {
+  if (!f) return '—'
+  const d = new Date(f)
+  return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })
+}
+function toast(msg, tipo) {
+  const el = document.getElementById('sa-toast')
+  el.textContent = msg
+  el.className = tipo || ''
+  el.style.display = 'block'
+  clearTimeout(el._t)
+  el._t = setTimeout(() => { el.style.display = 'none' }, 3500)
+}
+</script>
+</body>
+</html>
