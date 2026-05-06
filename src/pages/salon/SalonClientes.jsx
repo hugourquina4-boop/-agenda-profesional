@@ -63,6 +63,8 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
+const FORM_VACIO = { nombre:'', telefono:'', email:'', notas:'' }
+
 export default function SalonClientes() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
@@ -75,8 +77,14 @@ export default function SalonClientes() {
   const [saldo,      setSaldo]     = useState(null)
   const [historial,  setHistorial] = useState([])
   const [loadHist,   setLoadHist]  = useState(false)
-  const [elimTarget, setElimTarget] = useState(null)
-  const [toast,      setToast]     = useState(null)
+  const [elimTarget,  setElimTarget]  = useState(null)
+  const [toast,       setToast]       = useState(null)
+  const [showNuevo,   setShowNuevo]   = useState(false)
+  const [nuevoForm,   setNuevoForm]   = useState(FORM_VACIO)
+  const [guardando,   setGuardando]   = useState(false)
+  const [editNotas,   setEditNotas]   = useState(false)
+  const [notasEdit,   setNotasEdit]   = useState('')
+  const [guardandoN,  setGuardandoN]  = useState(false)
 
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
@@ -97,7 +105,6 @@ export default function SalonClientes() {
     ? clientes
     : clientes.filter(c => c.segmento === filtroSeg)
 
-  // Conteo por segmento para los filtros
   const conteos = clientes.reduce((acc, c) => {
     acc[c.segmento || 'nuevo'] = (acc[c.segmento || 'nuevo'] || 0) + 1
     return acc
@@ -108,29 +115,69 @@ export default function SalonClientes() {
     setTimeout(() => setToast(null), 2500)
   }
 
+  async function guardarCliente() {
+    if (!nuevoForm.nombre.trim()) { showToast('El nombre es requerido', false); return }
+    setGuardando(true)
+    const { error } = await supabase.from('clientes_agenda').insert({
+      tenant_id:            tenant.id,
+      nombre:               nuevoForm.nombre.trim(),
+      telefono:             nuevoForm.telefono.trim() || null,
+      email:                nuevoForm.email.trim() || null,
+      notas:                nuevoForm.notas.trim() || null,
+      segmento:             'nuevo',
+      num_visitas:          0,
+      total_gastado:        0,
+      puntos_fidelizacion:  0,
+    })
+    setGuardando(false)
+    if (error) { showToast('Error al crear cliente', false); return }
+    showToast('Cliente creado')
+    setShowNuevo(false)
+    setNuevoForm(FORM_VACIO)
+    cargar()
+  }
+
+  // Cascade delete: siempre incluir tenant_id para que pase el RLS
   async function eliminarCliente() {
     if (!elimTarget) return
     const id = elimTarget.id
-    await supabase.from('lista_espera').delete().eq('cliente_id', id)
-    await supabase.from('saldo_puntos').delete().eq('cliente_id', id)
-    await supabase.from('citas').delete().eq('cliente_id', id)
-    const { error } = await supabase.from('clientes_agenda').delete().eq('id', id)
-    if (error) { showToast('Error al eliminar cliente', false); return }
+    const tid = tenant.id
+    await supabase.from('lista_espera').delete().eq('cliente_id', id).eq('tenant_id', tid)
+    await supabase.from('saldo_puntos').delete().eq('cliente_id', id).eq('tenant_id', tid)
+    await supabase.from('citas').delete().eq('cliente_id', id).eq('tenant_id', tid)
+    const { error } = await supabase.from('clientes_agenda').delete().eq('id', id).eq('tenant_id', tid)
+    if (error) { showToast('Error al eliminar: ' + error.message, false); return }
     showToast('Cliente eliminado')
     setElimTarget(null)
     if (sel?.id === id) { setSel(null); setSaldo(null) }
     cargar()
   }
 
+  async function guardarNotas() {
+    if (!sel) return
+    setGuardandoN(true)
+    const { error } = await supabase.from('clientes_agenda')
+      .update({ notas: notasEdit.trim() || null })
+      .eq('id', sel.id).eq('tenant_id', tenant.id)
+    setGuardandoN(false)
+    if (error) { showToast('Error al guardar notas', false); return }
+    setSel(s => ({ ...s, notas: notasEdit.trim() || null }))
+    setEditNotas(false)
+    showToast('Notas guardadas')
+    cargar()
+  }
+
   async function abrirCliente(cli) {
     setSel(cli)
+    setNotasEdit(cli.notas || '')
+    setEditNotas(false)
     setSaldo(null)
-    setElimConfirm(false)
     setLoadHist(true)
     const [{ data: hist }, { data: sp }] = await Promise.all([
       supabase.from('citas')
         .select('id, fecha_inicio, estado, precio_cobrado, servicios(nombre, precio), profesionales(nombre)')
         .eq('cliente_id', cli.id)
+        .eq('tenant_id', tenant.id)
         .order('fecha_inicio', { ascending: false })
         .limit(10),
       supabase.from('saldo_puntos')
@@ -147,7 +194,6 @@ export default function SalonClientes() {
   function fmtFecha(iso) {
     return new Date(iso).toLocaleDateString('es-CO', { day:'numeric', month:'short', year:'numeric' })
   }
-
   function fmtFechaCorta(iso) {
     return new Date(iso).toLocaleDateString('es-CO', { day:'numeric', month:'short' })
   }
@@ -161,114 +207,7 @@ export default function SalonClientes() {
     <div style={{ padding:'0 0 16px' }}>
       {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
 
-      {/* Search */}
-      <div style={{ padding:'0 16px 12px', position:'sticky', top:0, background:'var(--bg)', zIndex:10, paddingTop:4 }}>
-        <div style={{ position:'relative', marginBottom:10 }}>
-          <div style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)' }}>
-            <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={17} />
-          </div>
-          <input className="sp-input" placeholder="Buscar cliente…"
-            value={busq} onChange={e => setBusq(e.target.value)}
-            style={{ paddingLeft:42 }}
-          />
-        </div>
-
-        {/* Filtros por segmento */}
-        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:2 }}>
-          {FILTROS.map(f => {
-            const activo = filtroSeg === f.key
-            const cnt = f.key === 'todos' ? clientes.length : (conteos[f.key] || 0)
-            const cfg = SEGMENTO[f.key]
-            return (
-              <button key={f.key} onClick={() => setFiltroSeg(f.key)}
-                style={{
-                  flexShrink:0, padding:'5px 11px', borderRadius:8, fontSize:12,
-                  fontWeight:700, cursor:'pointer', border:'1px solid',
-                  whiteSpace:'nowrap',
-                  background: activo ? (cfg ? cfg.bg : `${col}18`) : 'transparent',
-                  borderColor: activo ? (cfg ? cfg.color : col) : 'var(--border)',
-                  color: activo ? (cfg ? cfg.color : col) : 'var(--text-3)',
-                }}>
-                {f.label} {cnt > 0 && <span style={{ opacity:0.7 }}>· {cnt}</span>}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10 }}>
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className="sp-skeleton" style={{ height:72, borderRadius:16 }} />
-          ))}
-        </div>
-      ) : clientesFiltrados.length === 0 ? (
-        <div className="sp-empty">
-          <span className="sp-empty-icon">👥</span>
-          <p className="sp-empty-title">Sin clientes</p>
-          <p className="sp-empty-sub">
-            {busq ? 'No se encontraron resultados' : filtroSeg !== 'todos' ? `Sin clientes ${SEGMENTO[filtroSeg]?.label?.toLowerCase()}s` : 'Aún no hay clientes registrados'}
-          </p>
-        </div>
-      ) : (
-        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:8 }}>
-          {clientesFiltrados.map((c, i) => {
-            const color = COLORS[i % COLORS.length]
-            const cumple = cumpleProximo(c.fecha_nacimiento)
-            return (
-              <div key={c.id} onClick={() => abrirCliente(c)}
-                style={{
-                  width:'100%', display:'flex', alignItems:'center', gap:14,
-                  padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left',
-                  background:'var(--card)', border:`1px solid ${cumple ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
-                  transition:'all 0.15s',
-                }}>
-                <div style={{
-                  width:46, height:46, borderRadius:14, background:`${color}25`,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontFamily:'Outfit', fontWeight:800, fontSize:20, color, flexShrink:0,
-                }}>
-                  {c.nombre[0]}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:2, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                    {c.nombre}
-                    {cumple && <span title="Cumpleaños próximo">🎂</span>}
-                  </div>
-                  <div style={{ fontSize:12, color:'var(--text-3)', display:'flex', gap:8, alignItems:'center' }}>
-                    {c.num_visitas > 0
-                      ? <span>{c.num_visitas} visita{c.num_visitas !== 1 ? 's' : ''} · {fmtCOP(c.ticket_promedio)} ticket</span>
-                      : <span>{c.telefono || c.email || 'Sin contacto'}</span>
-                    }
-                  </div>
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
-                  <SegBadge segmento={c.segmento} />
-                  {c.puntos_fidelizacion > 0 && (
-                    <span style={{
-                      padding:'2px 7px', borderRadius:6, background:`${col}20`,
-                      fontSize:11, fontWeight:700, color:col,
-                    }}>
-                      ⭐ {c.puntos_fidelizacion}
-                    </span>
-                  )}
-                </div>
-                <button onClick={e => { e.stopPropagation(); setElimTarget(c) }}
-                  title="Eliminar cliente"
-                  style={{
-                    width:34, height:34, borderRadius:10, border:'1px solid rgba(239,68,68,0.25)',
-                    background:'transparent', color:'#ef4444', cursor:'pointer', flexShrink:0,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                  <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15} />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Confirmar eliminación */}
+      {/* ── Confirmar eliminación ── */}
       {elimTarget && (
         <>
           <div className="sp-sheet-overlay" onClick={() => setElimTarget(null)} />
@@ -298,14 +237,180 @@ export default function SalonClientes() {
         </>
       )}
 
-      {/* Sheet detalle cliente */}
+      {/* ── Nuevo cliente ── */}
+      {showNuevo && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => { setShowNuevo(false); setNuevoForm(FORM_VACIO) }} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">Nuevo cliente</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:20 }}>
+              {[
+                { key:'nombre',   label:'NOMBRE *', type:'text', placeholder:'' },
+                { key:'telefono', label:'TELÉFONO',  type:'tel',   placeholder:'' },
+                { key:'email',    label:'EMAIL',     type:'email', placeholder:'' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                    {f.label}
+                  </label>
+                  <input className="sp-input" type={f.type} placeholder={f.placeholder}
+                    value={nuevoForm[f.key]}
+                    onChange={e => setNuevoForm(p => ({ ...p, [f.key]: e.target.value }))} />
+                </div>
+              ))}
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                  NOTAS
+                </label>
+                <textarea className="sp-input"
+                  placeholder="Alergias, preferencias, referencias…"
+                  value={nuevoForm.notas}
+                  onChange={e => setNuevoForm(p => ({ ...p, notas: e.target.value }))}
+                  rows={3} style={{ resize:'vertical', minHeight:80 }} />
+              </div>
+            </div>
+            <button onClick={guardarCliente} disabled={guardando} style={{
+              width:'100%', padding:'15px', borderRadius:14, cursor:'pointer',
+              background:col, border:'none', color:'#fff',
+              fontFamily:'Outfit', fontWeight:700, fontSize:15, opacity: guardando ? 0.7 : 1,
+            }}>
+              {guardando ? 'Guardando…' : 'Guardar cliente'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── Header ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 0' }}>
+        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>Clientes</h2>
+        <button onClick={() => setShowNuevo(true)} style={{
+          display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
+          background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13,
+          cursor:'pointer', fontFamily:'Plus Jakarta Sans',
+        }}>
+          <Ico d="M12 4v16m8-8H4" size={15} />
+          Agregar
+        </button>
+      </div>
+
+      {/* ── Search + filtros ── */}
+      <div style={{ padding:'12px 16px 12px', position:'sticky', top:0, background:'var(--bg)', zIndex:10 }}>
+        <div style={{ position:'relative', marginBottom:10 }}>
+          <div style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)' }}>
+            <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={17} />
+          </div>
+          <input className="sp-input" placeholder="Buscar cliente…"
+            value={busq} onChange={e => setBusq(e.target.value)}
+            style={{ paddingLeft:42 }}
+          />
+        </div>
+        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:2 }}>
+          {FILTROS.map(f => {
+            const activo = filtroSeg === f.key
+            const cnt = f.key === 'todos' ? clientes.length : (conteos[f.key] || 0)
+            const cfg = SEGMENTO[f.key]
+            return (
+              <button key={f.key} onClick={() => setFiltroSeg(f.key)}
+                style={{
+                  flexShrink:0, padding:'5px 11px', borderRadius:8, fontSize:12,
+                  fontWeight:700, cursor:'pointer', border:'1px solid',
+                  whiteSpace:'nowrap',
+                  background: activo ? (cfg ? cfg.bg : `${col}18`) : 'transparent',
+                  borderColor: activo ? (cfg ? cfg.color : col) : 'var(--border)',
+                  color: activo ? (cfg ? cfg.color : col) : 'var(--text-3)',
+                }}>
+                {f.label} {cnt > 0 && <span style={{ opacity:0.7 }}>· {cnt}</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Lista ── */}
+      {loading ? (
+        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10 }}>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="sp-skeleton" style={{ height:72, borderRadius:16 }} />
+          ))}
+        </div>
+      ) : clientesFiltrados.length === 0 ? (
+        <div className="sp-empty">
+          <span className="sp-empty-icon">👥</span>
+          <p className="sp-empty-title">Sin clientes</p>
+          <p className="sp-empty-sub">
+            {busq ? 'No se encontraron resultados'
+              : filtroSeg !== 'todos' ? `Sin clientes ${SEGMENTO[filtroSeg]?.label?.toLowerCase()}s`
+              : 'Toca "Agregar" para registrar el primer cliente'}
+          </p>
+        </div>
+      ) : (
+        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:8 }}>
+          {clientesFiltrados.map((c, i) => {
+            const color = COLORS[i % COLORS.length]
+            const cumple = cumpleProximo(c.fecha_nacimiento)
+            return (
+              <div key={c.id} onClick={() => abrirCliente(c)}
+                style={{
+                  width:'100%', display:'flex', alignItems:'center', gap:14,
+                  padding:'14px 16px', borderRadius:16, cursor:'pointer',
+                  background:'var(--card)', border:`1px solid ${cumple ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
+                  transition:'all 0.15s',
+                }}>
+                <div style={{
+                  width:46, height:46, borderRadius:14, background:`${color}25`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontFamily:'Outfit', fontWeight:800, fontSize:20, color, flexShrink:0,
+                }}>
+                  {c.nombre[0]}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:3, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    {c.nombre}
+                    {cumple && <span title="Cumpleaños próximo">🎂</span>}
+                  </div>
+                  <div style={{ fontSize:12, color:'var(--text-3)', display:'flex', flexDirection:'column', gap:2 }}>
+                    {c.telefono && <span>📞 {c.telefono}</span>}
+                    {c.ultima_visita
+                      ? <span>Última visita: {fmtFechaCorta(c.ultima_visita)}</span>
+                      : c.num_visitas === 0 && <span style={{ color:'var(--text-3)' }}>Sin visitas aún</span>
+                    }
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
+                  <SegBadge segmento={c.segmento} />
+                  {c.puntos_fidelizacion > 0 && (
+                    <span style={{
+                      padding:'2px 7px', borderRadius:6, background:`${col}20`,
+                      fontSize:11, fontWeight:700, color:col,
+                    }}>
+                      ⭐ {c.puntos_fidelizacion}
+                    </span>
+                  )}
+                </div>
+                {/* Botón eliminar directo en la tarjeta */}
+                <button onClick={e => { e.stopPropagation(); setElimTarget(c) }}
+                  title="Eliminar cliente"
+                  style={{
+                    width:34, height:34, borderRadius:10, border:'1px solid rgba(239,68,68,0.25)',
+                    background:'transparent', color:'#ef4444', cursor:'pointer', flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                  <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Sheet detalle cliente ── */}
       {sel && (
         <>
           <div className="sp-sheet-overlay" onClick={() => { setSel(null); setSaldo(null) }} />
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
 
-            {/* Avatar + nombre + segmento */}
             <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
               <div style={{
                 width:56, height:56, borderRadius:18, background:`${col}25`,
@@ -325,13 +430,12 @@ export default function SalonClientes() {
               </div>
             </div>
 
-            {/* Stats LTV */}
             {sel.num_visitas >= 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
                 {[
-                  { label:'Visitas',   value: sel.num_visitas || 0             },
-                  { label:'Gastado',   value: fmtCOP(sel.total_gastado)        },
-                  { label:'Ticket',    value: fmtCOP(sel.ticket_promedio)      },
+                  { label:'Visitas',   value: sel.num_visitas || 0        },
+                  { label:'Gastado',   value: fmtCOP(sel.total_gastado)   },
+                  { label:'Ticket',    value: fmtCOP(sel.ticket_promedio) },
                 ].map(s => (
                   <div key={s.label} style={{
                     background:'var(--card)', border:'1px solid var(--border)',
@@ -344,17 +448,13 @@ export default function SalonClientes() {
               </div>
             )}
 
-            {/* Info de contacto */}
             <div style={{
               background:'var(--card)', border:'1px solid var(--border)',
               borderRadius:16, padding:'14px 16px', marginBottom:14,
               display:'flex', flexDirection:'column', gap:10,
             }}>
               {sel.telefono && (
-                <a href={`tel:${sel.telefono}`} style={{
-                  display:'flex', alignItems:'center', gap:10,
-                  fontSize:14, color:'var(--text-2)', textDecoration:'none',
-                }}>
+                <a href={`tel:${sel.telefono}`} style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'var(--text-2)', textDecoration:'none' }}>
                   <Ico d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" size={16} />
                   {sel.telefono}
                 </a>
@@ -379,7 +479,7 @@ export default function SalonClientes() {
                       {TIER[saldo.tier]?.label || 'Bronce'}
                     </span>
                     <span style={{ color:'var(--text-3)', marginLeft:6 }}>
-                      · {saldo.saldo} pts disponibles · {saldo.total_ganado} ganados
+                      · {saldo.saldo} pts · {saldo.total_ganado} ganados
                     </span>
                   </div>
                 </div>
@@ -396,7 +496,44 @@ export default function SalonClientes() {
               )}
             </div>
 
-            {/* WhatsApp CTA */}
+            {/* ── Notas ── */}
+            <div style={{
+              background:'var(--card)', border:'1px solid var(--border)',
+              borderRadius:16, padding:'14px 16px', marginBottom:14,
+            }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'var(--text-2)' }}>📝 Notas de atención</span>
+                <button onClick={() => { setEditNotas(e => !e); setNotasEdit(sel.notas || '') }}
+                  style={{ background:'none', border:'none', fontSize:12, color:'var(--accent)',
+                    fontWeight:700, cursor:'pointer', padding:'2px 8px', borderRadius:6 }}>
+                  {editNotas ? 'Cancelar' : 'Editar'}
+                </button>
+              </div>
+              {editNotas ? (
+                <>
+                  <textarea className="sp-input"
+                    value={notasEdit}
+                    onChange={e => setNotasEdit(e.target.value)}
+                    placeholder="Color de cabello, alergias, preferencias, referencias…"
+                    rows={4} style={{ resize:'vertical', minHeight:90, marginBottom:10, width:'100%' }}
+                    autoFocus
+                  />
+                  <button onClick={guardarNotas} disabled={guardandoN} style={{
+                    width:'100%', padding:'12px', borderRadius:12, cursor:'pointer',
+                    background:col, border:'none', color:'#fff', fontWeight:700, fontSize:14,
+                    opacity: guardandoN ? 0.7 : 1,
+                  }}>
+                    {guardandoN ? 'Guardando…' : 'Guardar notas'}
+                  </button>
+                </>
+              ) : (
+                <p style={{ fontSize:14, color: sel.notas ? 'var(--text-2)' : 'var(--text-3)',
+                  lineHeight:1.6, margin:0, whiteSpace:'pre-wrap' }}>
+                  {sel.notas || 'Sin notas. Toca "Editar" para agregar.'}
+                </p>
+              )}
+            </div>
+
             {sel.telefono && (
               <button onClick={() => window.open(`https://wa.me/${sel.telefono.replace(/\D/g,'')}`, '_blank')}
                 style={{
@@ -406,12 +543,11 @@ export default function SalonClientes() {
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                   fontFamily:'Plus Jakarta Sans',
                 }}>
-                <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={16} />
+                <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 12.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={16} />
                 Enviar mensaje
               </button>
             )}
 
-            {/* Eliminar cliente */}
             <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, marginBottom:14 }}>
               <button onClick={() => { setElimTarget(sel); setSel(null); setSaldo(null) }} style={{
                 width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
@@ -422,7 +558,6 @@ export default function SalonClientes() {
               </button>
             </div>
 
-            {/* Historial */}
             <p style={{ fontFamily:'Outfit', fontWeight:700, fontSize:16, color:'var(--text)', marginBottom:12 }}>
               Historial de citas
             </p>
@@ -435,23 +570,14 @@ export default function SalonClientes() {
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {historial.map(c => (
-                  <div key={c.id} style={{
-                    padding:'12px 14px', borderRadius:12,
-                    background:'var(--card)', border:'1px solid var(--border)',
-                  }}>
+                  <div key={c.id} style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)', border:'1px solid var(--border)' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <span style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>
                         {c.servicios?.nombre || '—'}
                       </span>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{
-                          width:7, height:7, borderRadius:'50%', flexShrink:0,
-                          background: ESTADO_COLOR[c.estado] || '#6b7280',
-                          display:'inline-block',
-                        }} />
-                        <span style={{ fontSize:11, color:'var(--text-3)' }}>
-                          {fmtFechaCorta(c.fecha_inicio)}
-                        </span>
+                        <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: ESTADO_COLOR[c.estado] || '#6b7280', display:'inline-block' }} />
+                        <span style={{ fontSize:11, color:'var(--text-3)' }}>{fmtFechaCorta(c.fecha_inicio)}</span>
                       </div>
                     </div>
                     <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>

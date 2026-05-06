@@ -190,6 +190,22 @@
     .rol-admin { background:var(--primary-lt); color:var(--primary); }
     .rol-profesional { background:rgba(99,102,241,.1); color:#818cf8; }
     .rol-recepcion { background:rgba(16,185,129,.1); color:var(--success); }
+
+    /* Accesos tab */
+    .clave-mask { font-family:monospace; font-size:13px; letter-spacing:.05em; cursor:pointer; user-select:all; }
+    .clave-mask.oculta { color:var(--txt3); letter-spacing:.2em; }
+    .action-btn-reset { background:rgba(245,158,11,.1); color:var(--warning); border-color:var(--warning); }
+    .action-btn-reset:hover { opacity:.75; }
+    .action-btn-pay { background:rgba(16,185,129,.1); color:var(--success); border-color:var(--success); }
+    .action-btn-pay:hover { opacity:.75; }
+
+    /* Pagos tab */
+    .pagos-table td .monto-cell { font-weight:700; color:var(--success); }
+    .metodo-badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; background:rgba(99,102,241,.1); color:#818cf8; }
+
+    /* Clave generada highlight */
+    .clave-generada { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.3); border-radius:8px; padding:12px 16px; font-family:monospace; font-size:18px; font-weight:800; color:var(--warning); text-align:center; letter-spacing:.1em; margin:12px 0; cursor:pointer; }
+    .clave-generada:hover { background:rgba(245,158,11,.2); }
   </style>
 </head>
 <body>
@@ -261,6 +277,8 @@
     <!-- Tabs -->
     <div class="sa-tabs">
       <button class="sa-tab active" onclick="switchTab('negocios',this)">Negocios</button>
+      <button class="sa-tab" onclick="switchTab('accesos',this)">🔑 Accesos</button>
+      <button class="sa-tab" onclick="switchTab('pagos',this)">💳 Pagos</button>
       <button class="sa-tab" onclick="switchTab('usuarios',this)">Usuarios</button>
     </div>
 
@@ -271,12 +289,40 @@
           <svg class="search-ico" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input class="sa-search" type="text" placeholder="Buscar negocio, ciudad, slug..." id="search-input" oninput="renderTabla()">
         </div>
-        <button class="filter-btn active" data-f="todos"      onclick="setFiltro('todos',this)">Todos</button>
-        <button class="filter-btn"        data-f="activos"    onclick="setFiltro('activos',this)">Activos</button>
+        <button class="filter-btn active" data-f="todos"       onclick="setFiltro('todos',this)">Todos</button>
+        <button class="filter-btn"        data-f="activos"     onclick="setFiltro('activos',this)">Activos</button>
         <button class="filter-btn"        data-f="suspendidos" onclick="setFiltro('suspendidos',this)">Suspendidos</button>
         <button class="sa-new-btn" onclick="abrirModal(null)">+ Nuevo Negocio</button>
       </div>
       <div class="rest-table-wrap" id="tabla-wrap">
+        <div class="sa-empty"><div class="sa-spin"></div></div>
+      </div>
+    </div>
+
+    <!-- TAB: Accesos -->
+    <div id="tab-accesos" style="display:none">
+      <div class="sa-toolbar">
+        <div class="search-wrap">
+          <svg class="search-ico" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="sa-search" type="text" placeholder="Buscar negocio o email..." id="search-accesos" oninput="renderAccesos()">
+        </div>
+        <span style="font-size:12px;color:var(--txt3)">Clic en la clave para copiarla</span>
+      </div>
+      <div class="rest-table-wrap" id="accesos-wrap">
+        <div class="sa-empty"><div class="sa-spin"></div></div>
+      </div>
+    </div>
+
+    <!-- TAB: Pagos -->
+    <div id="tab-pagos" style="display:none">
+      <div class="sa-toolbar">
+        <div class="search-wrap">
+          <svg class="search-ico" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="sa-search" type="text" placeholder="Buscar negocio..." id="search-pagos" oninput="renderPagos()">
+        </div>
+        <button class="sa-new-btn" onclick="abrirModalPago(null)">+ Registrar Pago</button>
+      </div>
+      <div class="rest-table-wrap" id="pagos-wrap">
         <div class="sa-empty"><div class="sa-spin"></div></div>
       </div>
     </div>
@@ -419,6 +465,103 @@
   </div>
 </div>
 
+<!-- MODAL CLAVE GENERADA -->
+<div class="sa-modal-ov" id="modal-clave-ov" onclick="if(event.target===this)document.getElementById('modal-clave-ov').classList.remove('open')">
+  <div class="sa-modal" style="max-width:420px">
+    <div class="sa-modal-header">
+      <div class="sa-modal-title">🔑 Clave generada</div>
+      <button type="button" class="sa-modal-close" onclick="document.getElementById('modal-clave-ov').classList.remove('open')">×</button>
+    </div>
+    <div class="sa-modal-body">
+      <p style="font-size:13px;color:var(--txt2);margin-bottom:4px">Email de acceso:</p>
+      <div class="access-box" id="clave-email-box" onclick="copiarTexto('clave-email-box')">
+        <svg class="copy-icon" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        <span id="clave-email-txt"></span>
+      </div>
+      <p style="font-size:13px;color:var(--txt2);margin-top:14px;margin-bottom:4px">Contraseña temporal:</p>
+      <div class="clave-generada" id="clave-valor-box" onclick="copiarTexto('clave-valor-box')" title="Clic para copiar">
+        <span id="clave-valor-txt"></span>
+      </div>
+      <p style="font-size:11px;color:var(--txt3);margin-top:8px">Clic en la clave para copiarla. Compártela con el dueño del negocio. Se guardó en el tab Accesos.</p>
+    </div>
+    <div class="sa-modal-footer">
+      <button type="button" class="btn-cancel" onclick="document.getElementById('modal-clave-ov').classList.remove('open')">Cerrar</button>
+      <button type="button" class="btn-save" onclick="copiarClaveCompleta()">Copiar todo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REGISTRAR PAGO -->
+<div class="sa-modal-ov" id="modal-pago-ov" onclick="if(event.target===this)cerrarModalPago()">
+  <div class="sa-modal" style="max-width:480px">
+    <div class="sa-modal-header">
+      <div class="sa-modal-title" id="modal-pago-title">Registrar Pago</div>
+      <button type="button" class="sa-modal-close" onclick="cerrarModalPago()">×</button>
+    </div>
+    <div class="sa-modal-body">
+      <div class="modal-err" id="modal-pago-err"></div>
+
+      <div class="form-group">
+        <label class="form-label">Negocio</label>
+        <select class="form-control" id="fp-tenant">
+          <option value="">— Seleccionar —</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Monto (COP)</label>
+          <input class="form-control" id="fp-monto" type="number" placeholder="49000" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Plan</label>
+          <select class="form-control" id="fp-plan">
+            <option value="basico">Básico</option>
+            <option value="profesional" selected>Profesional</option>
+            <option value="premium">Premium</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Desde</label>
+          <input class="form-control" id="fp-desde" type="date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Hasta</label>
+          <input class="form-control" id="fp-hasta" type="date">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Método de pago</label>
+          <select class="form-control" id="fp-metodo">
+            <option value="efectivo">Efectivo</option>
+            <option value="nequi">Nequi</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Referencia</label>
+          <input class="form-control" id="fp-ref" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <input class="form-control" id="fp-notas" placeholder="Observaciones opcionales">
+      </div>
+    </div>
+    <div class="sa-modal-footer">
+      <button type="button" class="btn-cancel" onclick="cerrarModalPago()">Cancelar</button>
+      <button type="button" class="btn-save" id="btn-save-pago" onclick="guardarPago()">Guardar pago</button>
+    </div>
+  </div>
+</div>
+
 <div id="sa-toast"></div>
 
 <script>
@@ -433,6 +576,7 @@ const COLORES = ['#f43f5e','#e11d48','#a855f7','#8b5cf6','#3b82f6','#06b6d4','#1
 
 let todosNegocios = []
 let todosUsuarios = []
+let todosPagos    = []
 let filtroActivo  = 'todos'
 let editandoId    = null
 let accesoSlug    = ''
@@ -486,9 +630,13 @@ function aplicarTema() {
 function switchTab(nombre, btn) {
   document.querySelectorAll('.sa-tab').forEach(b => b.classList.remove('active'))
   btn.classList.add('active')
-  document.getElementById('tab-negocios').style.display  = nombre === 'negocios'  ? '' : 'none'
-  document.getElementById('tab-usuarios').style.display  = nombre === 'usuarios'  ? '' : 'none'
+  document.getElementById('tab-negocios').style.display = nombre === 'negocios' ? '' : 'none'
+  document.getElementById('tab-accesos').style.display  = nombre === 'accesos'  ? '' : 'none'
+  document.getElementById('tab-pagos').style.display    = nombre === 'pagos'    ? '' : 'none'
+  document.getElementById('tab-usuarios').style.display = nombre === 'usuarios' ? '' : 'none'
   if (nombre === 'usuarios' && todosUsuarios.length === 0) cargarUsuarios()
+  if (nombre === 'pagos'    && todosPagos.length === 0)    cargarPagos()
+  if (nombre === 'accesos') renderAccesos()
 }
 
 // ── DATOS ─────────────────────────────────────────────────────────────
@@ -775,25 +923,42 @@ async function guardarNegocio() {
     btn.disabled = false; btn.textContent = 'Crear Negocio'
     if (eT) { mostrarErr(eT.message); return }
 
-    // Crear usuario en Supabase Auth (solo si se dio email+pass)
+    // Crear usuario via Edge Function (bypasa confirmación de email)
     if (email && pass) {
-      const { data: signUp, error: eU } = await db.auth.signUp({ email, password: pass })
-      if (eU) {
-        toast('Negocio creado. Error al crear usuario: ' + eU.message, 'error')
-      } else if (signUp?.user) {
-        await db.from('usuarios_tenant').insert({
-          user_id: signUp.user.id,
-          tenant_id: tenant.id,
-          rol: 'admin',
-          activo: true,
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-crear-usuario`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-secret': ACCESS_PASS,
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ email, password: pass, tenant_id: tenant.id }),
         })
-        toast('Negocio y usuario creados', 'success')
+        const result = await res.json()
+        if (!res.ok || !result.ok) {
+          toast('Negocio creado. Error al crear usuario: ' + (result.error || 'desconocido'), 'error')
+        } else {
+          // Actualizar datos locales
+          tenant.admin_email = email
+          tenant.admin_clave_temp = pass
+          tenant.admin_clave_fecha = new Date().toISOString()
+          // Mostrar clave generada
+          document.getElementById('clave-email-txt').textContent = email
+          document.getElementById('clave-valor-txt').textContent = pass
+          cerrarModal()
+          document.getElementById('modal-clave-ov').classList.add('open')
+        }
+      } catch (e) {
+        toast('Negocio creado, error de red: ' + e.message, 'error')
       }
     } else {
-      toast('Negocio creado. Crea el usuario desde Supabase Auth.', 'success')
+      toast('Negocio creado. Usa el tab Accesos → Reset clave para generar credenciales.', 'success')
+      accesoSlug = slug
+      cerrarModal()
+      setTimeout(() => verAcceso(slug), 400)
     }
-    accesoSlug = slug
-    setTimeout(() => verAcceso(slug), 400)
   }
 
   cerrarModal()
@@ -845,6 +1010,222 @@ async function toggleEstado(id, activo) {
   toast(activo ? 'Negocio activado' : 'Negocio suspendido', 'success')
   await cargarNegocios()
   cargarKpis()
+}
+
+// ── ACCESOS ───────────────────────────────────────────────────────────
+function renderAccesos() {
+  const q = (document.getElementById('search-accesos')?.value || '').toLowerCase()
+  const lista = todosNegocios.filter(t =>
+    !q || (t.nombre||'').toLowerCase().includes(q) || (t.admin_email||'').toLowerCase().includes(q)
+  )
+  const wrap = document.getElementById('accesos-wrap')
+  if (lista.length === 0) {
+    wrap.innerHTML = '<div class="sa-empty">No hay negocios registrados</div>'
+    return
+  }
+  const filas = lista.map(t => {
+    const clave = t.admin_clave_temp || ''
+    const fecha = t.admin_clave_fecha ? fmtFecha(t.admin_clave_fecha) : '—'
+    const claveCell = clave
+      ? `<span class="clave-mask oculta" onclick="toggleClave(this,'${esc(clave)}')" title="Clic para revelar">••••••••</span>`
+      : '<span style="color:var(--txt3);font-size:12px">Sin clave guardada</span>'
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="color-dot" style="background:${t.color_primario||'#f43f5e'}"></span>
+          <span style="font-weight:700">${esc(t.nombre)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--txt3)">${esc(t.slug)}</div>
+      </td>
+      <td style="font-size:13px">${esc(t.admin_email||'—')}</td>
+      <td>${claveCell}</td>
+      <td style="font-size:12px;color:var(--txt3)">${fecha}</td>
+      <td>
+        <button class="action-btn action-btn-reset" onclick="resetClave('${t.id}')">🔑 Reset clave</button>
+        <button class="action-btn action-btn-pay" onclick="abrirModalPago('${t.id}')">💳 Pago</button>
+      </td>
+    </tr>`
+  }).join('')
+  wrap.innerHTML = `<table class="rest-table">
+    <thead><tr>
+      <th>Negocio</th><th>Email admin</th><th>Clave temporal</th><th>Último reset</th><th>Acciones</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>`
+}
+
+function toggleClave(el, clave) {
+  if (el.classList.contains('oculta')) {
+    el.classList.remove('oculta')
+    el.textContent = clave
+  } else {
+    el.classList.add('oculta')
+    el.textContent = '••••••••'
+  }
+}
+
+async function resetClave(tenantId) {
+  toast('Generando nueva clave…')
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-secret': ACCESS_PASS,
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ tenant_id: tenantId }),
+    })
+    const result = await res.json()
+    if (!res.ok || !result.ok) {
+      toast('Error: ' + (result.error || 'No se pudo generar la clave'), 'error')
+      return
+    }
+    // Actualizar datos locales
+    const t = todosNegocios.find(x => x.id === tenantId)
+    if (t) {
+      t.admin_email      = result.email
+      t.admin_clave_temp = result.clave
+      t.admin_clave_fecha = new Date().toISOString()
+    }
+    renderAccesos()
+    // Mostrar modal con clave
+    document.getElementById('clave-email-txt').textContent = result.email
+    document.getElementById('clave-valor-txt').textContent = result.clave
+    document.getElementById('modal-clave-ov').classList.add('open')
+  } catch (e) {
+    toast('Error de red: ' + e.message, 'error')
+  }
+}
+
+function copiarTexto(elementId) {
+  const el = document.getElementById(elementId)
+  const texto = el.querySelector('span')?.textContent || el.textContent
+  navigator.clipboard.writeText(texto.trim()).then(() => toast('Copiado', 'success'))
+}
+
+function copiarClaveCompleta() {
+  const email = document.getElementById('clave-email-txt').textContent
+  const clave = document.getElementById('clave-valor-txt').textContent
+  navigator.clipboard.writeText(`Email: ${email}\nContraseña: ${clave}`)
+    .then(() => toast('Email y clave copiados', 'success'))
+}
+
+// ── PAGOS ─────────────────────────────────────────────────────────────
+async function cargarPagos() {
+  const { data } = await db.from('pagos_negocio')
+    .select('*, tenants(nombre,slug,color_primario)')
+    .order('created_at', { ascending: false })
+  todosPagos = data || []
+  renderPagos()
+}
+
+function renderPagos() {
+  const q = (document.getElementById('search-pagos')?.value || '').toLowerCase()
+  const lista = todosPagos.filter(p =>
+    !q || (p.tenants?.nombre||'').toLowerCase().includes(q)
+  )
+  const wrap = document.getElementById('pagos-wrap')
+  if (lista.length === 0) {
+    wrap.innerHTML = '<div class="sa-empty">No hay pagos registrados aún</div>'
+    return
+  }
+  const filas = lista.map(p => {
+    const t = p.tenants
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${t ? `<span class="color-dot" style="background:${t.color_primario||'#f43f5e'}"></span>` : ''}
+          <span style="font-weight:700">${esc(t?.nombre||'—')}</span>
+        </div>
+      </td>
+      <td><span style="font-weight:700;color:var(--success)">${fmtCOP(p.monto||0)}</span></td>
+      <td><span class="badge badge-plan">${p.plan||'—'}</span></td>
+      <td style="font-size:12px;color:var(--txt2)">${p.periodo_desde ? fmtFecha(p.periodo_desde) : '—'} → ${p.periodo_hasta ? fmtFecha(p.periodo_hasta) : '—'}</td>
+      <td><span class="metodo-badge">${p.metodo_pago||'efectivo'}</span></td>
+      <td style="font-size:12px;color:var(--txt3)">${esc(p.referencia||'')}</td>
+      <td style="font-size:12px;color:var(--txt3)">${fmtFecha(p.created_at)}</td>
+    </tr>`
+  }).join('')
+  wrap.innerHTML = `<table class="rest-table">
+    <thead><tr>
+      <th>Negocio</th><th>Monto</th><th>Plan</th><th>Período</th><th>Método</th><th>Referencia</th><th>Registrado</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>`
+}
+
+function abrirModalPago(tenantId) {
+  // Poblar selector de negocios
+  const sel = document.getElementById('fp-tenant')
+  sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+    todosNegocios.map(t =>
+      `<option value="${t.id}"${t.id === tenantId ? ' selected' : ''}>${esc(t.nombre)}</option>`
+    ).join('')
+  // Fechas default: mes actual
+  const hoy    = new Date()
+  const desde  = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+  const hasta  = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
+  document.getElementById('fp-desde').value = desde.toISOString().slice(0,10)
+  document.getElementById('fp-hasta').value = hasta.toISOString().slice(0,10)
+  document.getElementById('fp-monto').value = ''
+  document.getElementById('fp-ref').value   = ''
+  document.getElementById('fp-notas').value = ''
+  document.getElementById('modal-pago-err').style.display = 'none'
+  document.getElementById('modal-pago-ov').classList.add('open')
+}
+
+function cerrarModalPago() {
+  document.getElementById('modal-pago-ov').classList.remove('open')
+}
+
+async function guardarPago() {
+  const tenantId = document.getElementById('fp-tenant').value
+  const monto    = parseFloat(document.getElementById('fp-monto').value)
+  const plan     = document.getElementById('fp-plan').value
+  const desde    = document.getElementById('fp-desde').value
+  const hasta    = document.getElementById('fp-hasta').value
+  const metodo   = document.getElementById('fp-metodo').value
+  const ref      = document.getElementById('fp-ref').value.trim()
+  const notas    = document.getElementById('fp-notas').value.trim()
+
+  if (!tenantId)              { showPagoErr('Selecciona un negocio'); return }
+  if (!monto || monto <= 0)   { showPagoErr('Ingresa un monto válido'); return }
+
+  const btn = document.getElementById('btn-save-pago')
+  btn.disabled = true; btn.textContent = 'Guardando…'
+
+  const { error } = await db.from('pagos_negocio').insert({
+    tenant_id: tenantId, monto, plan,
+    metodo_pago:   metodo,
+    periodo_desde: desde || null,
+    periodo_hasta: hasta || null,
+    referencia:    ref   || null,
+    notas:         notas || null,
+  })
+
+  btn.disabled = false; btn.textContent = 'Guardar pago'
+  if (error) { showPagoErr(error.message); return }
+
+  // Actualizar fecha_vencimiento del tenant si se especificó 'hasta'
+  if (hasta && tenantId) {
+    await db.from('tenants').update({ fecha_vencimiento: hasta }).eq('id', tenantId)
+    const t = todosNegocios.find(x => x.id === tenantId)
+    if (t) t.fecha_vencimiento = hasta
+    renderTabla()
+  }
+
+  toast('Pago registrado', 'success')
+  cerrarModalPago()
+  todosPagos = []  // forzar recarga la próxima vez que abra la pestaña
+  await cargarPagos()
+}
+
+function showPagoErr(msg) {
+  const el = document.getElementById('modal-pago-err')
+  el.textContent = msg
+  el.style.display = 'block'
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────
