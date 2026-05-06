@@ -40,6 +40,7 @@ export default function SalonServicios() {
   const [toast,        setToast]        = useState(null)
   const [nuevo,        setNuevo]        = useState(false)
   const [elimConfirm,  setElimConfirm]  = useState(false)
+  const [elimTarget,   setElimTarget]   = useState(null)
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
@@ -114,16 +115,20 @@ export default function SalonServicios() {
     cargar()
   }
 
-  async function eliminar() {
+  async function eliminar(id) {
+    const targetId = id || sel?.id
+    if (!targetId) return
     setSaving(true)
-    const { error } = await supabase.from('servicios').delete().eq('id', sel.id)
+    const { error } = await supabase.from('servicios').delete().eq('id', targetId).eq('tenant_id', tenant.id)
     setSaving(false)
     if (error) {
       showToast('No se puede eliminar: tiene citas asociadas', false)
       setElimConfirm(false)
+      setElimTarget(null)
       return
     }
     showToast('Servicio eliminado')
+    setElimTarget(null)
     cerrarSheet()
     cargar()
   }
@@ -131,6 +136,37 @@ export default function SalonServicios() {
   return (
     <div style={{ padding:'0 16px 16px' }}>
       {toast && <div className="sp-toast show" style={{ background: toast.color }}>{toast.msg}</div>}
+
+      {/* Confirmar borrado rápido */}
+      {elimTarget && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setElimTarget(null)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <div style={{ textAlign:'center', padding:'8px 0 20px' }}>
+              <div style={{ fontSize:44, marginBottom:12 }}>🗑️</div>
+              <p style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:'var(--text)', marginBottom:8 }}>
+                ¿Eliminar "{elimTarget.nombre}"?
+              </p>
+              <p style={{ fontSize:13, color:'var(--text-3)', lineHeight:1.6 }}>
+                Esta acción es irreversible.
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => setElimTarget(null)} style={{
+                flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
+                background:'var(--surface)', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>Cancelar</button>
+              <button onClick={() => eliminar(elimTarget.id)} disabled={saving} style={{
+                flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
+                background:'#ef4444', border:'none', color:'#fff', fontWeight:700, fontSize:14,
+                opacity: saving ? 0.7 : 1,
+              }}>{saving ? 'Eliminando…' : 'Sí, eliminar'}</button>
+            </div>
+          </div>
+        </>
+      )}
 
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
         <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>Servicios</h2>
@@ -187,12 +223,19 @@ export default function SalonServicios() {
                   {!s.activo && (
                     <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:600 }}>Inactivo</span>
                   )}
-                  <button onClick={() => abrir(s)} style={{
+                  <button onClick={() => abrir(s)} title="Editar" style={{
                     width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
                     background:'transparent', color:'var(--text-2)', cursor:'pointer',
                     display:'flex', alignItems:'center', justifyContent:'center',
                   }}>
                     <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
+                  </button>
+                  <button onClick={() => setElimTarget(s)} title="Eliminar" style={{
+                    width:32, height:32, borderRadius:9, border:'1px solid rgba(239,68,68,0.3)',
+                    background:'transparent', color:'#ef4444', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} />
                   </button>
                 </div>
               ))}

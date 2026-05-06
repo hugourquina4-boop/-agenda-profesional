@@ -43,7 +43,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
 
   useEffect(() => {
     if (!tenant) return
-    supabase.from('profesionales').select('id, nombre, especialidad, foto_url').eq('tenant_id', tenant.id).eq('activo', true)
+    supabase.from('profesionales').select('id, nombre, especialidad, foto_url, activo').eq('tenant_id', tenant.id).order('nombre')
       .then(({ data }) => setProfs(data || []))
   }, [tenant])
 
