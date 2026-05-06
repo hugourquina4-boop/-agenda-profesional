@@ -75,7 +75,7 @@ export default function SalonClientes() {
   const [saldo,      setSaldo]     = useState(null)
   const [historial,  setHistorial] = useState([])
   const [loadHist,   setLoadHist]  = useState(false)
-  const [elimConfirm,setElimConfirm]= useState(false)
+  const [elimTarget, setElimTarget] = useState(null)
   const [toast,      setToast]     = useState(null)
 
   const cargar = useCallback(async () => {
@@ -109,16 +109,16 @@ export default function SalonClientes() {
   }
 
   async function eliminarCliente() {
-    const id = sel.id
-    // Eliminar dependencias en orden antes de borrar el cliente
+    if (!elimTarget) return
+    const id = elimTarget.id
     await supabase.from('lista_espera').delete().eq('cliente_id', id)
     await supabase.from('saldo_puntos').delete().eq('cliente_id', id)
     await supabase.from('citas').delete().eq('cliente_id', id)
     const { error } = await supabase.from('clientes_agenda').delete().eq('id', id)
     if (error) { showToast('Error al eliminar cliente', false); return }
     showToast('Cliente eliminado')
-    setSel(null)
-    setElimConfirm(false)
+    setElimTarget(null)
+    if (sel?.id === id) { setSel(null); setSaldo(null) }
     cargar()
   }
 
@@ -216,7 +216,7 @@ export default function SalonClientes() {
             const color = COLORS[i % COLORS.length]
             const cumple = cumpleProximo(c.fecha_nacimiento)
             return (
-              <button key={c.id} onClick={() => abrirCliente(c)}
+              <div key={c.id} onClick={() => abrirCliente(c)}
                 style={{
                   width:'100%', display:'flex', alignItems:'center', gap:14,
                   padding:'14px 16px', borderRadius:16, cursor:'pointer', textAlign:'left',
@@ -253,11 +253,49 @@ export default function SalonClientes() {
                     </span>
                   )}
                 </div>
-                <Ico d="M9 5l7 7-7 7" size={16} />
-              </button>
+                <button onClick={e => { e.stopPropagation(); setElimTarget(c) }}
+                  title="Eliminar cliente"
+                  style={{
+                    width:34, height:34, borderRadius:10, border:'1px solid rgba(239,68,68,0.25)',
+                    background:'transparent', color:'#ef4444', cursor:'pointer', flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                  <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15} />
+                </button>
+              </div>
             )
           })}
         </div>
+      )}
+
+      {/* Confirmar eliminación */}
+      {elimTarget && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setElimTarget(null)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <div style={{ textAlign:'center', padding:'8px 0 20px' }}>
+              <div style={{ fontSize:44, marginBottom:12 }}>🗑️</div>
+              <p style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:'var(--text)', marginBottom:8 }}>
+                ¿Eliminar a {elimTarget.nombre}?
+              </p>
+              <p style={{ fontSize:13, color:'var(--text-3)', lineHeight:1.6 }}>
+                Se borrarán todas sus citas e historial.<br />Esta acción es irreversible.
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => setElimTarget(null)} style={{
+                flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
+                background:'var(--surface)', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>Cancelar</button>
+              <button onClick={eliminarCliente} style={{
+                flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
+                background:'#ef4444', border:'none', color:'#fff', fontWeight:700, fontSize:14,
+              }}>Sí, eliminar</button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Sheet detalle cliente */}
@@ -375,33 +413,13 @@ export default function SalonClientes() {
 
             {/* Eliminar cliente */}
             <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, marginBottom:14 }}>
-              {!elimConfirm ? (
-                <button onClick={() => setElimConfirm(true)} style={{
-                  width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
-                  background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
-                  color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
-                }}>
-                  Eliminar cliente
-                </button>
-              ) : (
-                <div>
-                  <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
-                    ¿Eliminar a <strong>{sel.nombre}</strong>? Se borrarán también todas sus citas e historial. Irreversible.
-                  </p>
-                  <div style={{ display:'flex', gap:8 }}>
-                    <button onClick={() => setElimConfirm(false)} style={{
-                      flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                      background:'var(--surface)', border:'1px solid var(--border)',
-                      color:'var(--text-2)', fontWeight:600, fontSize:14,
-                    }}>Cancelar</button>
-                    <button onClick={eliminarCliente} style={{
-                      flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                      background:'#ef4444', border:'none', color:'#fff',
-                      fontWeight:700, fontSize:14,
-                    }}>Sí, eliminar</button>
-                  </div>
-                </div>
-              )}
+              <button onClick={() => { setElimTarget(sel); setSel(null); setSaldo(null) }} style={{
+                width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
+                background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
+                color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
+              }}>
+                Eliminar cliente
+              </button>
             </div>
 
             {/* Historial */}

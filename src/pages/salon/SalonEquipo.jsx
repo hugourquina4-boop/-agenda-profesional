@@ -48,7 +48,7 @@ export default function SalonEquipo() {
   const [form,        setForm]        = useState({})
   const [saving,      setSaving]      = useState(false)
   const [nuevo,       setNuevo]       = useState(false)
-  const [elimConfirm, setElimConfirm] = useState(false)
+  const [elimTarget,  setElimTarget]  = useState(null)
 
   // Sheet horarios
   const [profH,    setProfH]    = useState(null)
@@ -73,7 +73,6 @@ export default function SalonEquipo() {
 
   function cerrarSheet() {
     setSel(null)
-    setElimConfirm(false)
   }
 
   // ── Horarios ─────────────────────────────────────────────────
@@ -117,14 +116,12 @@ export default function SalonEquipo() {
     setSel(prof)
     setForm({ nombre: prof.nombre, especialidad: prof.especialidad || '', telefono: prof.telefono || '', foto_url: prof.foto_url || '', activo: prof.activo })
     setNuevo(false)
-    setElimConfirm(false)
   }
 
   function abrirNuevo() {
     setSel({ id: null })
     setForm({ nombre:'', especialidad:'', telefono:'', foto_url:'', activo:true })
     setNuevo(true)
-    setElimConfirm(false)
   }
 
   async function toggleActivo(prof) {
@@ -150,20 +147,18 @@ export default function SalonEquipo() {
   }
 
   async function eliminar() {
+    if (!elimTarget) return
     setSaving(true)
-    const id = sel.id
-    // Eliminar dependencias en orden antes de borrar el profesional
+    const id = elimTarget.id
     await supabase.from('lista_espera').delete().eq('profesional_id', id)
     await supabase.from('horarios').delete().eq('profesional_id', id)
     await supabase.from('citas').delete().eq('profesional_id', id)
     const { error } = await supabase.from('profesionales').delete().eq('id', id)
     setSaving(false)
-    if (error) {
-      showToast('Error al eliminar profesional', false)
-      return
-    }
+    if (error) { showToast('Error al eliminar profesional', false); return }
     showToast('Profesional eliminado')
-    cerrarSheet()
+    setElimTarget(null)
+    if (sel?.id === id) cerrarSheet()
     cargar()
   }
 
@@ -259,6 +254,15 @@ export default function SalonEquipo() {
                 }}>
                   <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={15} />
                 </button>
+
+                {/* Botón eliminar */}
+                <button onClick={() => setElimTarget(p)} title="Eliminar profesional" style={{
+                  width:34, height:34, borderRadius:10, border:'1px solid rgba(239,68,68,0.25)',
+                  background:'transparent', color:'#ef4444', cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                }}>
+                  <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15} />
+                </button>
               </div>
             )
           })}
@@ -328,39 +332,46 @@ export default function SalonEquipo() {
             {/* Eliminar (solo en edición) */}
             {!nuevo && (
               <div style={{ marginTop:14, borderTop:'1px solid var(--border)', paddingTop:14 }}>
-                {!elimConfirm ? (
-                  <button onClick={() => setElimConfirm(true)} style={{
-                    width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
-                    background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
-                    color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
-                  }}>
-                    Eliminar profesional
-                  </button>
-                ) : (
-                  <div>
-                    <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
-                      ¿Eliminar a <strong>{sel?.nombre}</strong>? Se borrarán sus citas y horarios. Irreversible.
-                    </p>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => setElimConfirm(false)} style={{
-                        flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                        background:'var(--surface)', border:'1px solid var(--border)',
-                        color:'var(--text-2)', fontWeight:600, fontSize:14,
-                      }}>
-                        Cancelar
-                      </button>
-                      <button onClick={eliminar} disabled={saving} style={{
-                        flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                        background:'#ef4444', border:'none', color:'#fff',
-                        fontWeight:700, fontSize:14, opacity: saving ? 0.7 : 1,
-                      }}>
-                        {saving ? 'Eliminando…' : 'Sí, eliminar'}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button onClick={() => { setElimTarget(sel); cerrarSheet() }} style={{
+                  width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
+                  background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
+                  color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
+                }}>
+                  Eliminar profesional
+                </button>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* Confirmar eliminación */}
+      {elimTarget && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setElimTarget(null)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <div style={{ textAlign:'center', padding:'8px 0 20px' }}>
+              <div style={{ fontSize:44, marginBottom:12 }}>🗑️</div>
+              <p style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:'var(--text)', marginBottom:8 }}>
+                ¿Eliminar a {elimTarget.nombre}?
+              </p>
+              <p style={{ fontSize:13, color:'var(--text-3)', lineHeight:1.6 }}>
+                Se borrarán sus citas y horarios.<br />Esta acción es irreversible.
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => setElimTarget(null)} style={{
+                flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
+                background:'var(--surface)', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>Cancelar</button>
+              <button onClick={eliminar} disabled={saving} style={{
+                flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
+                background:'#ef4444', border:'none', color:'#fff', fontWeight:700, fontSize:14,
+                opacity: saving ? 0.7 : 1,
+              }}>{saving ? 'Eliminando…' : 'Sí, eliminar'}</button>
+            </div>
           </div>
         </>
       )}
