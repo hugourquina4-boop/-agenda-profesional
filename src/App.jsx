@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useEffect } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { TenantProvider, useTenant } from './context/TenantContext'
 import Login from './pages/Login'
@@ -6,12 +6,7 @@ import SalonApp from './pages/salon/SalonApp'
 import Portal from './pages/public/Portal'
 import Registro from './pages/public/Registro'
 import SalonPortal from './pages/public/SalonPortal'
-import SuperadminLayout from './components/SuperadminLayout'
 import TenantLayout from './components/TenantLayout'
-import SuperDashboard from './pages/superadmin/Dashboard'
-import Negocios from './pages/superadmin/Negocios'
-import Suscripciones from './pages/superadmin/Suscripciones'
-import Planes from './pages/superadmin/Planes'
 import TenantDashboard from './pages/tenant/Dashboard'
 import Profesionales from './pages/tenant/Profesionales'
 import Servicios from './pages/tenant/Servicios'
@@ -40,11 +35,9 @@ function RequireAuth({ children }) {
   return children
 }
 
-function RequireSuperadmin({ children }) {
-  const { user, isSuperadmin, loading } = useAuth()
-  if (loading) return <Spinner />
-  if (!user || !isSuperadmin) return <Navigate to="/login" replace />
-  return children
+function SuperadminRedirect() {
+  useEffect(() => { window.location.replace('/superadmin.html') }, [])
+  return <Spinner />
 }
 
 function RequireTenant({ children }) {
@@ -77,14 +70,9 @@ export default function App() {
           <Route path="/registro" element={<Registro />} />
           <Route path="/agenda/:slug" element={<Portal />} />
 
-          {/* Panel superadmin */}
-          <Route path="/superadmin"
-            element={<RequireSuperadmin><SuperadminLayout /></RequireSuperadmin>}>
-            <Route index element={<SuperDashboard />} />
-            <Route path="negocios"      element={<Negocios />} />
-            <Route path="suscripciones" element={<Suscripciones />} />
-            <Route path="planes"        element={<Planes />} />
-          </Route>
+          {/* Panel superadmin → redirige al panel HTML estático */}
+          <Route path="/superadmin" element={<SuperadminRedirect />} />
+          <Route path="/superadmin/*" element={<SuperadminRedirect />} />
 
           {/* Panel tenant */}
           <Route path="/panel"

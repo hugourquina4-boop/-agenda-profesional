@@ -75,6 +75,8 @@ export default function SalonClientes() {
   const [saldo,      setSaldo]     = useState(null)
   const [historial,  setHistorial] = useState([])
   const [loadHist,   setLoadHist]  = useState(false)
+  const [elimConfirm,setElimConfirm]= useState(false)
+  const [toast,      setToast]     = useState(null)
 
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
@@ -101,9 +103,24 @@ export default function SalonClientes() {
     return acc
   }, {})
 
+  function showToast(msg, ok = true) {
+    setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  async function eliminarCliente() {
+    const { error } = await supabase.from('clientes_agenda').delete().eq('id', sel.id)
+    if (error) { showToast('No se puede eliminar: tiene citas asociadas', false); setElimConfirm(false); return }
+    showToast('Cliente eliminado')
+    setSel(null)
+    setElimConfirm(false)
+    cargar()
+  }
+
   async function abrirCliente(cli) {
     setSel(cli)
     setSaldo(null)
+    setElimConfirm(false)
     setLoadHist(true)
     const [{ data: hist }, { data: sp }] = await Promise.all([
       supabase.from('citas')
@@ -137,6 +154,7 @@ export default function SalonClientes() {
 
   return (
     <div style={{ padding:'0 0 16px' }}>
+      {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
 
       {/* Search */}
       <div style={{ padding:'0 16px 12px', position:'sticky', top:0, background:'var(--bg)', zIndex:10, paddingTop:4 }}>
@@ -349,6 +367,37 @@ export default function SalonClientes() {
                 Enviar mensaje
               </button>
             )}
+
+            {/* Eliminar cliente */}
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, marginBottom:14 }}>
+              {!elimConfirm ? (
+                <button onClick={() => setElimConfirm(true)} style={{
+                  width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
+                  background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
+                  color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
+                }}>
+                  Eliminar cliente
+                </button>
+              ) : (
+                <div>
+                  <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
+                    ¿Eliminar a <strong>{sel.nombre}</strong>? Esta acción es irreversible.
+                  </p>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={() => setElimConfirm(false)} style={{
+                      flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                      background:'var(--surface)', border:'1px solid var(--border)',
+                      color:'var(--text-2)', fontWeight:600, fontSize:14,
+                    }}>Cancelar</button>
+                    <button onClick={eliminarCliente} style={{
+                      flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                      background:'#ef4444', border:'none', color:'#fff',
+                      fontWeight:700, fontSize:14,
+                    }}>Sí, eliminar</button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Historial */}
             <p style={{ fontFamily:'Outfit', fontWeight:700, fontSize:16, color:'var(--text)', marginBottom:12 }}>

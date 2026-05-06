@@ -70,8 +70,16 @@
     .sa-body { flex:1; padding:24px; max-width:1400px; margin:0 auto; width:100%; }
 
     /* Stats */
-    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
-    @media(max-width:768px) { .stats-grid { grid-template-columns:repeat(2,1fr); } }
+    .stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:24px; }
+    @media(max-width:900px) { .stats-grid { grid-template-columns:repeat(3,1fr); } }
+    @media(max-width:560px) { .stats-grid { grid-template-columns:repeat(2,1fr); } }
+
+    /* Plan distribution */
+    .plan-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:24px; }
+    .plan-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; }
+    .plan-name { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+    .plan-count { font-size:28px; font-weight:800; line-height:1; }
+    .plan-mrr { font-size:12px; color:var(--txt2); margin-top:4px; }
     .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; display:flex; flex-direction:column; gap:4px; }
     .stat-label { font-size:11px; font-weight:600; color:var(--txt3); text-transform:uppercase; letter-spacing:.5px; }
     .stat-value { font-size:28px; font-weight:800; color:var(--txt1); line-height:1; }
@@ -235,6 +243,19 @@
         <div class="stat-value" id="kpi-citas" style="color:var(--primary)">—</div>
         <div class="stat-sub">en todos los negocios</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-label">MRR estimado</div>
+        <div class="stat-value" id="kpi-mrr" style="color:var(--success)">—</div>
+        <div class="stat-sub">suscripciones activas</div>
+      </div>
+    </div>
+
+    <!-- Plan distribution -->
+    <div id="plan-dist-wrap" style="display:none">
+      <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+        Distribución por plan — negocios activos
+      </div>
+      <div class="plan-grid" id="plan-dist-grid"></div>
     </div>
 
     <!-- Tabs -->
@@ -483,13 +504,53 @@ async function cargarNegocios() {
   renderTabla()
 }
 
+const PRECIO_PLAN = { free:0, basico:49000, profesional:49000, pro:99000, premium:99000, enterprise:199000 }
+const PLAN_CFG = {
+  free:        { label:'Free',        color:'#94a3b8' },
+  basico:      { label:'Básico',      color:'#3b82f6' },
+  profesional: { label:'Profesional', color:'#3b82f6' },
+  pro:         { label:'Pro',         color:'#8b5cf6' },
+  premium:     { label:'Premium',     color:'#8b5cf6' },
+  enterprise:  { label:'Enterprise',  color:'#f59e0b' },
+}
+
+function fmtCOP(n) {
+  if (n >= 1_000_000) return `$${(n/1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `$${Math.round(n/1_000)}K`
+  return `$${n}`
+}
+
 async function cargarKpis() {
-  const total    = todosNegocios.length
-  const activos  = todosNegocios.filter(t => t.activo).length
-  const suspend  = total - activos
+  const total   = todosNegocios.length
+  const activos = todosNegocios.filter(t => t.activo)
+  const suspend = total - activos.length
   document.getElementById('kpi-total').textContent   = total
-  document.getElementById('kpi-activos').textContent = activos
+  document.getElementById('kpi-activos').textContent = activos.length
   document.getElementById('kpi-suspend').textContent = suspend
+
+  // MRR
+  const mrr = activos.reduce((s, t) => s + (PRECIO_PLAN[t.plan] || 0), 0)
+  document.getElementById('kpi-mrr').textContent = mrr > 0 ? fmtCOP(mrr) : '$0'
+
+  // Plan distribution
+  const porPlan = {}
+  activos.forEach(t => { const p = t.plan || 'free'; porPlan[p] = (porPlan[p] || 0) + 1 })
+  const planKeys = Object.keys(porPlan)
+  if (planKeys.length > 0) {
+    document.getElementById('plan-dist-wrap').style.display = ''
+    document.getElementById('plan-dist-grid').innerHTML = planKeys
+      .sort((a,b) => (PRECIO_PLAN[b]||0) - (PRECIO_PLAN[a]||0))
+      .map(plan => {
+        const cfg    = PLAN_CFG[plan] || PLAN_CFG.free
+        const cnt    = porPlan[plan]
+        const precio = PRECIO_PLAN[plan] || 0
+        return `<div class="plan-card" style="border-color:${cfg.color}30">
+          <div class="plan-name" style="color:${cfg.color}">${cfg.label}</div>
+          <div class="plan-count" style="color:${cfg.color}">${cnt}</div>
+          <div class="plan-mrr">${precio > 0 ? fmtCOP(precio)+'/mes' : 'Gratis'}${cnt > 1 && precio > 0 ? ' · '+fmtCOP(cnt*precio)+' total' : ''}</div>
+        </div>`
+      }).join('')
+  }
 
   const hoy = new Date().toISOString().slice(0,10)
   const { count } = await db.from('citas')
