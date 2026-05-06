@@ -152,7 +152,7 @@ export default function SalonPortal() {
       clienteId = nc.id
     }
 
-    const { error: eCita } = await supabase.from('citas').insert({
+    const { data: citaCreada, error: eCita } = await supabase.from('citas').insert({
       tenant_id:      tenant.id,
       profesional_id: profId,
       servicio_id:    servId,
@@ -160,9 +160,14 @@ export default function SalonPortal() {
       fecha_inicio:   slot.inicio,
       fecha_fin:      slot.fin,
       estado:         'confirmada',
-    })
+    }).select('id').single()
 
     if (eCita) { setError('Error al agendar. Intenta de nuevo.'); setSaving(false); return }
+
+    // Notificación WhatsApp al cliente y al salón (fire-and-forget)
+    supabase.functions.invoke('notificacion-cita', {
+      body: { cita_id: citaCreada.id },
+    }).catch(() => {})
 
     setConfirmada({
       prof: profs.find(p => p.id === profId),
