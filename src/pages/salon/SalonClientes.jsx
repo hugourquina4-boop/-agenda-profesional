@@ -112,7 +112,16 @@ export default function SalonClientes() {
 
   function showToast(msg, ok = true) {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
-    setTimeout(() => setToast(null), 2500)
+    setTimeout(() => setToast(null), ok ? 2500 : 6000)
+  }
+
+  async function verificarAuth() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      showToast('Sesión expirada — recarga e inicia sesión', false)
+      return false
+    }
+    return true
   }
 
   async function guardarCliente() {
@@ -137,16 +146,25 @@ export default function SalonClientes() {
     cargar()
   }
 
-  // Cascade delete: siempre incluir tenant_id para que pase el RLS
   async function eliminarCliente() {
     if (!elimTarget) return
+    if (!await verificarAuth()) { setElimTarget(null); return }
     const id = elimTarget.id
     const tid = tenant.id
     await supabase.from('lista_espera').delete().eq('cliente_id', id).eq('tenant_id', tid)
     await supabase.from('saldo_puntos').delete().eq('cliente_id', id).eq('tenant_id', tid)
     await supabase.from('citas').delete().eq('cliente_id', id).eq('tenant_id', tid)
-    const { error } = await supabase.from('clientes_agenda').delete().eq('id', id).eq('tenant_id', tid)
-    if (error) { showToast('Error al eliminar: ' + error.message, false); return }
+    const { error, count } = await supabase
+      .from('clientes_agenda')
+      .delete({ count: 'exact' })
+      .eq('id', id)
+      .eq('tenant_id', tid)
+    if (error) { showToast('Error: ' + error.message, false); return }
+    if (!count || count === 0) {
+      showToast('No se eliminó — sin permisos o sesión expirada', false)
+      setElimTarget(null)
+      return
+    }
     showToast('Cliente eliminado')
     setElimTarget(null)
     if (sel?.id === id) { setSel(null); setSaldo(null) }

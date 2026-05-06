@@ -44,7 +44,16 @@ export default function SalonServicios() {
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
-    setTimeout(() => setToast(null), 2500)
+    setTimeout(() => setToast(null), ok ? 2500 : 6000)
+  }
+
+  async function verificarAuth() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      showToast('Sesión expirada — recarga e inicia sesión', false)
+      return false
+    }
+    return true
   }
 
   const cargar = useCallback(async () => {
@@ -91,6 +100,7 @@ export default function SalonServicios() {
 
   async function guardar() {
     if (!form.nombre?.trim()) { showToast('Nombre requerido', false); return }
+    if (!await verificarAuth()) return
     setSaving(true)
     const payload = {
       nombre: form.nombre.trim(),
@@ -105,7 +115,7 @@ export default function SalonServicios() {
       const { error } = await supabase.from('servicios').insert({ ...payload, tenant_id: tenant.id })
       err = error
     } else {
-      const { error } = await supabase.from('servicios').update(payload).eq('id', sel.id)
+      const { error } = await supabase.from('servicios').update(payload).eq('id', sel.id).eq('tenant_id', tenant.id)
       err = error
     }
     setSaving(false)
@@ -118,13 +128,24 @@ export default function SalonServicios() {
   async function eliminar(id) {
     const targetId = id || sel?.id
     if (!targetId) return
+    if (!await verificarAuth()) { setElimTarget(null); setElimConfirm(false); return }
     setSaving(true)
-    const { error } = await supabase.from('servicios').delete().eq('id', targetId).eq('tenant_id', tenant.id)
+    const { error, count } = await supabase
+      .from('servicios')
+      .delete({ count: 'exact' })
+      .eq('id', targetId)
+      .eq('tenant_id', tenant.id)
     setSaving(false)
     if (error) {
-      showToast('No se puede eliminar: tiene citas asociadas', false)
+      showToast('Error: ' + error.message, false)
       setElimConfirm(false)
       setElimTarget(null)
+      return
+    }
+    if (!count || count === 0) {
+      showToast('No se eliminó — sin permisos o sesión expirada', false)
+      setElimTarget(null)
+      setElimConfirm(false)
       return
     }
     showToast('Servicio eliminado')

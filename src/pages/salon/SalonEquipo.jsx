@@ -57,7 +57,16 @@ export default function SalonEquipo() {
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
-    setTimeout(() => setToast(null), 2500)
+    setTimeout(() => setToast(null), ok ? 2500 : 6000)
+  }
+
+  async function verificarAuth() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      showToast('Sesión expirada — recarga e inicia sesión', false)
+      return false
+    }
+    return true
   }
 
   const cargar = useCallback(async () => {
@@ -148,14 +157,25 @@ export default function SalonEquipo() {
 
   async function eliminar() {
     if (!elimTarget) return
+    if (!await verificarAuth()) { setElimTarget(null); return }
     setSaving(true)
-    const id = elimTarget.id
-    await supabase.from('lista_espera').delete().eq('profesional_id', id)
-    await supabase.from('horarios').delete().eq('profesional_id', id)
-    await supabase.from('citas').delete().eq('profesional_id', id)
-    const { error } = await supabase.from('profesionales').delete().eq('id', id)
+    const id  = elimTarget.id
+    const tid = tenant.id
+    await supabase.from('lista_espera').delete().eq('profesional_id', id).eq('tenant_id', tid)
+    await supabase.from('horarios').delete().eq('profesional_id', id).eq('tenant_id', tid)
+    await supabase.from('citas').delete().eq('profesional_id', id).eq('tenant_id', tid)
+    const { error, count } = await supabase
+      .from('profesionales')
+      .delete({ count: 'exact' })
+      .eq('id', id)
+      .eq('tenant_id', tid)
     setSaving(false)
-    if (error) { showToast('Error al eliminar profesional', false); return }
+    if (error) { showToast('Error: ' + error.message, false); return }
+    if (!count || count === 0) {
+      showToast('No se eliminó — sin permisos o sesión expirada', false)
+      setElimTarget(null)
+      return
+    }
     showToast('Profesional eliminado')
     setElimTarget(null)
     if (sel?.id === id) cerrarSheet()
