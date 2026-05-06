@@ -65,7 +65,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
   const { tenant } = useTenant()
 
   const [masOpen, setMasOpen] = useState(false)
-  const [theme,   setTheme]   = useState(() => localStorage.getItem('sp-theme') || 'dark')
+  const [theme,   setTheme]   = useState(() => localStorage.getItem('sp-theme') || 'light')
 
   useEffect(() => { localStorage.setItem('sp-theme', theme) }, [theme])
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')

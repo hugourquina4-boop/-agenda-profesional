@@ -109,7 +109,7 @@ export default function SalonLogin({ onLogin, onRegistro }) {
       {/* Fondo mesh */}
       <div style={{
         position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
-        background:'radial-gradient(ellipse 70% 50% at 20% 30%, rgba(244,63,94,0.08) 0%, transparent 70%), radial-gradient(ellipse 50% 60% at 80% 80%, rgba(168,85,247,0.07) 0%, transparent 70%)',
+        background:'radial-gradient(ellipse 70% 50% at 20% 30%, rgba(244,63,94,0.06) 0%, transparent 70%), radial-gradient(ellipse 50% 60% at 80% 80%, rgba(168,85,247,0.05) 0%, transparent 70%)',
       }} />
 
       <div style={{ width:'100%', maxWidth:360, position:'relative', zIndex:1 }}>
@@ -134,8 +134,9 @@ export default function SalonLogin({ onLogin, onRegistro }) {
 
         {/* Form card */}
         <div style={{
-          background:'rgba(255,255,255,0.035)', border:'1px solid var(--border)',
+          background:'var(--card)', border:'1px solid var(--border)',
           borderRadius:24, padding:28, backdropFilter:'blur(20px)',
+          boxShadow:'var(--shadow-sm)',
         }}>
           <form onSubmit={handleLogin} style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div>
