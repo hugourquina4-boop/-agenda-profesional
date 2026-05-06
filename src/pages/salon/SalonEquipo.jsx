@@ -244,45 +244,44 @@ export default function SalonEquipo() {
                   )}
                 </div>
 
-                {/* Badge activo — clic para toggle rápido */}
-                <button
-                  onClick={() => toggleActivo(p)}
-                  title={p.activo ? 'Clic para desactivar' : 'Clic para activar'}
-                  style={{
-                    padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700, flexShrink:0,
-                    background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
-                    color:       p.activo ? '#4ade80' : '#f87171',
-                    border:'none', cursor:'pointer',
+                {/* Botones de acción — agrupados para que nunca se corten */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                  <button
+                    onClick={() => toggleActivo(p)}
+                    title={p.activo ? 'Desactivar' : 'Activar'}
+                    style={{
+                      padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700,
+                      background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
+                      color:       p.activo ? '#4ade80' : '#f87171',
+                      border:'none', cursor:'pointer', whiteSpace:'nowrap',
+                    }}>
+                    {p.activo ? 'Activo' : 'Inactivo'}
+                  </button>
+
+                  <button onClick={() => abrirHorarios(p)} title="Horarios" style={{
+                    width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
+                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center',
                   }}>
-                  {p.activo ? 'Activo' : 'Inactivo'}
-                </button>
+                    <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={14} />
+                  </button>
 
-                {/* Botón horarios */}
-                <button onClick={() => abrirHorarios(p)} title="Gestionar horarios" style={{
-                  width:34, height:34, borderRadius:10, border:'1px solid var(--border)',
-                  background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
-                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                }}>
-                  <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={15} />
-                </button>
+                  <button onClick={() => abrir(p)} title="Editar" style={{
+                    width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
+                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
+                  </button>
 
-                {/* Botón editar */}
-                <button onClick={() => abrir(p)} style={{
-                  width:34, height:34, borderRadius:10, border:'1px solid var(--border)',
-                  background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
-                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                }}>
-                  <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={15} />
-                </button>
-
-                {/* Botón eliminar */}
-                <button onClick={() => setElimTarget(p)} title="Eliminar profesional" style={{
-                  width:34, height:34, borderRadius:10, border:'1px solid rgba(239,68,68,0.25)',
-                  background:'transparent', color:'#ef4444', cursor:'pointer',
-                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                }}>
-                  <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15} />
-                </button>
+                  <button onClick={() => setElimTarget(p)} title="Eliminar" style={{
+                    width:32, height:32, borderRadius:9, border:'1px solid rgba(239,68,68,0.35)',
+                    background:'rgba(239,68,68,0.06)', color:'#ef4444', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} />
+                  </button>
+                </div>
               </div>
             )
           })}
@@ -341,6 +340,19 @@ export default function SalonEquipo() {
               </div>
             </div>
 
+            {/* Eliminar — ANTES de Guardar para que siempre sea visible */}
+            {!nuevo && (
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:14 }}>
+                <button onClick={() => { setElimTarget(sel); cerrarSheet() }} style={{
+                  width:'100%', padding:'13px', borderRadius:14, cursor:'pointer',
+                  background:'rgba(239,68,68,0.08)', border:'1.5px solid rgba(239,68,68,0.4)',
+                  color:'#ef4444', fontFamily:'Outfit', fontWeight:700, fontSize:15,
+                }}>
+                  🗑 Eliminar profesional
+                </button>
+              </div>
+            )}
+
             <button onClick={guardar} disabled={saving} style={{
               width:'100%', padding:'15px', borderRadius:14, cursor:'pointer',
               background:col, border:'none', color:'#fff',
@@ -348,19 +360,6 @@ export default function SalonEquipo() {
             }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
-
-            {/* Eliminar (solo en edición) */}
-            {!nuevo && (
-              <div style={{ marginTop:14, borderTop:'1px solid var(--border)', paddingTop:14 }}>
-                <button onClick={() => { setElimTarget(sel); cerrarSheet() }} style={{
-                  width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
-                  background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
-                  color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
-                }}>
-                  Eliminar profesional
-                </button>
-              </div>
-            )}
           </div>
         </>
       )}

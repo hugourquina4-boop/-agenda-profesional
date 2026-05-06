@@ -299,21 +299,19 @@ export default function SalonClientes() {
         </>
       )}
 
-      {/* ── Header ── */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 0' }}>
-        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>Clientes</h2>
-        <button onClick={() => setShowNuevo(true)} style={{
-          display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
-          background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13,
-          cursor:'pointer', fontFamily:'Plus Jakarta Sans',
-        }}>
-          <Ico d="M12 4v16m8-8H4" size={15} />
-          Agregar
-        </button>
-      </div>
-
-      {/* ── Search + filtros ── */}
+      {/* ── Search + filtros (sticky, siempre visible) ── */}
       <div style={{ padding:'12px 16px 12px', position:'sticky', top:0, background:'var(--bg)', zIndex:10 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+          <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)', margin:0 }}>Clientes</h2>
+          <button onClick={() => setShowNuevo(true)} style={{
+            display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
+            background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13,
+            cursor:'pointer', fontFamily:'Plus Jakarta Sans',
+          }}>
+            <Ico d="M12 4v16m8-8H4" size={15} />
+            Agregar
+          </button>
+        </div>
         <div style={{ position:'relative', marginBottom:10 }}>
           <div style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)' }}>
             <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={17} />
