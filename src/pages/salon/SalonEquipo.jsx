@@ -151,11 +151,15 @@ export default function SalonEquipo() {
 
   async function eliminar() {
     setSaving(true)
-    const { error } = await supabase.from('profesionales').delete().eq('id', sel.id)
+    const id = sel.id
+    // Eliminar dependencias en orden antes de borrar el profesional
+    await supabase.from('lista_espera').delete().eq('profesional_id', id)
+    await supabase.from('horarios').delete().eq('profesional_id', id)
+    await supabase.from('citas').delete().eq('profesional_id', id)
+    const { error } = await supabase.from('profesionales').delete().eq('id', id)
     setSaving(false)
     if (error) {
-      showToast('No se puede eliminar: tiene citas asociadas', false)
-      setElimConfirm(false)
+      showToast('Error al eliminar profesional', false)
       return
     }
     showToast('Profesional eliminado')
@@ -335,7 +339,7 @@ export default function SalonEquipo() {
                 ) : (
                   <div>
                     <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
-                      ¿Confirmar eliminación? Esta acción es irreversible.
+                      ¿Eliminar a <strong>{sel?.nombre}</strong>? Se borrarán sus citas y horarios. Irreversible.
                     </p>
                     <div style={{ display:'flex', gap:8 }}>
                       <button onClick={() => setElimConfirm(false)} style={{

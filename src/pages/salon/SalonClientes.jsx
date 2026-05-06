@@ -109,8 +109,13 @@ export default function SalonClientes() {
   }
 
   async function eliminarCliente() {
-    const { error } = await supabase.from('clientes_agenda').delete().eq('id', sel.id)
-    if (error) { showToast('No se puede eliminar: tiene citas asociadas', false); setElimConfirm(false); return }
+    const id = sel.id
+    // Eliminar dependencias en orden antes de borrar el cliente
+    await supabase.from('lista_espera').delete().eq('cliente_id', id)
+    await supabase.from('saldo_puntos').delete().eq('cliente_id', id)
+    await supabase.from('citas').delete().eq('cliente_id', id)
+    const { error } = await supabase.from('clientes_agenda').delete().eq('id', id)
+    if (error) { showToast('Error al eliminar cliente', false); return }
     showToast('Cliente eliminado')
     setSel(null)
     setElimConfirm(false)
@@ -381,7 +386,7 @@ export default function SalonClientes() {
               ) : (
                 <div>
                   <p style={{ fontSize:13, color:'var(--text-2)', marginBottom:10, textAlign:'center' }}>
-                    ¿Eliminar a <strong>{sel.nombre}</strong>? Esta acción es irreversible.
+                    ¿Eliminar a <strong>{sel.nombre}</strong>? Se borrarán también todas sus citas e historial. Irreversible.
                   </p>
                   <div style={{ display:'flex', gap:8 }}>
                     <button onClick={() => setElimConfirm(false)} style={{
