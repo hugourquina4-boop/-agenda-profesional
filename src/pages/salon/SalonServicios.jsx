@@ -340,24 +340,16 @@ export default function SalonServicios() {
               </div>
             </div>
 
-            <button onClick={guardar} disabled={saving} style={{
-              width:'100%', padding:'15px', borderRadius:14, cursor:'pointer',
-              background:col, border:'none', color:'#fff',
-              fontFamily:'Outfit', fontWeight:700, fontSize:15, opacity: saving ? 0.7 : 1,
-            }}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-
-            {/* Eliminar (solo en edición) */}
+            {/* Eliminar (solo en edición) — va ANTES de Guardar */}
             {!nuevo && (
-              <div style={{ marginTop:14, borderTop:'1px solid var(--border)', paddingTop:14 }}>
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:14 }}>
                 {!elimConfirm ? (
                   <button onClick={() => setElimConfirm(true)} style={{
-                    width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
-                    background:'transparent', border:'1px solid rgba(239,68,68,0.35)',
-                    color:'#ef4444', fontFamily:'Outfit', fontWeight:600, fontSize:14,
+                    width:'100%', padding:'13px', borderRadius:14, cursor:'pointer',
+                    background:'rgba(239,68,68,0.08)', border:'1.5px solid rgba(239,68,68,0.4)',
+                    color:'#ef4444', fontFamily:'Outfit', fontWeight:700, fontSize:15,
                   }}>
-                    Eliminar servicio
+                    🗑 Eliminar servicio
                   </button>
                 ) : (
                   <div>
@@ -372,7 +364,7 @@ export default function SalonServicios() {
                       }}>
                         Cancelar
                       </button>
-                      <button onClick={eliminar} disabled={saving} style={{
+                      <button onClick={() => eliminar(sel?.id)} disabled={saving} style={{
                         flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
                         background:'#ef4444', border:'none', color:'#fff',
                         fontWeight:700, fontSize:14, opacity: saving ? 0.7 : 1,
@@ -384,6 +376,14 @@ export default function SalonServicios() {
                 )}
               </div>
             )}
+
+            <button onClick={guardar} disabled={saving} style={{
+              width:'100%', padding:'15px', borderRadius:14, cursor:'pointer',
+              background:col, border:'none', color:'#fff',
+              fontFamily:'Outfit', fontWeight:700, fontSize:15, opacity: saving ? 0.7 : 1,
+            }}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
           </div>
         </>
       )}
