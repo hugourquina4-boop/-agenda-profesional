@@ -20,7 +20,7 @@ function fmtCOP(n) {
 
 const PLAN_PRECIO = { starter: 49000, pro: 89000, ultra: 149000 }
 const PLAN_COLOR  = { starter: '#60a5fa', pro: '#a855f7', ultra: '#f59e0b' }
-const VERTICALES  = ['salon', 'barberia', 'spa', 'uñas', 'estetica']
+const VERTICALES  = ['salon', 'barberia', 'spa', 'estetica', 'unas']
 const PLANES      = ['starter', 'pro', 'ultra']
 const COLORES_PRESET = ['#f43f5e','#a855f7','#3b82f6','#22c55e','#f59e0b','#06b6d4','#ec4899','#14b8a6']
 
