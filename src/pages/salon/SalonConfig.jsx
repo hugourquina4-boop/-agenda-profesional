@@ -548,6 +548,137 @@ export default function SalonConfig() {
         </button>
       </Seccion>
 
+      {/* ── Automatizaciones WhatsApp ──────────────────────── */}
+      <Seccion titulo="Automatizaciones WhatsApp 🤖">
+        {[
+          {
+            icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+            titulo: 'Recordatorio 24h antes',
+            desc: 'Avisa al cliente el día anterior a su cita.',
+            cron: 'Todos los días 10:00am · función: notificacion-recordatorio',
+          },
+          {
+            icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+            titulo: 'Recordatorio 1h antes',
+            desc: 'Avisa al cliente cuando la cita es en 1 hora.',
+            cron: 'Cada hora · misma función: notificacion-recordatorio',
+          },
+          {
+            icon: 'M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21l-6-6m6 6l-6 6',
+            titulo: 'Felicitación de cumpleaños',
+            desc: 'Mensaje personalizado el día del cumpleaños del cliente.',
+            cron: 'Todos los días 9:00am · función: cumpleanos-clientes',
+          },
+          {
+            icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+            titulo: 'Resumen diario al salón',
+            desc: 'Ingresos, citas atendidas y agenda de mañana.',
+            cron: 'Todos los días 9:00pm · función: resumen-diario',
+          },
+        ].map((a, i) => (
+          <div key={i} style={{
+            padding:'14px 16px', borderRadius:14,
+            background:'var(--card)', border:'1px solid var(--border)',
+            display:'flex', alignItems:'flex-start', gap:12,
+          }}>
+            <div style={{ width:36, height:36, borderRadius:10, background:`${col}18`,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              color:col, flexShrink:0 }}>
+              <Ico d={a.icon} size={16} />
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:3 }}>
+                {a.titulo}
+              </div>
+              <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:6 }}>{a.desc}</div>
+              <div style={{ fontSize:10, fontFamily:'monospace', color:'var(--text-3)',
+                background:'var(--bg)', padding:'4px 8px', borderRadius:6,
+                border:'1px solid var(--border)', wordBreak:'break-all' }}>
+                {a.cron}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div style={{ padding:'12px 14px', borderRadius:12,
+          background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.2)',
+          fontSize:11, color:'#93c5fd', lineHeight:1.6 }}>
+          Para activar: ve a Supabase → Edge Functions → Schedules y crea un cron para cada función según el horario indicado. Requiere WHATSAPP_TOKEN y WHATSAPP_PHONE_ID en los secrets.
+        </div>
+      </Seccion>
+
+      {/* ── Tu plan ────────────────────────────────────── */}
+      <Seccion titulo="Tu plan">
+        {(() => {
+          const plan = tenant?.plan || 'starter'
+          const PLAN_COLOR = { starter:'#60a5fa', pro:'#a855f7', ultra:'#f59e0b' }
+          const PLAN_PRECIO = { starter:'$49.000', pro:'$89.000', ultra:'$149.000' }
+          const planColor = PLAN_COLOR[plan] || '#60a5fa'
+          const vence = tenant?.fecha_vencimiento
+          const venceDate = vence ? new Date(vence) : null
+          const diasRestantes = venceDate
+            ? Math.ceil((venceDate - new Date()) / (1000 * 60 * 60 * 24))
+            : null
+          return (
+            <div style={{
+              padding:'16px', borderRadius:14,
+              background:`${planColor}08`,
+              border:`1px solid ${planColor}30`,
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                <div style={{
+                  width:44, height:44, borderRadius:12,
+                  background:`linear-gradient(135deg,${planColor},${planColor}aa)`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  boxShadow:`0 4px 12px ${planColor}40`,
+                }}>
+                  <Ico d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" size={20} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{
+                      fontFamily:'Outfit', fontWeight:900, fontSize:18,
+                      color: planColor, textTransform:'capitalize',
+                    }}>Plan {plan}</span>
+                    <span style={{
+                      padding:'2px 8px', borderRadius:20,
+                      background:`${planColor}18`, border:`1px solid ${planColor}40`,
+                      fontSize:11, fontWeight:700, color: planColor,
+                    }}>
+                      {PLAN_PRECIO[plan] || '$49.000'}/mes
+                    </span>
+                  </div>
+                  {venceDate && (
+                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
+                      Vigente hasta{' '}
+                      <span style={{ fontWeight:700, color: diasRestantes && diasRestantes < 10 ? '#f87171' : 'var(--text-2)' }}>
+                        {venceDate.toLocaleDateString('es-CO', { day:'numeric', month:'long', year:'numeric' })}
+                      </span>
+                      {diasRestantes !== null && (
+                        <span style={{ marginLeft:6, color: diasRestantes < 10 ? '#f87171' : 'var(--text-3)' }}>
+                          ({diasRestantes > 0 ? `${diasRestantes} días` : 'Vencido'})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{
+                fontSize:11, color:'var(--text-3)', lineHeight:1.6,
+                padding:'10px 12px', borderRadius:10,
+                background:'var(--bg)', border:'1px solid var(--border)',
+              }}>
+                Para cambiar de plan o renovar, contacta a tu administrador de Salón Pro.
+              </div>
+            </div>
+          )
+        })()}
+      </Seccion>
+
+      {/* ── Seguridad — cambiar contraseña ──────────────── */}
+      <Seccion titulo="Seguridad">
+        <CambiarClave accentColor={col} />
+      </Seccion>
+
       <button onClick={guardar} disabled={saving} style={{
         width:'100%', padding:'16px', borderRadius:14, cursor: saving ? 'not-allowed' : 'pointer',
         background: `linear-gradient(135deg,${col},${col}cc)`,
@@ -557,5 +688,92 @@ export default function SalonConfig() {
         {saving ? 'Guardando…' : 'Guardar configuración'}
       </button>
     </div>
+  )
+}
+
+function CambiarClave({ accentColor }) {
+  const [abierto,  setAbierto]  = useState(false)
+  const [pass,     setPass]     = useState('')
+  const [pass2,    setPass2]    = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [msg,      setMsg]      = useState(null)   // { text, ok }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (pass !== pass2) { setMsg({ text:'Las contraseñas no coinciden', ok:false }); return }
+    if (pass.length < 6) { setMsg({ text:'Mínimo 6 caracteres', ok:false }); return }
+    setMsg(null); setLoading(true)
+    const { error } = await supabase.auth.updateUser({ password: pass })
+    setLoading(false)
+    if (error) {
+      setMsg({ text: error.message, ok: false })
+    } else {
+      setMsg({ text:'Contraseña actualizada correctamente', ok: true })
+      setPass(''); setPass2('')
+      setTimeout(() => setAbierto(false), 2000)
+    }
+  }
+
+  if (!abierto) return (
+    <button
+      onClick={() => setAbierto(true)}
+      style={{
+        display:'flex', alignItems:'center', gap:10,
+        padding:'12px 16px', borderRadius:14, cursor:'pointer', width:'100%',
+        background:'var(--card)', border:'1px solid var(--border)',
+        color:'var(--text-2)', fontWeight:600, fontSize:13, textAlign:'left',
+      }}>
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+      </svg>
+      Cambiar mi contraseña
+    </button>
+  )
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      <input
+        type="password" required placeholder="Nueva contraseña (mín. 6 caracteres)"
+        value={pass} onChange={e => setPass(e.target.value)}
+        style={{
+          width:'100%', padding:'10px 14px', borderRadius:12,
+          border:'1px solid var(--border)', background:'var(--bg)',
+          color:'var(--text)', fontSize:14, outline:'none',
+        }}
+      />
+      <input
+        type="password" required placeholder="Confirmar contraseña"
+        value={pass2} onChange={e => setPass2(e.target.value)}
+        style={{
+          width:'100%', padding:'10px 14px', borderRadius:12,
+          border:'1px solid var(--border)', background:'var(--bg)',
+          color:'var(--text)', fontSize:14, outline:'none',
+        }}
+      />
+      {msg && (
+        <p style={{ fontSize:13, color: msg.ok ? '#4ade80' : '#f87171', padding:'8px 12px',
+          borderRadius:10, background: msg.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)' }}>
+          {msg.text}
+        </p>
+      )}
+      <div style={{ display:'flex', gap:10 }}>
+        <button type="button" onClick={() => { setAbierto(false); setPass(''); setPass2(''); setMsg(null) }}
+          style={{
+            flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
+            background:'transparent', border:'1px solid var(--border)',
+            color:'var(--text-2)', fontWeight:600, fontSize:13,
+          }}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={loading} style={{
+          flex:2, padding:'10px', borderRadius:12, border:'none', cursor:'pointer',
+          background:`linear-gradient(135deg,${accentColor},${accentColor}cc)`,
+          color:'#fff', fontWeight:700, fontSize:13, opacity: loading ? 0.7 : 1,
+        }}>
+          {loading ? 'Guardando…' : 'Actualizar contraseña'}
+        </button>
+      </div>
+    </form>
   )
 }

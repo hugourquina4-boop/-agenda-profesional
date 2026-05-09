@@ -38,10 +38,133 @@ function PlanBadge({ plan }) {
   )
 }
 
-const FORM_INICIAL = { nombre:'', slug:'', ciudad:'', vertical:'salon', plan:'starter', color:'#f43f5e' }
+const FORM_INICIAL = { nombre:'', slug:'', ciudad:'', vertical:'salon', plan:'starter', color:'#f43f5e', email_dueno:'', password_temp:'' }
+
+const ADMIN_SECRET = 'salonpro2026'
+
+// Modal para resetear contraseña (por email o por tenant)
+function ModalResetClave({ titulo, emailInicial, tenantId, onClose, showToast }) {
+  const [email,    setEmail]    = useState(emailInicial || '')
+  const [clave,    setClave]    = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [resultado, setResultado] = useState(null)
+
+  async function handleReset(e) {
+    e.preventDefault()
+    if (!email.trim()) return
+    setLoading(true)
+    setResultado(null)
+    const body = tenantId
+      ? { tenant_id: tenantId, nueva_clave: clave.trim() || undefined }
+      : { email: email.trim(), nueva_clave: clave.trim() || undefined }
+
+    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      headers: { 'x-admin-secret': ADMIN_SECRET },
+      body,
+    })
+    setLoading(false)
+    if (error || data?.error) {
+      showToast(data?.error || error?.message || 'Error', '#f87171')
+    } else {
+      setResultado({ email: data.email, clave: data.clave })
+      showToast(`Clave actualizada para ${data.email}`)
+    }
+  }
+
+  return (
+    <>
+      <div className="sp-sheet-overlay" onClick={onClose} />
+      <div className="sp-sheet">
+        <div className="sp-sheet-handle" />
+        <p className="sp-sheet-title">{titulo}</p>
+
+        {resultado ? (
+          <div style={{ textAlign:'center', padding:'16px 0 24px' }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>🔑</div>
+            <p style={{ fontSize:14, color:'var(--text-2)', marginBottom:8 }}>
+              Contraseña actualizada para:
+            </p>
+            <p style={{ fontFamily:'Outfit', fontWeight:700, fontSize:16, color:'var(--text)', marginBottom:16 }}>
+              {resultado.email}
+            </p>
+            <div style={{
+              padding:'14px 18px', borderRadius:14,
+              background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.25)',
+              fontFamily:'monospace', fontSize:18, fontWeight:700,
+              color:'#4ade80', letterSpacing:2, marginBottom:20,
+            }}>
+              {resultado.clave}
+            </div>
+            <p style={{ fontSize:12, color:'var(--text-3)' }}>
+              Copia esta clave — no se muestra de nuevo
+            </p>
+            <button onClick={onClose} style={{
+              marginTop:16, width:'100%', padding:'12px', borderRadius:14,
+              background:'linear-gradient(135deg,#f43f5e,#e11d48)',
+              border:'none', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer',
+            }}>
+              Listo
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleReset} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {!tenantId && (
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                  EMAIL DEL USUARIO
+                </label>
+                <input
+                  type="email" required
+                  value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="usuario@email.com"
+                  style={{
+                    width:'100%', padding:'10px 14px', borderRadius:12,
+                    border:'1px solid var(--border)', background:'var(--bg)',
+                    color:'var(--text)', fontSize:14, outline:'none',
+                  }}
+                />
+              </div>
+            )}
+            <div>
+              <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                NUEVA CONTRASEÑA <span style={{ color:'var(--text-3)', fontWeight:400 }}>(vacío = generar automáticamente)</span>
+              </label>
+              <input
+                type="text"
+                value={clave} onChange={e => setClave(e.target.value)}
+                placeholder="Dejar vacío para generar"
+                style={{
+                  width:'100%', padding:'10px 14px', borderRadius:12,
+                  border:'1px solid var(--border)', background:'var(--bg)',
+                  color:'var(--text)', fontSize:14, outline:'none',
+                }}
+              />
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:4 }}>
+              <button type="button" onClick={onClose} style={{
+                flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                background:'transparent', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>
+                Cancelar
+              </button>
+              <button type="submit" disabled={loading} style={{
+                flex:2, padding:'12px', borderRadius:14, border:'none', cursor:'pointer',
+                background:'linear-gradient(135deg,#f43f5e,#e11d48)',
+                color:'#fff', fontWeight:700, fontSize:14, opacity: loading ? 0.7 : 1,
+              }}>
+                {loading ? 'Actualizando…' : 'Resetear contraseña'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </>
+  )
+}
 
 export default function SalonSuperadmin({ onGestionar }) {
-  const { esSuperadmin } = useTenant()
+  const { esSuperadmin, user } = useTenant()
 
   const [negocios,    setNegocios]    = useState([])
   const [loading,     setLoading]     = useState(true)
@@ -51,6 +174,7 @@ export default function SalonSuperadmin({ onGestionar }) {
   const [gestionando, setGestionando] = useState(null)
   const [toast,       setToast]       = useState(null)
   const [form,        setForm]        = useState(FORM_INICIAL)
+  const [resetModal,  setResetModal]  = useState(null)  // { titulo, emailInicial, tenantId }
 
   const showToast = (msg, color = '#22c55e') => {
     setToast({ msg, color })
@@ -93,8 +217,25 @@ export default function SalonSuperadmin({ onGestionar }) {
       p_plan:     form.plan,
       p_color:    form.color,
     })
+    if (error) { setCreando(false); showToast(error.message || 'Error creando negocio', '#f87171'); return }
+
+    if (form.email_dueno.trim()) {
+      const { data: lista } = await supabase.rpc('superadmin_tenants_info')
+      const nuevo = lista?.find(t => t.slug === form.slug.trim())
+      if (nuevo) {
+        await supabase.functions.invoke('admin-crear-usuario', {
+          headers: { 'x-admin-secret': 'salonpro2026' },
+          body: {
+            email:     form.email_dueno.trim(),
+            password:  form.password_temp.trim() || 'SalonPro2026!',
+            tenant_id: nuevo.tenant_id,
+            rol:       'admin',
+          },
+        })
+      }
+    }
+
     setCreando(false)
-    if (error) { showToast(error.message || 'Error creando negocio', '#f87171'); return }
     showToast(`"${form.nombre}" creado ✓`)
     setModal(false)
     setForm(FORM_INICIAL)
@@ -130,6 +271,48 @@ export default function SalonSuperadmin({ onGestionar }) {
   return (
     <>
       {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
+
+      {/* ── Modal reset clave ─────────────────────────────── */}
+      {resetModal && (
+        <ModalResetClave
+          titulo={resetModal.titulo}
+          emailInicial={resetModal.emailInicial}
+          tenantId={resetModal.tenantId}
+          onClose={() => setResetModal(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── Mi acceso superadmin ─────────────────────────── */}
+      <div style={{ margin:'16px 16px 0', padding:'14px 16px', borderRadius:16,
+        background:'var(--card)', border:'1px solid var(--border)',
+        display:'flex', alignItems:'center', gap:12 }}>
+        <div style={{
+          width:40, height:40, borderRadius:12, flexShrink:0,
+          background:'linear-gradient(135deg,#f43f5e,#e11d48)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          boxShadow:'0 4px 12px rgba(244,63,94,0.3)',
+        }}>
+          <Ico d="M12 11c0-1.657-1.343-3-3-3S6 9.343 6 11m6 0c0-1.657 1.343-3 3-3s3 1.343 3 3m-6 0v2m0 4h.01M5 20h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2z" size={20} />
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:2 }}>
+            Mi acceso superadmin
+          </div>
+          <div style={{ fontSize:11, color:'var(--text-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            {user?.email || '—'}
+          </div>
+        </div>
+        <button
+          onClick={() => setResetModal({ titulo:'Resetear mi contraseña', emailInicial: user?.email || '', tenantId: null })}
+          style={{
+            padding:'7px 14px', borderRadius:10, border:'1px solid rgba(244,63,94,0.3)',
+            background:'rgba(244,63,94,0.1)', color:'#f87171',
+            fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0,
+          }}>
+          <Ico d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" size={13} />
+        </button>
+      </div>
 
       {/* ── Modal: nuevo negocio ──────────────────────────── */}
       {modal && (
@@ -263,6 +446,43 @@ export default function SalonSuperadmin({ onGestionar }) {
                   ))}
                 </div>
               </div>
+
+              {/* Email dueño */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                  Email del dueño <span style={{ color:'var(--text-3)', fontWeight:400 }}>(opcional — crea acceso automático)</span>
+                </label>
+                <input
+                  type="email"
+                  value={form.email_dueno}
+                  onChange={e => setForm(f => ({ ...f, email_dueno: e.target.value }))}
+                  placeholder="dueno@salon.com"
+                  style={{
+                    width:'100%', padding:'10px 14px', borderRadius:12, boxSizing:'border-box',
+                    border:'1px solid var(--border)', background:'var(--bg)',
+                    color:'var(--text)', fontSize:14, outline:'none',
+                  }}
+                />
+              </div>
+
+              {form.email_dueno.trim() && (
+                <div>
+                  <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                    Contraseña temporal <span style={{ color:'var(--text-3)', fontWeight:400 }}>(default: SalonPro2026!)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.password_temp}
+                    onChange={e => setForm(f => ({ ...f, password_temp: e.target.value }))}
+                    placeholder="SalonPro2026!"
+                    style={{
+                      width:'100%', padding:'10px 14px', borderRadius:12, boxSizing:'border-box',
+                      border:'1px solid var(--border)', background:'var(--bg)',
+                      color:'var(--text)', fontSize:14, outline:'none',
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Preview slug */}
@@ -458,9 +678,23 @@ export default function SalonSuperadmin({ onGestionar }) {
                     fontFamily:'Outfit' }}>
                     {fmtCOP(PLAN_PRECIO[n.plan] || 49000)}/mes
                   </span>
-                  <span style={{ flex:1, fontSize:10, color:'var(--text-3)', textAlign:'right' }}>
-                    Desde {new Date(n.created_at).toLocaleDateString('es-CO', { month:'short', year:'numeric' })}
-                  </span>
+                  <span style={{ flex:1 }} />
+                  <button
+                    onClick={() => setResetModal({
+                      titulo: `Resetear clave — ${n.nombre}`,
+                      emailInicial: n.admin_email || '',
+                      tenantId: n.tenant_id,
+                    })}
+                    style={{
+                      padding:'5px 11px', borderRadius:8, cursor:'pointer',
+                      border:'1px solid rgba(245,158,11,0.3)',
+                      background:'rgba(245,158,11,0.08)',
+                      color:'#fbbf24', fontWeight:700, fontSize:11,
+                      display:'flex', alignItems:'center', gap:5,
+                    }}>
+                    <Ico d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" size={12} />
+                    Resetear clave
+                  </button>
                 </div>
               </div>
             )
