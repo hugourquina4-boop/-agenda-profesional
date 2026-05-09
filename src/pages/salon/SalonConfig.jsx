@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 import ImageUploader from '../../components/ImageUploader'
@@ -47,6 +47,23 @@ export default function SalonConfig() {
   const [saving, setSaving] = useState(false)
   const [toast,  setToast]  = useState(null)
   const qrRef = useRef(null)
+
+  const [reglas,      setReglas]      = useState([])
+  const [modalRegla,  setModalRegla]  = useState(false)
+  const [editRegla,   setEditRegla]   = useState(null)
+  const [savingRegla, setSavingRegla] = useState(false)
+  const [reglaForm,   setReglaForm]   = useState({
+    nombre:'', dias_semana:[5, 6], hora_inicio:'17:00', hora_fin:'21:00', pct:20,
+  })
+
+  const cargarReglas = useCallback(async () => {
+    if (!tenant) return
+    const { data } = await supabase.from('reglas_precio_dinamico')
+      .select('*').eq('tenant_id', tenant.id).order('created_at')
+    setReglas(data || [])
+  }, [tenant])
+
+  useEffect(() => { cargarReglas() }, [cargarReglas])
 
   function descargarQR() {
     const svg = qrRef.current?.querySelector('svg')
@@ -130,6 +147,40 @@ export default function SalonConfig() {
     if (error) { showToast(error.message, false); return }
     showToast('Configuración guardada')
     recargar()
+  }
+
+  async function guardarRegla() {
+    if (!reglaForm.nombre.trim() || !reglaForm.dias_semana.length) {
+      showToast('Nombre y días son requeridos', false); return
+    }
+    setSavingRegla(true)
+    const row = {
+      nombre:        reglaForm.nombre.trim(),
+      dias_semana:   reglaForm.dias_semana,
+      hora_inicio:   reglaForm.hora_inicio,
+      hora_fin:      reglaForm.hora_fin,
+      multiplicador: parseFloat((1 + Number(reglaForm.pct) / 100).toFixed(2)),
+      activo:        true,
+    }
+    if (editRegla) {
+      await supabase.from('reglas_precio_dinamico').update(row).eq('id', editRegla.id)
+    } else {
+      await supabase.from('reglas_precio_dinamico').insert({ ...row, tenant_id: tenant.id })
+    }
+    setSavingRegla(false)
+    setModalRegla(false)
+    setEditRegla(null)
+    cargarReglas()
+  }
+
+  async function toggleRegla(id, activo) {
+    await supabase.from('reglas_precio_dinamico').update({ activo: !activo }).eq('id', id)
+    cargarReglas()
+  }
+
+  async function eliminarRegla(id) {
+    await supabase.from('reglas_precio_dinamico').delete().eq('id', id)
+    cargarReglas()
   }
 
   const col = form?.color_primario || '#f43f5e'
@@ -328,6 +379,173 @@ export default function SalonConfig() {
             onChange={e => set('politica_cancelacion', e.target.value)}
             style={{ resize:'none' }} />
         </Campo>
+      </Seccion>
+
+      {/* ── Precios dinámicos ── */}
+      {modalRegla && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setModalRegla(false)} style={{ zIndex:1000 }} />
+          <div className="sp-sheet" style={{ zIndex:1001 }}>
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">{editRegla ? 'Editar regla' : 'Nueva regla de precio'}</p>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <Campo label="Nombre de la regla">
+                <input className="sp-input"
+                  placeholder="Ej: Fin de semana, Temporada alta"
+                  value={reglaForm.nombre}
+                  onChange={e => setReglaForm(f => ({ ...f, nombre: e.target.value }))}
+                  autoFocus
+                />
+              </Campo>
+
+              <Campo label="Días de la semana">
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d, i) => {
+                    const sel = reglaForm.dias_semana.includes(i)
+                    return (
+                      <button key={i}
+                        onClick={() => setReglaForm(f => ({
+                          ...f,
+                          dias_semana: sel
+                            ? f.dias_semana.filter(x => x !== i)
+                            : [...f.dias_semana, i],
+                        }))}
+                        style={{
+                          padding:'7px 13px', borderRadius:10, cursor:'pointer',
+                          background: sel ? col : 'var(--bg)',
+                          border:`1px solid ${sel ? col : 'var(--border)'}`,
+                          color: sel ? '#fff' : 'var(--text-2)',
+                          fontWeight:700, fontSize:12,
+                        }}>
+                        {d}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Campo>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <Campo label="Hora inicio">
+                  <input className="sp-input" type="time"
+                    value={reglaForm.hora_inicio}
+                    onChange={e => setReglaForm(f => ({ ...f, hora_inicio: e.target.value }))} />
+                </Campo>
+                <Campo label="Hora fin">
+                  <input className="sp-input" type="time"
+                    value={reglaForm.hora_fin}
+                    onChange={e => setReglaForm(f => ({ ...f, hora_fin: e.target.value }))} />
+                </Campo>
+              </div>
+
+              <Campo label={`Incremento de precio: +${reglaForm.pct}%`}>
+                <input type="range" min="5" max="100" step="5"
+                  value={reglaForm.pct}
+                  onChange={e => setReglaForm(f => ({ ...f, pct: Number(e.target.value) }))}
+                  style={{ width:'100%', accentColor:col }} />
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--text-3)', marginTop:4 }}>
+                  <span>+5%</span>
+                  <span style={{ color:col, fontWeight:700 }}>
+                    +{reglaForm.pct}% = ×{(1 + reglaForm.pct / 100).toFixed(2)}
+                  </span>
+                  <span>+100%</span>
+                </div>
+              </Campo>
+            </div>
+
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => { setModalRegla(false); setEditRegla(null) }} style={{
+                flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                background:'transparent', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>Cancelar</button>
+              <button onClick={guardarRegla} disabled={savingRegla} style={{
+                flex:2, padding:'12px', borderRadius:14, border:'none', cursor:'pointer',
+                background:`linear-gradient(135deg,${col},${col}cc)`,
+                color:'#fff', fontWeight:700, fontSize:14,
+                opacity: savingRegla ? 0.7 : 1,
+              }}>
+                {savingRegla ? 'Guardando…' : 'Guardar regla'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <Seccion titulo="Precios dinámicos ⚡">
+        <div style={{ fontSize:12, color:'var(--text-3)', lineHeight:1.5, marginBottom:4 }}>
+          Define horarios donde el precio sube automáticamente. Los clientes verán el precio ajustado en el portal de reservas.
+        </div>
+
+        {reglas.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {reglas.map(r => {
+              const pct       = Math.round((r.multiplicador - 1) * 100)
+              const diasNombres = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+              return (
+                <div key={r.id} style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  padding:'12px 14px', borderRadius:12,
+                  background:'var(--card)',
+                  border:`1px solid ${r.activo ? col + '40' : 'var(--border)'}`,
+                  opacity: r.activo ? 1 : 0.55,
+                }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:3 }}>
+                      {r.nombre} · <span style={{ color:col }}>+{pct}%</span>
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-3)' }}>
+                      {r.dias_semana.slice().sort((a,b)=>a-b).map(d => diasNombres[d]).join(', ')}
+                      {' · '}{r.hora_inicio.slice(0,5)}–{r.hora_fin.slice(0,5)}
+                    </div>
+                  </div>
+                  <button onClick={() => toggleRegla(r.id, r.activo)} style={{
+                    padding:'5px 10px', borderRadius:8, cursor:'pointer', fontSize:11, fontWeight:700,
+                    background: r.activo ? '#22c55e18' : 'rgba(128,128,128,0.1)',
+                    border:`1px solid ${r.activo ? '#22c55e40' : 'var(--border)'}`,
+                    color: r.activo ? '#22c55e' : 'var(--text-3)', flexShrink:0,
+                  }}>
+                    {r.activo ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button onClick={() => {
+                    setEditRegla(r)
+                    setReglaForm({
+                      nombre:      r.nombre,
+                      dias_semana: r.dias_semana,
+                      hora_inicio: r.hora_inicio.slice(0,5),
+                      hora_fin:    r.hora_fin.slice(0,5),
+                      pct:         Math.round((r.multiplicador - 1) * 100),
+                    })
+                    setModalRegla(true)
+                  }} style={{ background:'none', border:'none', cursor:'pointer',
+                    color:'var(--text-3)', padding:4, flexShrink:0 }}>
+                    <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={15} />
+                  </button>
+                  <button onClick={() => eliminarRegla(r.id)} style={{
+                    background:'none', border:'none', cursor:'pointer',
+                    color:'#f87171', padding:4, flexShrink:0,
+                  }}>
+                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <button onClick={() => {
+          setEditRegla(null)
+          setReglaForm({ nombre:'', dias_semana:[5,6], hora_inicio:'17:00', hora_fin:'21:00', pct:20 })
+          setModalRegla(true)
+        }} style={{
+          width:'100%', padding:'11px', borderRadius:12, cursor:'pointer',
+          background:'transparent', border:`2px dashed ${col}40`,
+          color:col, fontWeight:700, fontSize:13,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+        }}>
+          <Ico d="M12 4v16m8-8H4" size={14} />
+          Agregar regla de precio
+        </button>
       </Seccion>
 
       <button onClick={guardar} disabled={saving} style={{

@@ -44,8 +44,8 @@ v16 al v26               ✅ Eventos LTV, segmentación, loyalty, accesos, porta
 v27_auth_superadmin_fix  ✅ Fix accesos superadmin + constraint rol + nombre/email NOT NULL
 v28_ordenes_desempeno    ✅ ordenes_espera, v_desempeno_prof, trigger updated_at
 v29_inventario           ✅ productos_salon con RLS + trigger
-v30_fotos_clientes       ⏳ PENDIENTE — tabla fotos_cliente para galería antes/después
-v31_metas_profesionales  ⏳ PENDIENTE — columna meta_mensual en commission_rules
+v30_fotos_clientes       ✅ fotos_cliente con RLS + Storage bucket imagenes
+v31_metas_profesionales  ✅ meta_mensual en commission_rules
 ```
 
 ---

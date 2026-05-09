@@ -1,0 +1,472 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../../lib/supabase'
+import { useTenant } from '../../context/TenantContext'
+
+function Ico({ d, size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  )
+}
+
+function fmtCOP(n) {
+  if (!n) return '$0'
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
+}
+
+const PLAN_PRECIO = { starter: 49000, pro: 89000, ultra: 149000 }
+const PLAN_COLOR  = { starter: '#60a5fa', pro: '#a855f7', ultra: '#f59e0b' }
+const VERTICALES  = ['salon', 'barberia', 'spa', 'uñas', 'estetica']
+const PLANES      = ['starter', 'pro', 'ultra']
+const COLORES_PRESET = ['#f43f5e','#a855f7','#3b82f6','#22c55e','#f59e0b','#06b6d4','#ec4899','#14b8a6']
+
+function PlanBadge({ plan }) {
+  const color = PLAN_COLOR[plan] || '#60a5fa'
+  return (
+    <span style={{
+      padding:'3px 8px', borderRadius:20,
+      background:`${color}18`, border:`1px solid ${color}40`,
+      fontSize:10, fontWeight:700, color, letterSpacing:0.5,
+      textTransform:'uppercase', flexShrink:0,
+    }}>
+      {plan || 'starter'}
+    </span>
+  )
+}
+
+const FORM_INICIAL = { nombre:'', slug:'', ciudad:'', vertical:'salon', plan:'starter', color:'#f43f5e' }
+
+export default function SalonSuperadmin({ onGestionar }) {
+  const { esSuperadmin } = useTenant()
+
+  const [negocios,    setNegocios]    = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [buscar,      setBuscar]      = useState('')
+  const [modal,       setModal]       = useState(false)
+  const [creando,     setCreando]     = useState(false)
+  const [gestionando, setGestionando] = useState(null)
+  const [toast,       setToast]       = useState(null)
+  const [form,        setForm]        = useState(FORM_INICIAL)
+
+  const showToast = (msg, color = '#22c55e') => {
+    setToast({ msg, color })
+    setTimeout(() => setToast(null), 2800)
+  }
+
+  const cargar = useCallback(async () => {
+    setLoading(true)
+    const { data, error } = await supabase.rpc('superadmin_tenants_info')
+    if (error) {
+      console.error('[Superadmin]', error)
+      showToast('Error cargando datos', '#f87171')
+    }
+    setNegocios(data || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { if (esSuperadmin) cargar() }, [cargar, esSuperadmin])
+
+  function slugify(s) {
+    return s.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  }
+
+  function setNombre(v) {
+    setForm(f => ({ ...f, nombre: v, slug: slugify(v) }))
+  }
+
+  async function crearNegocio() {
+    if (!form.nombre.trim() || !form.slug.trim()) {
+      showToast('Nombre y slug son requeridos', '#f87171'); return
+    }
+    setCreando(true)
+    const { error } = await supabase.rpc('crear_negocio', {
+      p_nombre:   form.nombre.trim(),
+      p_slug:     form.slug.trim(),
+      p_ciudad:   form.ciudad || null,
+      p_vertical: form.vertical,
+      p_plan:     form.plan,
+      p_color:    form.color,
+    })
+    setCreando(false)
+    if (error) { showToast(error.message || 'Error creando negocio', '#f87171'); return }
+    showToast(`"${form.nombre}" creado ✓`)
+    setModal(false)
+    setForm(FORM_INICIAL)
+    cargar()
+  }
+
+  async function gestionar(tenantId) {
+    setGestionando(tenantId)
+    await onGestionar(tenantId)
+    setGestionando(null)
+  }
+
+  const filtrados = negocios.filter(n =>
+    n.nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
+    n.ciudad?.toLowerCase().includes(buscar.toLowerCase()) ||
+    n.slug?.toLowerCase().includes(buscar.toLowerCase())
+  )
+
+  const activos     = negocios.filter(n => n.activo)
+  const mrr         = activos.reduce((s, n) => s + (PLAN_PRECIO[n.plan] || 49000), 0)
+  const arr         = mrr * 12
+  const citasMes    = negocios.reduce((s, n) => s + Number(n.citas_mes || 0), 0)
+  const ingresosMes = negocios.reduce((s, n) => s + Number(n.ingresos_mes || 0), 0)
+
+  if (!esSuperadmin) return (
+    <div className="sp-empty">
+      <span className="sp-empty-icon">🔒</span>
+      <p className="sp-empty-title">Sin acceso</p>
+      <p className="sp-empty-sub">Solo superadmin puede ver esta sección</p>
+    </div>
+  )
+
+  return (
+    <>
+      {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
+
+      {/* ── Modal: nuevo negocio ──────────────────────────── */}
+      {modal && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setModal(false)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">Nuevo negocio</p>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:14, paddingBottom:8 }}>
+              {/* Nombre */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                  Nombre del negocio *
+                </label>
+                <input
+                  autoFocus
+                  value={form.nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  placeholder="Glamour Studio"
+                  style={{
+                    width:'100%', padding:'10px 14px', borderRadius:12, boxSizing:'border-box',
+                    border:'1px solid var(--border)', background:'var(--bg)',
+                    color:'var(--text)', fontSize:14, outline:'none',
+                  }}
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                  Slug URL *
+                </label>
+                <div style={{ position:'relative' }}>
+                  <span style={{
+                    position:'absolute', left:12, top:'50%', transform:'translateY(-50%)',
+                    fontSize:13, color:'var(--text-3)', fontWeight:600, pointerEvents:'none',
+                  }}>
+                    /reservar/
+                  </span>
+                  <input
+                    value={form.slug}
+                    onChange={e => setForm(f => ({ ...f, slug: slugify(e.target.value) }))}
+                    placeholder="glamour-studio"
+                    style={{
+                      width:'100%', padding:'10px 14px 10px 88px', borderRadius:12, boxSizing:'border-box',
+                      border:'1px solid var(--border)', background:'var(--bg)',
+                      color:'var(--text)', fontSize:14, outline:'none',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Ciudad */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                  Ciudad
+                </label>
+                <input
+                  value={form.ciudad}
+                  onChange={e => setForm(f => ({ ...f, ciudad: e.target.value }))}
+                  placeholder="Bogotá"
+                  style={{
+                    width:'100%', padding:'10px 14px', borderRadius:12, boxSizing:'border-box',
+                    border:'1px solid var(--border)', background:'var(--bg)',
+                    color:'var(--text)', fontSize:14, outline:'none',
+                  }}
+                />
+              </div>
+
+              {/* Vertical + Plan */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                    Tipo
+                  </label>
+                  <select value={form.vertical}
+                    onChange={e => setForm(f => ({ ...f, vertical: e.target.value }))}
+                    style={{
+                      width:'100%', padding:'10px 12px', borderRadius:12,
+                      border:'1px solid var(--border)', background:'var(--bg)',
+                      color:'var(--text)', fontSize:13, outline:'none',
+                    }}>
+                    {VERTICALES.map(v => (
+                      <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                    Plan
+                  </label>
+                  <select value={form.plan}
+                    onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}
+                    style={{
+                      width:'100%', padding:'10px 12px', borderRadius:12,
+                      border:'1px solid var(--border)', background:'var(--bg)',
+                      color:'var(--text)', fontSize:13, outline:'none',
+                    }}>
+                    {PLANES.map(p => (
+                      <option key={p} value={p}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)} — {fmtCOP(PLAN_PRECIO[p])}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Color */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:8 }}>
+                  Color de marca
+                </label>
+                <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                  <input type="color" value={form.color}
+                    onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                    style={{
+                      width:40, height:40, borderRadius:10, border:'1px solid var(--border)',
+                      cursor:'pointer', padding:3, background:'var(--bg)',
+                    }}
+                  />
+                  {COLORES_PRESET.map(c => (
+                    <div key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
+                      style={{
+                        width:28, height:28, borderRadius:8, background:c, cursor:'pointer', flexShrink:0,
+                        outline: form.color === c ? `3px solid ${c}` : 'none',
+                        outlineOffset: 2,
+                        transition:'outline 0.1s',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Preview slug */}
+            {form.slug && (
+              <div style={{
+                padding:'10px 14px', borderRadius:12, marginTop:4,
+                background:'var(--bg)', border:'1px solid var(--border)',
+                fontSize:12, color:'var(--text-3)',
+              }}>
+                Portal: <span style={{ color:'var(--text-2)', fontWeight:600 }}>
+                  /reservar/{form.slug}
+                </span>
+              </div>
+            )}
+
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setModal(false)} style={{
+                flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                background:'transparent', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>
+                Cancelar
+              </button>
+              <button onClick={crearNegocio} disabled={creando} style={{
+                flex:2, padding:'12px', borderRadius:14, border:'none', cursor:'pointer',
+                background:'linear-gradient(135deg,#f43f5e,#e11d48)',
+                color:'#fff', fontWeight:700, fontSize:14,
+                opacity: creando ? 0.7 : 1,
+              }}>
+                {creando ? 'Creando…' : 'Crear negocio'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── KPI strip ────────────────────────────────────── */}
+      <div style={{
+        display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:1,
+        background:'var(--border)', margin:'16px 16px 0', borderRadius:16, overflow:'hidden',
+      }}>
+        {[
+          ['Negocios', negocios.length, '#60a5fa'],
+          ['Activos',  activos.length,  '#4ade80'],
+          ['MRR',      fmtCOP(mrr),     '#c084fc'],
+          ['Citas/mes', citasMes,       '#fb923c'],
+        ].map(([lbl, val, c]) => (
+          <div key={lbl} style={{ padding:'14px 10px', background:'var(--card)', textAlign:'center' }}>
+            <div style={{ fontSize:17, fontWeight:900, color:c, fontFamily:'Outfit', lineHeight:1 }}>{val}</div>
+            <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
+              textTransform:'uppercase', letterSpacing:0.6, marginTop:4 }}>{lbl}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ARR + ingresos reales */}
+      {ingresosMes > 0 && (
+        <div style={{ margin:'8px 16px 0', padding:'10px 14px', borderRadius:12,
+          background:'var(--card)', border:'1px solid var(--border)',
+          display:'flex', alignItems:'center', gap:16, fontSize:12 }}>
+          <div>
+            <span style={{ color:'var(--text-3)', fontWeight:600 }}>ARR est. </span>
+            <span style={{ color:'var(--text)', fontWeight:800, fontFamily:'Outfit' }}>{fmtCOP(arr)}</span>
+          </div>
+          <div style={{ width:1, height:16, background:'var(--border)' }} />
+          <div>
+            <span style={{ color:'var(--text-3)', fontWeight:600 }}>Ingresos este mes </span>
+            <span style={{ color:'#4ade80', fontWeight:800, fontFamily:'Outfit' }}>{fmtCOP(ingresosMes)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Action bar ───────────────────────────────────── */}
+      <div style={{ padding:'12px 16px 8px', display:'flex', gap:10 }}>
+        <div style={{ flex:1, position:'relative', display:'flex', alignItems:'center' }}>
+          <div style={{ position:'absolute', left:11, color:'var(--text-3)', pointerEvents:'none', display:'flex' }}>
+            <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={15} />
+          </div>
+          <input
+            value={buscar}
+            onChange={e => setBuscar(e.target.value)}
+            placeholder="Buscar negocio…"
+            style={{
+              width:'100%', padding:'9px 12px 9px 36px', borderRadius:12,
+              border:'1px solid var(--border)', background:'var(--card)',
+              color:'var(--text)', fontSize:13, outline:'none',
+            }}
+          />
+        </div>
+        <button onClick={() => setModal(true)} style={{
+          display:'flex', alignItems:'center', gap:7, padding:'9px 16px', borderRadius:12,
+          background:'linear-gradient(135deg,#f43f5e,#e11d48)', border:'none',
+          color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', flexShrink:0,
+          boxShadow:'0 4px 14px rgba(244,63,94,0.35)',
+        }}>
+          <Ico d="M12 4v16m8-8H4" size={14} />
+          Nuevo
+        </button>
+      </div>
+
+      {/* ── Lista negocios ───────────────────────────────── */}
+      {loading ? (
+        <div style={{ display:'flex', justifyContent:'center', padding:'60px 0' }}>
+          <div className="sp-spinner" />
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="sp-empty">
+          <span className="sp-empty-icon">🏪</span>
+          <p className="sp-empty-title">{buscar ? 'Sin resultados' : 'Sin negocios'}</p>
+          <p className="sp-empty-sub">{buscar ? 'Intenta otra búsqueda' : 'Crea el primer negocio'}</p>
+        </div>
+      ) : (
+        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
+          {filtrados.map(n => {
+            const col = n.color_primario || '#f43f5e'
+            return (
+              <div key={n.tenant_id} style={{
+                borderRadius:18, background:'var(--card)',
+                border:'1px solid var(--border)', overflow:'hidden',
+                opacity: n.activo ? 1 : 0.55,
+              }}>
+                {/* Accent bar */}
+                <div style={{ height:3, background:`linear-gradient(90deg,${col},${col}55)` }} />
+
+                {/* Header */}
+                <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px' }}>
+                  <div style={{
+                    width:46, height:46, borderRadius:13, flexShrink:0,
+                    background:`linear-gradient(135deg,${col},${col}88)`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'Outfit', fontWeight:900, fontSize:19, color:'#fff',
+                    boxShadow:`0 4px 12px ${col}44`,
+                  }}>
+                    {n.nombre?.[0]?.toUpperCase()}
+                  </div>
+
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{n.nombre}</span>
+                      <PlanBadge plan={n.plan} />
+                      {!n.activo && (
+                        <span style={{
+                          padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:700,
+                          background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.25)',
+                          color:'#f87171',
+                        }}>INACTIVO</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-3)', display:'flex', gap:6, flexWrap:'wrap' }}>
+                      <span>/{n.slug}</span>
+                      {n.ciudad && <><span>·</span><span>{n.ciudad}</span></>}
+                      {n.vertical && <><span>·</span><span>{n.vertical}</span></>}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => gestionar(n.tenant_id)}
+                    disabled={!!gestionando}
+                    style={{
+                      padding:'8px 14px', borderRadius:10, border:`1px solid ${col}40`,
+                      background:`${col}15`, color:col, fontWeight:700, fontSize:12,
+                      cursor:'pointer', flexShrink:0,
+                      opacity: gestionando === n.tenant_id ? 0.6 : 1,
+                    }}>
+                    {gestionando === n.tenant_id ? '…' : 'Gestionar →'}
+                  </button>
+                </div>
+
+                {/* Stats */}
+                <div style={{
+                  display:'grid', gridTemplateColumns:'repeat(4,1fr)',
+                  gap:1, background:'var(--border)',
+                  borderTop:'1px solid var(--border)',
+                }}>
+                  {[
+                    ['Citas/mes',   n.citas_mes ?? 0],
+                    ['Ingresos',    fmtCOP(n.ingresos_mes ?? 0)],
+                    ['Profes.',     n.total_profesionales ?? 0],
+                    ['Clientes',    n.total_clientes ?? 0],
+                  ].map(([lbl, val]) => (
+                    <div key={lbl} style={{ padding:'10px 8px', background:'var(--card)', textAlign:'center' }}>
+                      <div style={{ fontSize:15, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>{val}</div>
+                      <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:600,
+                        textTransform:'uppercase', letterSpacing:0.4 }}>{lbl}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div style={{ padding:'8px 16px', display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:600 }}>MRR:</span>
+                  <span style={{ fontSize:12, fontWeight:800, color:PLAN_COLOR[n.plan] || '#60a5fa',
+                    fontFamily:'Outfit' }}>
+                    {fmtCOP(PLAN_PRECIO[n.plan] || 49000)}/mes
+                  </span>
+                  <span style={{ flex:1, fontSize:10, color:'var(--text-3)', textAlign:'right' }}>
+                    Desde {new Date(n.created_at).toLocaleDateString('es-CO', { month:'short', year:'numeric' })}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}

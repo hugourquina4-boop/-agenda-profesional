@@ -18,6 +18,7 @@ const SalonAnalytics  = lazy(() => import('./SalonAnalytics'))
 const SalonOrdenes    = lazy(() => import('./SalonOrdenes'))
 const SalonInventario = lazy(() => import('./SalonInventario'))
 const SalonAccesos    = lazy(() => import('./SalonAccesos'))
+const SalonSuperadmin = lazy(() => import('./SalonSuperadmin'))
 
 function PageLoader() {
   return (
@@ -127,7 +128,7 @@ function TenantPicker({ todosTenants, onSelect }) {
 }
 
 export default function SalonApp() {
-  const { tenant, loading, recargar, todosTenants, seleccionarTenant } = useTenant()
+  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin } = useTenant()
   const [page,          setPage]          = useState('hoy')
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false)
   const [refreshKey,    setRefreshKey]    = useState(0)
@@ -163,6 +164,12 @@ export default function SalonApp() {
       case 'analytics':  return <SalonAnalytics />
       case 'accesos':    return <SalonAccesos />
       case 'config':     return <SalonConfig />
+      case 'superadmin': return (
+        <SalonSuperadmin onGestionar={async (tid) => {
+          await seleccionarTenant(tid)
+          setPage('hoy')
+        }} />
+      )
       default:           return <SalonDashboard key={refreshKey} />
     }
   }

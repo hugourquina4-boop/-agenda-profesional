@@ -4,6 +4,11 @@ import { supabase } from '../../lib/supabase'
 
 const DIA_KEY = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado']
 
+function timeToMin(t) {
+  const [h, m] = (t || '00:00').slice(0, 5).split(':').map(Number)
+  return h * 60 + m
+}
+
 function fmtHora(iso) {
   if (!iso) return ''
   const [h, m] = iso.substring(11, 16).split(':')
@@ -145,9 +150,40 @@ export default function SalonPortal() {
   const [wlTel,    setWlTel]    = useState('')
   const [wlSaving, setWlSaving] = useState(false)
 
+  const [reglas, setReglas] = useState([])
+
   const selectedServs = useMemo(() => servs.filter(s => servIds.includes(s.id)), [servs, servIds])
   const duracionTotal = useMemo(() => selectedServs.reduce((s, x) => s + (x.duracion_min || 0), 0), [selectedServs])
-  const precioTotal   = useMemo(() => selectedServs.reduce((s, x) => s + (Number(x.precio) || 0), 0), [selectedServs])
+  const precioBase    = useMemo(() => selectedServs.reduce((s, x) => s + (Number(x.precio) || 0), 0), [selectedServs])
+
+  const reglaActiva = useMemo(() => {
+    if (!slot || !reglas.length) return null
+    const dia    = new Date(slot.inicio).getDay()
+    const minSlot = parseInt(slot.inicio.slice(11, 13)) * 60 + parseInt(slot.inicio.slice(14, 16))
+    return reglas.find(r =>
+      r.activo &&
+      r.dias_semana.includes(dia) &&
+      timeToMin(r.hora_inicio) <= minSlot &&
+      timeToMin(r.hora_fin) > minSlot
+    ) || null
+  }, [slot, reglas])
+
+  const precioTotal = useMemo(() => {
+    if (!reglaActiva || !precioBase) return precioBase
+    return Math.round(precioBase * reglaActiva.multiplicador)
+  }, [precioBase, reglaActiva])
+
+  function slotEsPremium(s) {
+    if (!reglas.length) return false
+    const dia     = new Date(s.inicio).getDay()
+    const minSlot = parseInt(s.inicio.slice(11, 13)) * 60 + parseInt(s.inicio.slice(14, 16))
+    return reglas.some(r =>
+      r.activo &&
+      r.dias_semana.includes(dia) &&
+      timeToMin(r.hora_inicio) <= minSlot &&
+      timeToMin(r.hora_fin) > minSlot
+    )
+  }
 
   const porCategoria = useMemo(() => {
     const map = {}
@@ -170,10 +206,16 @@ export default function SalonPortal() {
         .select('*').eq('slug', slug).eq('activo', true).maybeSingle()
       if (!t) { setNotFound(true); setLoading(false); return }
       setTenant(t)
-      const { data: ps } = await supabase.from('profesionales')
-        .select('id, nombre, especialidad, foto_url')
-        .eq('tenant_id', t.id).eq('activo', true).order('nombre')
-      setProfs(ps || [])
+      const [profsRes, reglasRes] = await Promise.all([
+        supabase.from('profesionales')
+          .select('id, nombre, especialidad, foto_url')
+          .eq('tenant_id', t.id).eq('activo', true).order('nombre'),
+        supabase.from('reglas_precio_dinamico')
+          .select('*')
+          .eq('tenant_id', t.id).eq('activo', true),
+      ])
+      setProfs(profsRes.data || [])
+      setReglas(reglasRes.data || [])
       setLoading(false)
     }
     load()
@@ -685,30 +727,65 @@ export default function SalonPortal() {
               )
             ) : slots.length > 0 ? (
               <>
-                <p style={{ fontSize:11, color:'rgba(255,255,255,0.28)', fontWeight:700, letterSpacing:1.2, marginBottom:14, textTransform:'uppercase' }}>
-                  Horarios disponibles
-                </p>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                  <p style={{ fontSize:11, color:'rgba(255,255,255,0.28)', fontWeight:700, letterSpacing:1.2, textTransform:'uppercase', margin:0 }}>
+                    Horarios disponibles
+                  </p>
+                  {reglas.length > 0 && (
+                    <p style={{ fontSize:11, color:'rgba(255,255,255,0.28)', margin:0 }}>
+                      ⚡ precio premium
+                    </p>
+                  )}
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:28 }}>
                   {slots.map(s => {
-                    const sel = slot?.inicio === s.inicio
+                    const sel     = slot?.inicio === s.inicio
+                    const premium = slotEsPremium(s)
                     return (
                       <button key={s.inicio} onClick={() => setSlot(s)} style={{
                         ...(sel ? glassSelected(col, { borderRadius:14 }) : glass({ borderRadius:14 })),
-                        padding:'14px 6px', cursor:'pointer',
-                        color: sel ? '#fff' : 'rgba(255,255,255,0.55)',
+                        padding:'12px 4px 10px', cursor:'pointer',
+                        color: sel ? '#fff' : premium ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.55)',
                         fontFamily:'Outfit', fontWeight:700, fontSize:14,
                         transition:'all 0.15s ease',
                         textShadow: sel ? `0 0 12px ${col}` : 'none',
+                        display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                        border: premium && !sel ? `1px solid ${col}35` : undefined,
                       }}>
                         {s.label}
+                        {premium && <span style={{ fontSize:9, opacity:0.7 }}>⚡</span>}
                       </button>
                     )
                   })}
                 </div>
                 {slot && (
-                  <button onClick={() => setStep(3)} style={primaryBtn(col)}>
-                    Continuar con las {slot.label}
-                  </button>
+                  <>
+                    {reglaActiva && precioBase > 0 && (
+                      <div style={{
+                        ...glass({ borderRadius:14 }),
+                        padding:'12px 16px', marginBottom:14,
+                        display:'flex', alignItems:'center', gap:10,
+                        border:`1px solid ${col}30`,
+                      }}>
+                        <span style={{ fontSize:16 }}>⚡</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.8)' }}>
+                            {reglaActiva.nombre}
+                          </div>
+                          <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:2 }}>
+                            +{Math.round((reglaActiva.multiplicador - 1) * 100)}% · precio ajustado por alta demanda
+                          </div>
+                        </div>
+                        <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:16, color:col }}>
+                          {fmtCOP(precioTotal)}
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={() => setStep(3)} style={primaryBtn(col)}>
+                      Continuar con las {slot.label}
+                      {reglaActiva && precioBase > 0 ? ` · ${fmtCOP(precioTotal)}` : ''}
+                    </button>
+                  </>
                 )}
               </>
             ) : null}
