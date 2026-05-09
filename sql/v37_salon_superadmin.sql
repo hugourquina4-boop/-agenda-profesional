@@ -91,7 +91,7 @@ CREATE OR REPLACE FUNCTION salon_admin_reset_password(
 )
 RETURNS JSONB
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, auth AS $$
+SET search_path = extensions, public, auth AS $$
 DECLARE
   v_user_id UUID;
 BEGIN
