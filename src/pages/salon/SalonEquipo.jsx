@@ -15,6 +15,65 @@ function Ico({ d, size = 18 }) {
 
 const COLORS = ['#f43f5e','#a855f7','#3b82f6','#22c55e','#f59e0b','#06b6d4','#ec4899']
 
+function MiniCalendar({ year, month, excepciones, onDayTap, accentColor }) {
+  const firstDow  = new Date(year, month - 1, 1).getDay()
+  const startOff  = (firstDow + 6) % 7
+  const daysTotal = new Date(year, month, 0).getDate()
+  const today     = new Date().toISOString().split('T')[0]
+  const excMap    = {}
+  excepciones.forEach(e => { excMap[e.fecha] = e })
+
+  const cells = []
+  for (let i = 0; i < startOff; i++) cells.push(null)
+  for (let d = 1; d <= daysTotal; d++) cells.push(d)
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:4 }}>
+        {['L','M','X','J','V','S','D'].map(d => (
+          <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:'var(--text-3)', padding:'4px 0' }}>{d}</div>
+        ))}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`} />
+          const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const exc     = excMap[dateStr]
+          const isToday = dateStr === today
+          let bg = 'transparent', color = 'var(--text-2)', border = isToday ? accentColor : 'transparent', fontW = isToday ? 800 : 500
+          if (exc) {
+            bg     = exc.activo ? 'rgba(34,197,94,0.18)'  : 'rgba(239,68,68,0.14)'
+            color  = exc.activo ? '#4ade80'               : '#f87171'
+            border = exc.activo ? 'rgba(34,197,94,0.4)'   : 'rgba(239,68,68,0.4)'
+            fontW  = 700
+          }
+          return (
+            <button key={dateStr} onClick={() => onDayTap(dateStr, exc || null)}
+              style={{
+                aspectRatio:'1', borderRadius:8, minHeight:36,
+                border:`1px solid ${border}`, background:bg,
+                color, fontSize:13, fontWeight:fontW,
+                cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+              }}>
+              {day}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display:'flex', gap:16, marginTop:10, justifyContent:'center' }}>
+        <span style={{ fontSize:10, color:'#4ade80', display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:8, height:8, borderRadius:2, background:'rgba(34,197,94,0.18)', border:'1px solid rgba(34,197,94,0.4)', display:'inline-block' }} />
+          Horario especial
+        </span>
+        <span style={{ fontSize:10, color:'#f87171', display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:8, height:8, borderRadius:2, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.4)', display:'inline-block' }} />
+          Ausente
+        </span>
+      </div>
+    </div>
+  )
+}
+
 const DIAS_SEMANA = [
   { key:'lunes',     label:'Lunes' },
   { key:'martes',    label:'Martes' },
@@ -168,9 +227,17 @@ export default function SalonEquipo() {
     })
   }
 
-  function abrirNuevaExcepcion() {
-    const today = new Date().toISOString().split('T')[0]
-    setExcForm({ id: null, fecha: today, activo: true, slots: rangeToSlots('09:00', '19:00'), hora_inicio: '09:00', hora_fin: '19:00', nota: '', isNew: true })
+  function abrirNuevaExcepcion(fecha) {
+    const dateStr = fecha || new Date().toISOString().split('T')[0]
+    setExcForm({ id: null, fecha: dateStr, activo: true, slots: rangeToSlots('09:00', '19:00'), hora_inicio: '09:00', hora_fin: '19:00', nota: '', isNew: true })
+  }
+
+  function onDayTap(dateStr, existingExc) {
+    if (existingExc) {
+      abrirEditarExcepcion(existingExc)
+    } else {
+      abrirNuevaExcepcion(dateStr)
+    }
   }
 
   function abrirEditarExcepcion(exc) {
@@ -703,7 +770,7 @@ export default function SalonEquipo() {
               }
             </p>
             <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:16 }}>
-              {excForm ? 'Ajuste para una fecha específica' : 'Días con horario diferente o ausencia'}
+              {excForm ? 'Ajuste para una fecha específica' : 'Toca un día para modificar su horario'}
             </p>
 
             {!excForm ? (
@@ -729,58 +796,58 @@ export default function SalonEquipo() {
                   </button>
                 </div>
 
-                {/* Lista de excepciones */}
-                {excepciones.length === 0 ? (
-                  <div style={{ textAlign:'center', padding:'28px 0 24px', color:'var(--text-3)', fontSize:13 }}>
-                    Sin excepciones en {MESES[excMes.month - 1]}
-                  </div>
-                ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
-                    {excepciones.map(exc => (
-                      <div key={exc.id} style={{
-                        display:'flex', alignItems:'center', gap:10,
-                        padding:'12px 14px', borderRadius:12,
-                        background:'var(--card)', border:'1px solid var(--border)',
-                      }}>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>
-                            {formatFecha(exc.fecha)}
+                {/* Calendario visual — tap en cualquier día */}
+                <MiniCalendar
+                  year={excMes.year}
+                  month={excMes.month}
+                  excepciones={excepciones}
+                  onDayTap={onDayTap}
+                  accentColor={col}
+                />
+
+                {/* Lista compacta de excepciones del mes */}
+                {excepciones.length > 0 && (
+                  <div style={{ marginBottom:12 }}>
+                    <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8 }}>
+                      Excepciones registradas
+                    </p>
+                    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                      {excepciones.map(exc => (
+                        <div key={exc.id} style={{
+                          display:'flex', alignItems:'center', gap:10,
+                          padding:'9px 12px', borderRadius:10,
+                          background:'var(--card)', border:'1px solid var(--border)',
+                        }}>
+                          <div style={{
+                            width:6, height:6, borderRadius:'50%', flexShrink:0,
+                            background: exc.activo ? '#4ade80' : '#f87171',
+                          }} />
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <span style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>
+                              {formatFecha(exc.fecha)}
+                            </span>
+                            <span style={{ fontSize:12, color: exc.activo ? '#4ade80' : '#f87171', marginLeft:8 }}>
+                              {exc.activo ? `${exc.hora_inicio?.slice(0,5)}–${exc.hora_fin?.slice(0,5)}` : 'Ausente'}
+                            </span>
+                            {exc.nota && <span style={{ fontSize:11, color:'var(--text-3)', marginLeft:6 }}>{exc.nota}</span>}
                           </div>
-                          <div style={{ fontSize:12, marginTop:2 }}>
-                            {exc.activo
-                              ? <span style={{ color:'#22c55e' }}>{exc.hora_inicio?.slice(0,5)} — {exc.hora_fin?.slice(0,5)}</span>
-                              : <span style={{ color:'#ef4444' }}>Ausente</span>
-                            }
-                            {exc.nota && <span style={{ color:'var(--text-3)', marginLeft:8 }}>{exc.nota}</span>}
-                          </div>
+                          <button onClick={() => eliminarExcepcion(exc.id)} style={{
+                            width:26, height:26, borderRadius:7,
+                            border:'1px solid rgba(239,68,68,0.3)',
+                            background:'rgba(239,68,68,0.06)', color:'#ef4444', cursor:'pointer',
+                            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                          }}>
+                            <Ico d="M6 18L18 6M6 6l12 12" size={11} />
+                          </button>
                         </div>
-                        <button onClick={() => abrirEditarExcepcion(exc)} style={{
-                          width:30, height:30, borderRadius:8, border:'1px solid var(--border)',
-                          background:'transparent', color:'var(--text-2)', cursor:'pointer',
-                          display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                        }}>
-                          <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={13} />
-                        </button>
-                        <button onClick={() => eliminarExcepcion(exc.id)} style={{
-                          width:30, height:30, borderRadius:8,
-                          border:'1px solid rgba(239,68,68,0.35)',
-                          background:'rgba(239,68,68,0.06)', color:'#ef4444', cursor:'pointer',
-                          display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                        }}>
-                          <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={13} />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                <button onClick={abrirNuevaExcepcion} style={{
-                  width:'100%', padding:'13px', borderRadius:14, cursor:'pointer',
-                  background:col, border:'none', color:'#fff',
-                  fontFamily:'Outfit', fontWeight:700, fontSize:15,
-                }}>
-                  + Agregar excepción
-                </button>
+                <p style={{ fontSize:11, color:'var(--text-3)', textAlign:'center', marginBottom:4 }}>
+                  Toca cualquier día del calendario para añadir o editar
+                </p>
               </>
             ) : (
               /* Formulario de excepción */
