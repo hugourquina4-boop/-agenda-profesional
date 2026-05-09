@@ -185,12 +185,40 @@ export default function SalonSuperadmin({ onGestionar }) {
   const cargar = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
-    const { data, error } = await supabase.rpc('superadmin_tenants_info')
+
+    const { data: tenants, error } = await supabase
+      .from('tenants')
+      .select('id, nombre, slug, ciudad, vertical, plan, color_primario, activo, admin_email, created_at, nombre_representante, telefono, direccion, pagina_web, instagram')
+      .order('created_at', { ascending: false })
+
     if (error) {
-      console.error('[Superadmin] RPC error:', error)
+      console.error('[Superadmin] Error:', error)
       setLoadError(error.message || 'Error al cargar negocios')
+      setNegocios([])
+      setLoading(false)
+      return
     }
-    setNegocios(data || [])
+
+    const mesInicio = new Date()
+    mesInicio.setDate(1); mesInicio.setHours(0,0,0,0)
+
+    const conMetricas = await Promise.all((tenants || []).map(async t => {
+      const [citas, profs, clientes] = await Promise.all([
+        supabase.from('citas').select('id', { count:'exact', head:true }).eq('tenant_id', t.id).gte('created_at', mesInicio.toISOString()),
+        supabase.from('profesionales').select('id', { count:'exact', head:true }).eq('tenant_id', t.id).eq('activo', true),
+        supabase.from('clientes_agenda').select('id', { count:'exact', head:true }).eq('tenant_id', t.id).eq('activo', true),
+      ])
+      return {
+        ...t,
+        tenant_id: t.id,
+        citas_mes:          citas.count   || 0,
+        ingresos_mes:       0,
+        total_profesionales: profs.count  || 0,
+        total_clientes:     clientes.count || 0,
+      }
+    }))
+
+    setNegocios(conMetricas)
     setLoading(false)
   }, [])
 
