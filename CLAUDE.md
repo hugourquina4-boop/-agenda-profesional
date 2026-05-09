@@ -451,5 +451,5 @@ v45_boveda_accesos.sql        → tabla: boveda_accesos + RLS (solo admin) + fun
 - **Negocios activos en v1.1**: glamour-studio, estetica-jess
 - **Modelo**: SaaS B2B para negocios de citas (belleza, bienestar, salud no-clínica)
 - **Competencia**: WeiBook (weibook.co)
-- **Planes**: starter $49K · pro $89K · ultra $149K COP/mes
+- **Planes**: starter $60K · pro $100K · ultra $140K COP/mes
 - **Meta**: 5 negocios pagando antes de construir v1.3

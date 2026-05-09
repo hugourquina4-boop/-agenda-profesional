@@ -18,7 +18,7 @@ function fmtCOP(n) {
   return `$${n}`
 }
 
-const PLAN_PRECIO = { starter: 49000, pro: 89000, ultra: 149000 }
+const PLAN_PRECIO = { starter: 60000, pro: 100000, ultra: 140000 }
 const PLAN_COLOR  = { starter: '#60a5fa', pro: '#a855f7', ultra: '#f59e0b' }
 const VERTICALES  = ['salon', 'barberia', 'spa', 'estetica', 'unas']
 const PLANES      = ['starter', 'pro', 'ultra']
