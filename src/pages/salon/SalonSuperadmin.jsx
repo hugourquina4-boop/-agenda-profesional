@@ -38,7 +38,7 @@ function PlanBadge({ plan }) {
   )
 }
 
-const FORM_INICIAL = { nombre:'', slug:'', ciudad:'', vertical:'salon', plan:'starter', color:'#f43f5e', email_dueno:'', password_temp:'' }
+const FORM_INICIAL = { nombre:'', slug:'', ciudad:'', vertical:'salon', plan:'starter', color:'#f43f5e', email_dueno:'', password_temp:'', representante:'', telefono:'', direccion:'', web:'', instagram:'' }
 
 const ADMIN_SECRET = 'salonpro2026'
 
@@ -168,6 +168,7 @@ export default function SalonSuperadmin({ onGestionar }) {
 
   const [negocios,    setNegocios]    = useState([])
   const [loading,     setLoading]     = useState(true)
+  const [loadError,   setLoadError]   = useState(null)
   const [buscar,      setBuscar]      = useState('')
   const [modal,       setModal]       = useState(false)
   const [creando,     setCreando]     = useState(false)
@@ -183,10 +184,11 @@ export default function SalonSuperadmin({ onGestionar }) {
 
   const cargar = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     const { data, error } = await supabase.rpc('superadmin_tenants_info')
     if (error) {
-      console.error('[Superadmin]', error)
-      showToast('Error cargando datos', '#f87171')
+      console.error('[Superadmin] RPC error:', error)
+      setLoadError(error.message || 'Error al cargar negocios')
     }
     setNegocios(data || [])
     setLoading(false)
@@ -210,12 +212,17 @@ export default function SalonSuperadmin({ onGestionar }) {
     }
     setCreando(true)
     const { error } = await supabase.rpc('crear_negocio', {
-      p_nombre:   form.nombre.trim(),
-      p_slug:     form.slug.trim(),
-      p_ciudad:   form.ciudad || null,
-      p_vertical: form.vertical,
-      p_plan:     form.plan,
-      p_color:    form.color,
+      p_nombre:         form.nombre.trim(),
+      p_slug:           form.slug.trim(),
+      p_ciudad:         form.ciudad         || null,
+      p_vertical:       form.vertical,
+      p_plan:           form.plan,
+      p_color:          form.color,
+      p_representante:  form.representante  || null,
+      p_telefono:       form.telefono       || null,
+      p_direccion:      form.direccion      || null,
+      p_web:            form.web            || null,
+      p_instagram:      form.instagram      || null,
     })
     if (error) { setCreando(false); showToast(error.message || 'Error creando negocio', '#f87171'); return }
 
@@ -483,6 +490,100 @@ export default function SalonSuperadmin({ onGestionar }) {
                   />
                 </div>
               )}
+
+              {/* ── Sección Contacto ── */}
+              <div style={{
+                padding:'14px', borderRadius:14, marginTop:4,
+                background:'rgba(128,128,128,0.05)', border:'1px solid var(--border)',
+              }}>
+                <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.8,
+                  textTransform:'uppercase', marginBottom:12 }}>Datos de contacto</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:5 }}>
+                      Nombre del representante
+                    </label>
+                    <input
+                      value={form.representante}
+                      onChange={e => setForm(f => ({ ...f, representante: e.target.value }))}
+                      placeholder="Ej: María García"
+                      style={{
+                        width:'100%', padding:'9px 12px', borderRadius:10, boxSizing:'border-box',
+                        border:'1px solid var(--border)', background:'var(--bg)',
+                        color:'var(--text)', fontSize:13, outline:'none',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:5 }}>
+                        Teléfono
+                      </label>
+                      <input
+                        value={form.telefono}
+                        onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
+                        placeholder="+57 300 0000000"
+                        style={{
+                          width:'100%', padding:'9px 12px', borderRadius:10, boxSizing:'border-box',
+                          border:'1px solid var(--border)', background:'var(--bg)',
+                          color:'var(--text)', fontSize:13, outline:'none',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:5 }}>
+                        Instagram
+                      </label>
+                      <div style={{ position:'relative' }}>
+                        <span style={{
+                          position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+                          fontSize:12, color:'var(--text-3)', pointerEvents:'none',
+                        }}>@</span>
+                        <input
+                          value={form.instagram}
+                          onChange={e => setForm(f => ({ ...f, instagram: e.target.value.replace('@','') }))}
+                          placeholder="miestudio"
+                          style={{
+                            width:'100%', padding:'9px 12px 9px 22px', borderRadius:10, boxSizing:'border-box',
+                            border:'1px solid var(--border)', background:'var(--bg)',
+                            color:'var(--text)', fontSize:13, outline:'none',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:5 }}>
+                      Dirección
+                    </label>
+                    <input
+                      value={form.direccion}
+                      onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
+                      placeholder="Calle 50 # 20-30, Cali"
+                      style={{
+                        width:'100%', padding:'9px 12px', borderRadius:10, boxSizing:'border-box',
+                        border:'1px solid var(--border)', background:'var(--bg)',
+                        color:'var(--text)', fontSize:13, outline:'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:5 }}>
+                      Página web
+                    </label>
+                    <input
+                      value={form.web}
+                      onChange={e => setForm(f => ({ ...f, web: e.target.value }))}
+                      placeholder="https://miestudio.com"
+                      style={{
+                        width:'100%', padding:'9px 12px', borderRadius:10, boxSizing:'border-box',
+                        border:'1px solid var(--border)', background:'var(--bg)',
+                        color:'var(--text)', fontSize:13, outline:'none',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Preview slug */}
@@ -583,6 +684,35 @@ export default function SalonSuperadmin({ onGestionar }) {
         </button>
       </div>
 
+      {/* ── Error persistente ────────────────────────────── */}
+      {loadError && (
+        <div style={{
+          margin:'12px 16px 0', padding:'14px 16px', borderRadius:14,
+          background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)',
+          display:'flex', alignItems:'flex-start', gap:12,
+        }}>
+          <div style={{ fontSize:18, flexShrink:0 }}>⚠️</div>
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:13, fontWeight:700, color:'#f87171', marginBottom:4 }}>
+              Error cargando negocios
+            </p>
+            <p style={{ fontSize:12, color:'rgba(248,113,113,0.8)', marginBottom:10, fontFamily:'monospace', lineHeight:1.5 }}>
+              {loadError}
+            </p>
+            <p style={{ fontSize:11, color:'var(--text-3)', marginBottom:10, lineHeight:1.5 }}>
+              Aplica <b>v42_fix_superadmin_info.sql</b> en Supabase → SQL Editor y recarga.
+            </p>
+            <button onClick={cargar} style={{
+              padding:'7px 14px', borderRadius:9, border:'1px solid rgba(239,68,68,0.35)',
+              background:'rgba(239,68,68,0.12)', color:'#f87171',
+              fontSize:12, fontWeight:700, cursor:'pointer',
+            }}>
+              Reintentar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Lista negocios ───────────────────────────────── */}
       {loading ? (
         <div style={{ display:'flex', justifyContent:'center', padding:'60px 0' }}>
@@ -670,6 +800,45 @@ export default function SalonSuperadmin({ onGestionar }) {
                     </div>
                   ))}
                 </div>
+
+                {/* Contacto */}
+                {(n.nombre_representante || n.telefono || n.instagram || n.pagina_web || n.direccion) && (
+                  <div style={{
+                    padding:'10px 16px', borderTop:'1px solid var(--border)',
+                    display:'flex', flexWrap:'wrap', gap:'6px 16px',
+                  }}>
+                    {n.nombre_representante && (
+                      <span style={{ fontSize:11, color:'var(--text-3)', display:'flex', alignItems:'center', gap:4 }}>
+                        <Ico d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" size={12} />
+                        {n.nombre_representante}
+                      </span>
+                    )}
+                    {n.telefono && (
+                      <span style={{ fontSize:11, color:'var(--text-3)', display:'flex', alignItems:'center', gap:4 }}>
+                        <Ico d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" size={12} />
+                        {n.telefono}
+                      </span>
+                    )}
+                    {n.instagram && (
+                      <span style={{ fontSize:11, color:'#c084fc', display:'flex', alignItems:'center', gap:3 }}>
+                        @{n.instagram}
+                      </span>
+                    )}
+                    {n.pagina_web && (
+                      <a href={n.pagina_web} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize:11, color:'#60a5fa', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}>
+                        <Ico d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" size={12} />
+                        Web
+                      </a>
+                    )}
+                    {n.direccion && (
+                      <span style={{ fontSize:11, color:'var(--text-3)', display:'flex', alignItems:'center', gap:3 }}>
+                        <Ico d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" size={12} />
+                        {n.direccion}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Footer */}
                 <div style={{ padding:'8px 16px', display:'flex', alignItems:'center', gap:8 }}>

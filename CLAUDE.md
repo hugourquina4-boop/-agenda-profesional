@@ -51,15 +51,18 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Nueva cita (5 pasos) | SalonNuevaCita.jsx | Horarios, slots, anti-solapamiento, WA confirmación al crear |
 | Portal público | SalonPortal.jsx | Reservas online, precios dinámicos, lista de espera, WA confirmación |
 | Servicios CRUD | SalonServicios.jsx | Precio, duración, categoría — independiente por tenant |
-| Equipo CRUD + horarios | SalonEquipo.jsx | 7 días, fotos, upsert horarios — independiente por tenant |
+| Equipo CRUD + horarios táctiles + excepciones | SalonEquipo.jsx | HorarioGrid drag-to-select por día, excepciones por fecha (ausencia/horario especial) |
+| HorarioGrid (componente reutilizable) | components/HorarioGrid.jsx | Drag-to-select táctil, pointer capture, exports: rangeToSlots, slotsToRange, slotsToFranjas |
 | Clientes CRUD + historial + fotos | SalonClientes.jsx | Cumpleaños, segmento, historial, galería, CSV export + import |
 | Caja — Registro de cobros | SalonCaja.jsx | Tabla pagos, tabs Por cobrar/Cobrado, métodos pago, PDF export |
 | Comisiones — Reglas + liquidación | SalonComisiones.jsx | % por profesional, meta mensual, liquidación PDF individual |
 | Órdenes en espera | SalonOrdenes.jsx | Grid tarjetas, nueva orden, cobrar → pagos → comisión |
-| Inventario de productos | SalonInventario.jsx | CRUD, categorías, valor total, alertas stock mínimo |
+| Inventario de productos | SalonInventario.jsx | CRUD + CSV import (preview → upsert por SKU), subcategoria/marca/codigo/contenido/proveedor, categorías: capilar/color/tratamiento/retail/uñas/insumos/herramienta/otro |
 | Analytics — KPIs y métricas | SalonAnalytics.jsx | v_kpis_mes, v_revenue_staff, v_retention, gráficos, PDF export |
 | Configuración del negocio | SalonConfig.jsx | Logo, color, WhatsApp, tipología, horario, slots, QR, plan |
 | Superadmin React (dentro del app) | SalonSuperadmin.jsx | Vista interna para Hugo: MRR/ARR, crear negocio con usuario inicial |
+| ErrorBoundary — auto-reload chunks | components/ErrorBoundary.jsx | Detecta chunk 404 post-deploy → window.location.reload() automático |
+| Service Worker | public/sw.js | Versión v3, excluye /assets/ (hashes) del caché para evitar chunks rancios |
 
 ### ✅ EDGE FUNCTIONS OPERATIVAS
 
@@ -72,94 +75,110 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | `admin-crear-usuario` | SalonAccesos + Superadmin | Crea usuario Supabase Auth sin afectar sesión |
 | `admin-reset-password` | SalonAccesos | Resetea contraseña vía email |
 
-### ✅ SQL APLICADO EN SUPABASE
+### ✅ SQL APLICADO EN SUPABASE (todos al día)
 
 ```
-SALON_SETUP_COMPLETO.sql  ✅ Schema base
-v9–v35                    ✅ Todos aplicados (ver historial previo)
-v36_eliminar_dev_policies ⚠️ PENDIENTE APLICAR — elimina políticas dev_* (seguridad crítica)
-v37_salon_superadmin.sql  ✅ APLICADO — SHA-256 admin, SECURITY DEFINER RPCs:
-                             salon_verificar_admin, salon_admin_reset_password,
-                             salon_admin_get_tenants, salon_admin_set_activo,
-                             salon_admin_set_plan, salon_admin_get_users
+SALON_SETUP_COMPLETO.sql   ✅ Schema base
+v9–v35                     ✅ Todos aplicados
+v36_eliminar_dev_policies  ✅ APLICADO — elimina políticas dev_* cross-tenant
+v37_salon_superadmin.sql   ✅ APLICADO — SHA-256 admin, SECURITY DEFINER RPCs:
+                              salon_verificar_admin, salon_admin_reset_password,
+                              salon_admin_get_tenants, salon_admin_set_activo,
+                              salon_admin_set_plan, salon_admin_get_users
+v38_permisos_rol.sql       ✅ APLICADO — tabla permisos_tenant + RPCs:
+                              salon_seed_permisos, get_permisos_tenant, set_permiso_tenant
+v39_horarios_flexibles.sql ✅ APLICADO — tabla horarios_excepcion + RPCs:
+                              get_disponibilidad_dia, get_excepciones_mes
+v40_superadmin_fixes.sql   ✅ APLICADO — fix crear_negocio (vincula Hugo vía RLS),
+                              fix superadmin_tenants_info (+admin_email),
+                              vincula Hugo a todos los tenants existentes
+v41_inventario_enhanced.sql ✅ APLICADO — subcategoria, marca, codigo, contenido, proveedor
+                              en productos_salon; CHECK categorías expandido; índice único
+                              (tenant_id, codigo) para upsert CSV sin duplicados
+v42_fix_superadmin_info.sql  ⏳ PENDIENTE APLICAR — fix superadmin_tenants_info + crear_negocio
+                              con campos de contacto; nuevas columnas tenants: nombre_representante,
+                              foto_representante, pagina_web, instagram; re-vincula Hugo
 ```
 
 ### ✅ SQL EJECUTADO DIRECTAMENTE (sin archivo)
 
 ```sql
--- Función tenants_del_usuario() actualizada:
--- Si usuario es superadmin → retorna TODOS los tenants con campo slug
--- Si usuario regular → retorna solo sus tenants activos
-
--- Hugo vinculado como superadmin en todos los tenants:
--- INSERT INTO usuarios_tenant ... ON CONFLICT DO UPDATE SET rol='superadmin'
+-- tenants_del_usuario(): superadmin → todos los tenants; regular → solo los suyos
+-- Hugo vinculado como superadmin en todos los tenants existentes via ON CONFLICT DO UPDATE
 ```
 
 ---
 
 ## 🚨 Pendientes Críticos
 
-### 1. v36_eliminar_dev_policies — APLICAR EN SUPABASE
-Archivo existe en `sql/v36_eliminar_dev_policies.sql`. Ejecutar en SQL Editor.
-Elimina políticas `dev_*` que permiten acceso cross-tenant. Bloquea lanzamiento a clientes reales.
+### 1. Control de acceso por rol — PENDIENTE IMPLEMENTAR EN UI
+La tabla `permisos_tenant` ya existe en BD (v38 aplicado). Falta conectarla en el frontend.
 
-### 2. Control de acceso por rol — PENDIENTE IMPLEMENTAR
-El dueño/admin del negocio debe poder definir qué módulos ve cada integrante del equipo.
+**Lo que falta:**
+- `SalonLayout.jsx`: leer `get_permisos_tenant(tenant_id)` al cargar sesión → filtrar sidebar según rol
+- `SalonAccesos.jsx` o `SalonConfig.jsx`: UI para que el admin configure qué módulos ve cada rol
 
-**Módulos visibles por rol** (diseño a implementar):
+**Tabla de permisos por rol (referencia):**
 
-| Módulo | superadmin | admin | contable | recepcion | profesional |
-|--------|-----------|-------|----------|-----------|-------------|
-| Inicio/Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Agenda | ✅ | ✅ | ❌ | ✅ | ✅ (solo propia) |
-| Clientes | ✅ | ✅ | ❌ | ✅ | ✅ |
-| Servicios | ✅ | ✅ | ❌ | ✅ | ✅ |
-| Órdenes en espera | ✅ | ✅ | ❌ | ✅ | ✅ |
-| Caja | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Comisiones | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Inventario | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Analytics | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Equipo | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Accesos | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Configuración | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Módulo | admin | contable | recepcion | profesional |
+|--------|-------|----------|-----------|-------------|
+| Inicio/Dashboard | ✅ | ✅ | ✅ | ✅ |
+| Agenda | ✅ | ❌ | ✅ | ✅ (solo propia) |
+| Clientes | ✅ | ❌ | ✅ | ✅ |
+| Servicios | ✅ | ❌ | ✅ | ✅ |
+| Órdenes en espera | ✅ | ❌ | ✅ | ✅ |
+| Caja | ✅ | ✅ | ❌ | ❌ |
+| Comisiones | ✅ | ✅ | ❌ | ❌ |
+| Inventario | ✅ | ✅ | ❌ | ❌ |
+| Analytics | ✅ | ✅ | ❌ | ❌ |
+| Equipo | ✅ | ❌ | ❌ | ❌ |
+| Accesos | ✅ | ❌ | ❌ | ❌ |
+| Configuración | ✅ | ❌ | ❌ | ❌ |
 
-**Implementación planificada:**
-- Tabla `permisos_tenant` (tenant_id, rol, modulo, activo) — el admin configura por negocio
-- `SalonLayout` filtra el menú según `rol` del usuario logueado
-- El admin puede ajustar permisos desde `SalonAccesos` o `SalonConfig`
-
-### 3. Deploy Edge Functions pendientes
+### 2. Deploy Edge Functions pendientes
 ```bash
 npx supabase functions deploy cumpleanos-clientes resumen-diario
 ```
 
-### 4. Activar Supabase Schedules (4 crons)
+### 3. Activar Supabase Schedules (4 crons)
 Ver sección Automatizaciones en SalonConfig para los horarios.
 
 ---
 
-## Panel Maestro Superadmin (superadmin.html)
+## Dos Paneles de Hugo — DISTINCIÓN CRÍTICA
 
+### Panel 1: superadmin.html (monitoreo, sin React)
 **URL**: https://project-gnyy8.vercel.app/superadmin.html
-**Clave**: `HFURQUINA12` (SHA-256 computado en browser, verificado via RPC SECURITY DEFINER)
-**Acceso**: Solo Hugo. Nunca visible para dueños de negocios.
+**Clave**: `HFURQUINA12` (SHA-256 en browser, verificado via RPC SECURITY DEFINER)
+**Propósito**: **Monitoreo** — revisar negocios vinculados, estado activo/inactivo, plan contratado, métricas.
 
-### Funciones disponibles
-
+**Funciones disponibles:**
 - Ver todos los negocios con métricas (citas, clientes, profesionales)
-- Crear nuevo negocio + usuario admin inicial
 - Activar / Suspender negocio
 - Cambiar plan y fecha de vencimiento
-- Reset de clave de cualquier usuario por email (vía `salon_admin_reset_password`)
-- Registrar pagos de suscripción
+- Reset de clave de cualquier usuario por email
 - Ver todos los usuarios de la plataforma
+- Registrar pagos de suscripción
+
+### Panel 2: Módulo Superadmin dentro de /salon (React, solo Hugo)
+**URL**: https://project-gnyy8.vercel.app/salon → módulo "Plataforma" en el sidebar
+**Acceso**: Solo usuarios con `rol = 'superadmin'` — completamente oculto para dueños de negocios.
+**Propósito**: **Gestión operativa** — crear negocios nuevos, vincular dueños, asignar credenciales, contratos/planes, verificar pagos.
+
+**Funciones:**
+- Crear nuevo negocio (tenant) con usuario admin inicial y clave temporal
+- Identificar y vincular al dueño del negocio
+- Asignar plan contratado y fecha de vigencia
+- Verificar y registrar pagos de suscripción
+- MRR / ARR de la plataforma
 
 ### Flujo para nuevo negocio
 
-1. Superadmin crea negocio en `superadmin.html` → genera tenant con admin inicial
-2. Admin del negocio recibe email + clave temporal
-3. Admin entra a `/salon?tenant=slug` → configura servicios, equipo, horarios
-4. Trabajadores reciben acceso desde `Accesos` dentro del panel del negocio
+1. Hugo entra a `/salon` → módulo "Plataforma" (Superadmin React)
+2. Crea negocio: nombre, slug, vertical, plan, email admin, clave temporal
+3. Admin recibe email + clave temporal
+4. Admin entra a `/salon?tenant=slug` → configura servicios, equipo, horarios
+5. Trabajadores reciben acceso desde módulo `Accesos` del panel
 
 ---
 
@@ -171,7 +190,7 @@ Ver sección Automatizaciones en SalonConfig para los horarios.
 - **Crear usuarios nuevos**: Edge Function `admin-crear-usuario` (x-admin-secret: salonpro2026)
 - **Reset clave dentro de plataforma**: `salon_admin_reset_password` RPC (SECURITY DEFINER, extensions schema para gen_salt)
 - **Recovery email**: `supabase.auth.resetPasswordForEmail` → redirige a `/salon` → handler PASSWORD_RECOVERY en TenantContext
-- **Superadmin acceso total**: `tenants_del_usuario()` retorna ALL tenants si rol='superadmin'. Cada nuevo negocio requiere INSERT en usuarios_tenant para Hugo.
+- **Superadmin acceso total**: `tenants_del_usuario()` retorna ALL tenants si rol='superadmin'. `crear_negocio()` auto-inserta a Hugo en `usuarios_tenant` del nuevo tenant.
 
 ### Datos y Seguridad
 
@@ -180,12 +199,37 @@ Ver sección Automatizaciones en SalonConfig para los horarios.
 - **confirmed_at** es columna generada — actualizar solo `email_confirmed_at`
 - **pgcrypto** en Supabase vive en schema `extensions` — search_path debe incluirlo
 - **Superadmin oculto en Accesos**: filtrar `rol !== 'superadmin'` en SalonAccesos
+- **usuarios_tenant tiene NOT NULL**: nombre y email obligatorios — siempre incluirlos en INSERT
 
 ### UI
 
-- **Inline CSS**: no Tailwind en componentes salon/ — variables `var(--bg)`, `var(--card)`, etc.
+- **Inline CSS**: no Tailwind en componentes salon/ — variables `var(--bg)`, `var(--card)`, `var(--text)`, `var(--text-2)`, `var(--text-3)`, `var(--border)`, `var(--accent)`
 - **URL slug**: `SalonLogin.elegirSalon()` y `TenantPicker` siempre actualizan `?tenant=slug` en URL
 - **Code splitting**: lazy imports con Suspense + ErrorBoundary en todos los módulos
+- **Chunk errors post-deploy**: ErrorBoundary.componentDidCatch + main.jsx vite:preloadError → ambos llaman window.location.reload(). SW excluye /assets/ del caché.
+- **HorarioGrid**: componente táctil reutilizable en `src/components/HorarioGrid.jsx`. Usa `setPointerCapture` + `document.elementFromPoint`. Exporta helpers de conversión de slots.
+
+### Schema crítico: usuarios_tenant
+
+```
+id UUID PK
+tenant_id UUID NOT NULL
+user_id UUID NOT NULL
+rol TEXT CHECK IN ('superadmin','admin','contable','recepcion','profesional')
+nombre TEXT NOT NULL
+email TEXT NOT NULL
+activo BOOLEAN
+UNIQUE (tenant_id, user_id)
+```
+
+### Schema crítico: productos_salon (v41)
+
+```
+id, tenant_id, nombre, categoria, subcategoria, marca, codigo (SKU),
+contenido NUMERIC, unidad, proveedor, precio_venta, precio_costo,
+stock, stock_minimo, notas, activo, created_at
+UNIQUE INDEX (tenant_id, codigo) WHERE codigo IS NOT NULL AND codigo <> ''
+```
 
 ---
 
@@ -208,8 +252,9 @@ Estado: [lo que está pendiente según este CLAUDE.md]
 ```
 
 - Leer siempre primero: `TenantContext.jsx`, el módulo a modificar, y este CLAUDE.md
-- Para SQL nuevo: archivo `vXX_nombre.sql` con RLS + tenant_id
+- Para SQL nuevo: archivo `vXX_nombre.sql` con RLS + tenant_id. Próximo: v42
 - Para UI: React + inline CSS, variables salon.css
 - Para deploy: `git push` → Vercel auto-despliega. O `npx vercel --prod --yes` si urgente
 - Para Edge Functions: `npx supabase functions deploy <nombre>` (requiere access token)
 - Nunca omitir `.eq('tenant_id', tenant.id)` en queries
+- `get_excepciones_mes` RPC no retorna `id` — usar query directa a `horarios_excepcion` si necesitas el id
