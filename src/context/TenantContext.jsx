@@ -31,9 +31,12 @@ export function TenantProvider({ children }) {
         resetState(); setUser(u); setLoading(false); return
       }
 
-      // Elegir tenant: localStorage primero, luego el primero de la lista
+      // Elegir tenant: URL slug > localStorage > primero de lista
+      const slugUrl  = new URLSearchParams(window.location.search).get('tenant')
       const guardado = localStorage.getItem(KEY_TENANT)
-      const entrada  = lista.find(t => t.tenant_id === guardado) || lista[0]
+      const entrada  = (slugUrl  && lista.find(t => t.slug === slugUrl))
+                    || (guardado && lista.find(t => t.tenant_id === guardado))
+                    || lista[0]
 
       await cargarTenant(entrada.tenant_id, entrada.rol, u)
     } catch (e) {
