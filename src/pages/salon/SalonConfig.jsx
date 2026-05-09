@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 import ImageUploader from '../../components/ImageUploader'
+import { QRCodeSVG } from 'qrcode.react'
 
 function Ico({ d, size = 18 }) {
   return (
@@ -45,6 +46,28 @@ export default function SalonConfig() {
   const [form,   setForm]   = useState(null)
   const [saving, setSaving] = useState(false)
   const [toast,  setToast]  = useState(null)
+  const qrRef = useRef(null)
+
+  function descargarQR() {
+    const svg = qrRef.current?.querySelector('svg')
+    if (!svg) return
+    const size = 400
+    const canvas = document.createElement('canvas')
+    canvas.width = size; canvas.height = size
+    const ctx = canvas.getContext('2d')
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const img = new Image()
+    img.onload = () => {
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(img, 0, 0, size, size)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `qr-reservas-${tenant?.slug || 'salon'}.png`
+      a.click()
+    }
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgData)
+  }
 
   useEffect(() => {
     if (!tenant) return
@@ -58,8 +81,14 @@ export default function SalonConfig() {
       logo_url:       tenant.logo_url       || '',
       color_primario: tenant.color_primario || '#f43f5e',
       descripcion:    tenant.descripcion    || '',
-      promo:          tenant.config_vertical?.promo         || '',
-      horario_texto:  tenant.config_vertical?.horario_texto || '',
+      promo:               tenant.config_vertical?.promo               || '',
+      horario_texto:       tenant.config_vertical?.horario_texto       || '',
+      tipologia:           tenant.config_vertical?.tipologia           || 'salon',
+      hora_apertura:       tenant.config_vertical?.hora_apertura       || '09:00',
+      hora_cierre:         tenant.config_vertical?.hora_cierre         || '20:00',
+      duracion_slot_min:   tenant.config_vertical?.duracion_slot_min   || 30,
+      anticipacion_horas:  tenant.config_vertical?.anticipacion_horas  || 2,
+      politica_cancelacion:tenant.config_vertical?.politica_cancelacion|| '',
     })
   }, [tenant])
 
@@ -87,8 +116,14 @@ export default function SalonConfig() {
       descripcion:     form.descripcion.trim() || null,
       config_vertical: {
         ...(tenant.config_vertical || {}),
-        promo:         form.promo.trim()         || null,
-        horario_texto: form.horario_texto.trim() || null,
+        promo:                form.promo.trim()                || null,
+        horario_texto:        form.horario_texto.trim()        || null,
+        tipologia:            form.tipologia,
+        hora_apertura:        form.hora_apertura,
+        hora_cierre:          form.hora_cierre,
+        duracion_slot_min:    Number(form.duracion_slot_min),
+        anticipacion_horas:   Number(form.anticipacion_horas),
+        politica_cancelacion: form.politica_cancelacion.trim() || null,
       },
     }).eq('id', tenant.id)
     setSaving(false)
@@ -190,6 +225,28 @@ export default function SalonConfig() {
             value={form.horario_texto} onChange={e => set('horario_texto', e.target.value)} />
         </Campo>
 
+        {/* QR de reservas */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12,
+          padding:'20px 16px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
+            Código QR de tu portal
+          </div>
+          <div ref={qrRef} style={{ padding:14, background:'#ffffff', borderRadius:12 }}>
+            <QRCodeSVG
+              value={`${window.location.origin}/reservar/${tenant?.slug || 'demo'}`}
+              size={140}
+              level="H"
+            />
+          </div>
+          <button onClick={descargarQR} style={{
+            padding:'9px 22px', borderRadius:10, cursor:'pointer',
+            background:`${col}18`, border:`1px solid ${col}40`,
+            color:col, fontWeight:700, fontSize:13,
+          }}>
+            ↓ Descargar QR como PNG
+          </button>
+        </div>
+
         {/* Link del portal */}
         <div style={{ padding:'14px 16px', borderRadius:14, background:`${col}0e`,
           border:`1px solid ${col}28` }}>
@@ -222,6 +279,55 @@ export default function SalonConfig() {
             Agrega el número de WhatsApp para que los clientes puedan contactarte fácilmente
           </div>
         )}
+      </Seccion>
+
+      {/* ── Operación ── */}
+      <Seccion titulo="Operación">
+        <Campo label="Tipología del negocio">
+          <select className="sp-input" value={form.tipologia}
+            onChange={e => set('tipologia', e.target.value)}>
+            <option value="salon">Salón de belleza</option>
+            <option value="barberia">Barbería</option>
+            <option value="spa">Spa</option>
+            <option value="unas">Uñas / Manicure</option>
+            <option value="estetica">Estética</option>
+          </select>
+        </Campo>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <Campo label="Hora apertura">
+            <input className="sp-input" type="time"
+              value={form.hora_apertura} onChange={e => set('hora_apertura', e.target.value)} />
+          </Campo>
+          <Campo label="Hora cierre">
+            <input className="sp-input" type="time"
+              value={form.hora_cierre} onChange={e => set('hora_cierre', e.target.value)} />
+          </Campo>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <Campo label="Duración mínima de cita">
+            <select className="sp-input" value={form.duracion_slot_min}
+              onChange={e => set('duracion_slot_min', e.target.value)}>
+              {[15,20,30,45,60].map(m => (
+                <option key={m} value={m}>{m} min</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo label="Anticipación mínima (horas)">
+            <input className="sp-input" type="number" min="0" max="72"
+              value={form.anticipacion_horas}
+              onChange={e => set('anticipacion_horas', e.target.value)} />
+          </Campo>
+        </div>
+
+        <Campo label="Política de cancelación">
+          <textarea className="sp-input" rows={3}
+            placeholder="Ej: Puedes cancelar hasta 24h antes sin costo. Cancelaciones tardías tienen cargo del 50%."
+            value={form.politica_cancelacion}
+            onChange={e => set('politica_cancelacion', e.target.value)}
+            style={{ resize:'none' }} />
+        </Campo>
       </Seccion>
 
       <button onClick={guardar} disabled={saving} style={{

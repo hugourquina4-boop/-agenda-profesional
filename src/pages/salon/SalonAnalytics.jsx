@@ -133,6 +133,84 @@ export default function SalonAnalytics() {
 
   useEffect(() => { cargar() }, [cargar])
 
+  async function descargarPDF() {
+    const { default: jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const mesLabel = kpi?.mes ? `${MES_LABELS[parseInt(kpi.mes.slice(5,7))-1]} ${kpi.mes.slice(0,4)}` : new Date().toLocaleDateString('es-CO',{month:'long',year:'numeric'})
+
+    doc.setFillColor(r,g,b); doc.rect(0,0,210,28,'F')
+    doc.setTextColor(255,255,255)
+    doc.setFontSize(16); doc.setFont('helvetica','bold')
+    doc.text(tenant?.nombre || 'Salón', 14, 12)
+    doc.setFontSize(10); doc.setFont('helvetica','normal')
+    doc.text(`Reporte Analytics · ${mesLabel}`, 14, 20)
+
+    doc.setTextColor(0,0,0)
+    // KPIs
+    const kpis = [
+      ['Citas completadas', String(kpi?.completadas ?? '—')],
+      ['Ingresos brutos', `$${(kpi?.ingresos_brutos||0).toLocaleString('es-CO')}`],
+      ['Ticket promedio', `$${(kpi?.avg_ticket||0).toLocaleString('es-CO')}`],
+      ['No-show rate', `${kpi?.no_show_rate ?? '—'}%`],
+      ['Retención', `${retention?.retention_rate ?? '—'}%`],
+      ['Clientes recurrentes', String(retention?.clientes_recurrentes ?? '—')],
+    ]
+    let x = 14, y = 42
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(r,g,b)
+    doc.text('MÉTRICAS DEL MES', x, y); y += 7
+    kpis.forEach(([label, val], i) => {
+      if (i % 2 === 0 && i > 0) { x = 14; y += 12 }
+      if (i % 2 === 1) x = 110
+      doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100)
+      doc.text(label, x, y)
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+      doc.setFontSize(12)
+      doc.text(val, x, y + 6)
+      doc.setFontSize(9)
+      if (i % 2 === 0) x = 110
+    })
+
+    // Historial
+    if (historia.length > 0) {
+      y = 90
+      doc.setFillColor(245,245,245); doc.rect(10, y-5, 190, 9, 'F')
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+      doc.text('Mes', 14, y); doc.text('Ingresos', 60, y)
+      doc.text('Citas', 110, y); doc.text('No-show', 155, y); y += 8
+      historia.forEach((d, i) => {
+        if (i%2===0) { doc.setFillColor(252,252,252); doc.rect(10,y-4,190,7,'F') }
+        doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
+        doc.text(d.mes||'', 14, y)
+        doc.text(`$${(d.ingresos_brutos||0).toLocaleString('es-CO')}`, 60, y)
+        doc.text(String(d.completadas||0), 110, y)
+        doc.text(`${d.no_show_rate||0}%`, 155, y)
+        y += 7
+      })
+    }
+
+    // Staff
+    if (staff.length > 0) {
+      y += 10
+      doc.setFillColor(r,g,b,50); doc.rect(10,y-5,190,9,'F')
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+      doc.text('Profesional', 14, y); doc.text('Citas', 80, y)
+      doc.text('Ingresos', 110, y); doc.text('Comisión', 160, y); y += 8
+      staff.forEach((s, i) => {
+        if (y > 270) { doc.addPage(); y = 20 }
+        if (i%2===0) { doc.setFillColor(252,252,252); doc.rect(10,y-4,190,7,'F') }
+        doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
+        doc.text((s.nombre||'').substring(0,22), 14, y)
+        doc.text(String(s.citas_completadas||0), 80, y)
+        doc.text(`$${(s.ingresos_brutos||0).toLocaleString('es-CO')}`, 110, y)
+        doc.text(`$${(s.comisiones_ganadas||0).toLocaleString('es-CO')}`, 160, y)
+        y += 7
+      })
+    }
+
+    doc.save(`analytics-${mesLabel.replace(' ','-')}.pdf`)
+  }
+
   if (loading) return (
     <div style={{ display:'flex', justifyContent:'center', padding:'60px 0' }}>
       <div className="sp-spinner" style={{ borderTopColor:col }} />
@@ -155,6 +233,13 @@ export default function SalonAnalytics() {
       {/* ── KPIs del mes ──────────────────────────────────── */}
       <div className="sp-section" style={{ marginTop:20 }}>
         <span className="sp-section-title">Este mes</span>
+        {kpi && (
+          <button onClick={descargarPDF} style={{
+            padding:'5px 14px', borderRadius:9, cursor:'pointer',
+            background:`${col}18`, border:`1px solid ${col}40`,
+            color:col, fontWeight:700, fontSize:12,
+          }}>↓ PDF</button>
+        )}
       </div>
 
       <div style={{ padding:'0 16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>

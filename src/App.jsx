@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, useEffect } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { TenantProvider, useTenant } from './context/TenantContext'
 import Login from './pages/Login'
@@ -102,8 +103,9 @@ export default function App() {
           {/* Panel salón / peluquería — sin auth por ahora */}
           <Route path="/salon" element={<SalonApp />} />
 
-          {/* Portal público de reservas */}
+          {/* Portal público de reservas — dos URLs equivalentes */}
           <Route path="/reservar/:slug" element={<SalonPortal />} />
+          <Route path="/agenda/:slug"   element={<SalonPortal />} />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

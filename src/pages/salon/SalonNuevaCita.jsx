@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
@@ -11,69 +11,98 @@ function Ico({ d, size = 18 }) {
   )
 }
 
-const STEP_LABELS = ['Profesional', 'Servicio', 'Fecha y hora', 'Cliente']
+const STEP_LABELS = ['Profesional', 'Servicios', 'Fecha y hora', 'Cliente']
+const DIA_KEY = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado']
+
+function fmtCOP(n) {
+  if (!n || n <= 0) return null
+  return '$' + Number(n).toLocaleString('es-CO')
+}
 
 export default function SalonNuevaCita({ onClose, onCreada }) {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [step, setStep] = useState(0)
-  const [profs,    setProfs]    = useState([])
-  const [servs,    setServs]    = useState([])
-  const [slots,     setSlots]     = useState([])
-  const [sinHorario,setSinHorario]= useState(false)
-  const [clientes, setClientes] = useState([])
+  const [step,       setStep]       = useState(0)
+  const [profs,      setProfs]      = useState([])
+  const [servs,      setServs]      = useState([])
+  const [slots,      setSlots]      = useState([])
+  const [sinHorario, setSinHorario] = useState(false)
+  const [clientes,   setClientes]   = useState([])
 
-  const [profId,   setProfId]   = useState(null)
-  const [servId,   setServId]   = useState(null)
-  const [fecha,    setFecha]    = useState(new Date().toISOString().slice(0,10))
-  const [slot,     setSlot]     = useState(null)
-  const [clienteId,setClienteId]= useState(null)
+  const [profId,      setProfId]      = useState(null)
+  const [servIds,     setServIds]     = useState([])   // multi-select
+  const [fecha,       setFecha]       = useState(new Date().toISOString().slice(0,10))
+  const [slot,        setSlot]        = useState(null)
+  const [clienteId,   setClienteId]   = useState(null)
   const [busqCliente, setBusqCliente] = useState('')
-  const [nuevoCliente, setNuevoCliente] = useState({ nombre:'', telefono:'' })
-  const [modoNuevo, setModoNuevo] = useState(false)
+  const [nuevoCliente,setNuevoCliente]= useState({ nombre:'', telefono:'' })
+  const [modoNuevo,   setModoNuevo]   = useState(false)
 
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState(null)
+  const [toast,  setToast]  = useState(null)
 
-  const showToast = (msg, color='#ef4444') => {
+  const showToast = (msg, color = '#ef4444') => {
     setToast({ msg, color })
     setTimeout(() => setToast(null), 3000)
   }
 
+  // Derivados de servicios seleccionados
+  const selectedServs  = useMemo(() => servs.filter(s => servIds.includes(s.id)), [servs, servIds])
+  const duracionTotal  = useMemo(() => selectedServs.reduce((sum, s) => sum + (s.duracion_min || 0), 0), [selectedServs])
+  const precioTotal    = useMemo(() => selectedServs.reduce((sum, s) => sum + (Number(s.precio) || 0), 0), [selectedServs])
+
+  // Servicios agrupados por categoría
+  const porCategoria = useMemo(() => {
+    const map = {}
+    servs.forEach(s => {
+      const cat = s.categoria || 'General'
+      if (!map[cat]) map[cat] = []
+      map[cat].push(s)
+    })
+    return map
+  }, [servs])
+
+  function toggleServ(id) {
+    setServIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    setSlot(null)
+  }
+
+  // Carga profesionales
   useEffect(() => {
     if (!tenant) return
-    supabase.from('profesionales').select('id, nombre, especialidad, foto_url, activo').eq('tenant_id', tenant.id).order('nombre')
-      .then(({ data }) => setProfs(data || []))
+    supabase.from('profesionales')
+      .select('id, nombre, especialidad, foto_url, activo')
+      .eq('tenant_id', tenant.id).order('nombre')
+      .then(({ data }) => setProfs((data || []).filter(p => p.activo)))
   }, [tenant])
 
+  // Carga servicios al elegir profesional
   useEffect(() => {
     if (!profId || !tenant) return
-    supabase.from('servicios').select('id, nombre, precio, duracion_min, categoria')
-      .eq('tenant_id', tenant.id).eq('activo', true).order('nombre')
+    setServIds([])
+    setSlot(null)
+    supabase.from('servicios')
+      .select('id, nombre, precio, duracion_min, categoria')
+      .eq('tenant_id', tenant.id).eq('activo', true).order('categoria').order('nombre')
       .then(({ data }) => setServs(data || []))
-  }, [profId])
+  }, [profId, tenant])
 
-  const DIA_KEY = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado']
-
+  // Regenera slots cuando cambia duración total, fecha o profesional
   useEffect(() => {
-    if (!profId || !servId || !fecha || !tenant) return
-    const serv = servs.find(s => s.id === servId)
-    if (!serv) return
+    if (!profId || duracionTotal === 0 || !fecha || !tenant) { setSlots([]); return }
     setSinHorario(false)
     setSlots([])
-    generarSlots(profId, fecha, serv.duracion_min)
-  }, [profId, servId, fecha])
+    setSlot(null)
+    generarSlots(profId, fecha, duracionTotal)
+  }, [profId, fecha, duracionTotal])
 
   async function generarSlots(pId, f, durMin) {
-    // Verificar horario configurado para ese día de la semana
     const diaSemana = DIA_KEY[new Date(f + 'T12:00:00').getDay()]
     const { data: horario } = await supabase
       .from('horarios')
       .select('hora_inicio, hora_fin')
-      .eq('profesional_id', pId)
-      .eq('dia', diaSemana)
-      .eq('activo', true)
+      .eq('profesional_id', pId).eq('dia', diaSemana).eq('activo', true)
       .maybeSingle()
 
     if (!horario) { setSinHorario(true); return }
@@ -83,7 +112,6 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
     const inicioMin = hI * 60 + mI
     const finMin    = hF * 60 + mF
 
-    // Citas ocupadas del día
     const { data: citasOcup } = await supabase
       .from('citas')
       .select('fecha_inicio, fecha_fin')
@@ -93,9 +121,9 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
       .neq('estado', 'cancelada')
 
     const generados = []
-    for (let h = inicioMin; h + durMin <= finMin; h += durMin) {
-      const hh = String(Math.floor(h / 60)).padStart(2, '0')
-      const mm = String(h % 60).padStart(2, '0')
+    for (let h = inicioMin; h + durMin <= finMin; h += 15) {
+      const hh     = String(Math.floor(h / 60)).padStart(2, '0')
+      const mm     = String(h % 60).padStart(2, '0')
       const inicio = `${f}T${hh}:${mm}:00`
       const fin    = new Date(new Date(inicio).getTime() + durMin * 60000).toISOString().slice(0, 19)
       const ocupado = (citasOcup || []).some(c => c.fecha_inicio < fin && c.fecha_fin > inicio)
@@ -104,9 +132,11 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
     setSlots(generados)
   }
 
+  // Búsqueda de clientes
   useEffect(() => {
     if (!tenant || busqCliente.length < 2) { setClientes([]); return }
-    supabase.from('clientes_agenda').select('id, nombre, telefono')
+    supabase.from('clientes_agenda')
+      .select('id, nombre, telefono')
       .eq('tenant_id', tenant.id).ilike('nombre', `%${busqCliente}%`).limit(8)
       .then(({ data }) => setClientes(data || []))
   }, [busqCliente, tenant])
@@ -123,17 +153,20 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         if (error) throw error
         cliId = data.id
       }
-      if (!cliId) { showToast('Selecciona un cliente'); setSaving(false); return }
-      if (!slot)  { showToast('Selecciona un horario'); setSaving(false); return }
+      if (!cliId)          { showToast('Selecciona un cliente'); setSaving(false); return }
+      if (!slot)           { showToast('Selecciona un horario'); setSaving(false); return }
+      if (!servIds.length) { showToast('Selecciona al menos un servicio'); setSaving(false); return }
 
       const { error } = await supabase.from('citas').insert({
-        tenant_id: tenant.id,
+        tenant_id:      tenant.id,
         profesional_id: profId,
-        servicio_id: servId,
-        cliente_id: cliId,
-        fecha_inicio: slot.inicio,
-        fecha_fin: slot.fin,
-        estado: 'confirmada',
+        servicio_id:    servIds[0],        // servicio principal
+        servicios_ids:  servIds,           // todos los servicios
+        cliente_id:     cliId,
+        fecha_inicio:   slot.inicio,
+        fecha_fin:      slot.fin,
+        estado:         'confirmada',
+        precio_cobrado: precioTotal || null,
       })
       if (error) throw error
       onCreada?.()
@@ -144,23 +177,17 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
     setSaving(false)
   }
 
-  const prof = profs.find(p => p.id === profId)
-  const serv = servs.find(s => s.id === servId)
-
-  const canNext = [
+  const prof     = profs.find(p => p.id === profId)
+  const canNext  = [
     !!profId,
-    !!servId,
+    servIds.length > 0,
     !!slot,
     modoNuevo ? !!nuevoCliente.nombre.trim() : !!clienteId,
   ]
 
   return (
     <>
-      {toast && (
-        <div className="sp-toast show" style={{ background: toast.color }}>
-          {toast.msg}
-        </div>
-      )}
+      {toast && <div className="sp-toast show" style={{ background: toast.color }}>{toast.msg}</div>}
 
       <div className="sp-sheet-overlay" onClick={onClose} />
       <div className="sp-sheet" style={{ paddingBottom: 80 }}>
@@ -172,13 +199,13 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
           <button onClick={onClose} style={{
             width:32, height:32, borderRadius:10, border:'1px solid var(--border)',
             background:'var(--card)', color:'var(--text-2)', display:'flex',
-            alignItems:'center', justifyContent:'center', cursor:'pointer'
+            alignItems:'center', justifyContent:'center', cursor:'pointer',
           }}>
             <Ico d="M6 18L18 6M6 6l12 12" size={16} />
           </button>
         </div>
 
-        {/* Progress */}
+        {/* Barra de progreso */}
         <div style={{ display:'flex', gap:6, marginBottom:24 }}>
           {STEP_LABELS.map((lbl, i) => (
             <div key={i} style={{
@@ -193,72 +220,112 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
           {STEP_LABELS[step]}
         </p>
 
-        {/* Step 0 — Profesional */}
+        {/* ── Step 0 — Profesional ── */}
         {step === 0 && (
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {profs.map(p => (
-              <button key={p.id} onClick={() => setProfId(p.id)}
-                style={{
-                  display:'flex', alignItems:'center', gap:14, padding:'14px 16px',
-                  borderRadius:14, cursor:'pointer', textAlign:'left',
-                  background: profId === p.id ? `${col}15` : 'var(--card)',
-                  border: `1px solid ${profId === p.id ? col + '55' : 'var(--border)'}`,
-                  color:'var(--text)',
-                }}>
+              <button key={p.id} onClick={() => setProfId(p.id)} style={{
+                display:'flex', alignItems:'center', gap:14, padding:'14px 16px',
+                borderRadius:14, cursor:'pointer', textAlign:'left',
+                background: profId === p.id ? `${col}15` : 'var(--card)',
+                border: `1px solid ${profId === p.id ? col + '55' : 'var(--border)'}`,
+                color:'var(--text)',
+              }}>
                 <div style={{
                   width:42, height:42, borderRadius:13, background:`${col}25`,
                   display:'flex', alignItems:'center', justifyContent:'center',
                   fontFamily:'Outfit', fontWeight:800, fontSize:18, color:col, flexShrink:0,
                 }}>
-                  {p.nombre[0]}
+                  {p.foto_url
+                    ? <img src={p.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'inherit' }} />
+                    : p.nombre[0]
+                  }
                 </div>
                 <div>
                   <div style={{ fontWeight:700, fontSize:15 }}>{p.nombre}</div>
                   {p.especialidad && <div style={{ fontSize:12, color:'var(--text-3)', marginTop:1 }}>{p.especialidad}</div>}
                 </div>
-                {profId === p.id && (
-                  <div style={{ marginLeft:'auto', color:col }}>
-                    <Ico d="M5 13l4 4L19 7" size={18} />
-                  </div>
-                )}
+                {profId === p.id && <div style={{ marginLeft:'auto', color:col }}><Ico d="M5 13l4 4L19 7" size={18} /></div>}
               </button>
             ))}
           </div>
         )}
 
-        {/* Step 1 — Servicio */}
+        {/* ── Step 1 — Servicios (multi-select) ── */}
         {step === 1 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {servs.map(s => (
-              <button key={s.id} onClick={() => setServId(s.id)}
-                style={{
-                  display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'14px 16px', borderRadius:14, cursor:'pointer', textAlign:'left',
-                  background: servId === s.id ? `${col}15` : 'var(--card)',
-                  border: `1px solid ${servId === s.id ? col + '55' : 'var(--border)'}`,
-                  color:'var(--text)',
-                }}>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:15 }}>{s.nombre}</div>
-                  <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
-                    {s.duracion_min}min
-                    {s.categoria ? ` · ${s.categoria}` : ''}
-                  </div>
+          <div>
+            {/* Contador de selección */}
+            {servIds.length > 0 && (
+              <div style={{
+                padding:'10px 14px', borderRadius:12, marginBottom:14,
+                background:`${col}12`, border:`1px solid ${col}30`,
+                display:'flex', alignItems:'center', justifyContent:'space-between',
+              }}>
+                <span style={{ fontSize:13, fontWeight:700, color:col }}>
+                  {servIds.length} servicio{servIds.length > 1 ? 's' : ''} · {duracionTotal} min
+                </span>
+                {precioTotal > 0 && (
+                  <span style={{ fontSize:14, fontWeight:800, color:col, fontFamily:'Outfit' }}>
+                    {fmtCOP(precioTotal)}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Lista agrupada por categoría */}
+            {Object.entries(porCategoria).map(([cat, items]) => (
+              <div key={cat} style={{ marginBottom:16 }}>
+                <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
+                  textTransform:'uppercase', marginBottom:8 }}>
+                  {cat}
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                  {items.map(s => {
+                    const sel = servIds.includes(s.id)
+                    return (
+                      <button key={s.id} onClick={() => toggleServ(s.id)} style={{
+                        display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding:'13px 14px', borderRadius:13, cursor:'pointer', textAlign:'left',
+                        background: sel ? `${col}15` : 'var(--card)',
+                        border: `1px solid ${sel ? col + '55' : 'var(--border)'}`,
+                        color:'var(--text)',
+                      }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontWeight:700, fontSize:14, color: sel ? col : 'var(--text)' }}>
+                            {s.nombre}
+                          </div>
+                          <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
+                            {s.duracion_min}min
+                            {s.categoria ? ` · ${s.categoria}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+                          {s.precio > 0 && (
+                            <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:14, color: sel ? col : 'var(--text-2)' }}>
+                              {fmtCOP(s.precio)}
+                            </span>
+                          )}
+                          {/* Checkbox visual */}
+                          <div style={{
+                            width:22, height:22, borderRadius:7, flexShrink:0,
+                            background: sel ? col : 'transparent',
+                            border: `2px solid ${sel ? col : 'var(--border)'}`,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            transition:'all 0.15s',
+                          }}>
+                            {sel && <Ico d="M5 13l4 4L19 7" size={12} style={{ color:'#fff' }} />}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  {s.precio > 0 && (
-                    <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:15, color:col }}>
-                      ${Number(s.precio).toLocaleString('es-CO')}
-                    </span>
-                  )}
-                  {servId === s.id && <Ico d="M5 13l4 4L19 7" size={18} />}
-                </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
 
-        {/* Step 2 — Fecha y hora */}
+        {/* ── Step 2 — Fecha y hora ── */}
         {step === 2 && (
           <div>
             <input type="date" value={fecha} min={new Date().toISOString().slice(0,10)}
@@ -269,7 +336,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
               <div style={{ textAlign:'center', padding:'24px 0' }}>
                 <p style={{ fontSize:22, marginBottom:8 }}>😴</p>
                 <p style={{ color:'var(--text-3)', fontSize:14, fontWeight:600 }}>
-                  {profs.find(p => p.id === profId)?.nombre?.split(' ')[0] || 'El profesional'} no trabaja este día
+                  {prof?.nombre?.split(' ')[0] || 'El profesional'} no trabaja este día
                 </p>
                 <p style={{ color:'var(--text-3)', fontSize:12, marginTop:4 }}>
                   Elige otra fecha o configura sus horarios en Equipo
@@ -282,14 +349,13 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
                 {slots.map(s => (
-                  <button key={s.inicio} onClick={() => setSlot(s)}
-                    style={{
-                      padding:'12px 8px', borderRadius:12, cursor:'pointer',
-                      background: slot?.inicio === s.inicio ? col : 'var(--card)',
-                      border: `1px solid ${slot?.inicio === s.inicio ? col : 'var(--border)'}`,
-                      color: slot?.inicio === s.inicio ? '#fff' : 'var(--text-2)',
-                      fontFamily:'Outfit', fontWeight:700, fontSize:14,
-                    }}>
+                  <button key={s.inicio} onClick={() => setSlot(s)} style={{
+                    padding:'12px 8px', borderRadius:12, cursor:'pointer',
+                    background: slot?.inicio === s.inicio ? col : 'var(--card)',
+                    border: `1px solid ${slot?.inicio === s.inicio ? col : 'var(--border)'}`,
+                    color: slot?.inicio === s.inicio ? '#fff' : 'var(--text-2)',
+                    fontFamily:'Outfit', fontWeight:700, fontSize:14,
+                  }}>
                     {s.label}
                   </button>
                 ))}
@@ -298,48 +364,37 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
           </div>
         )}
 
-        {/* Step 3 — Cliente */}
+        {/* ── Step 3 — Cliente ── */}
         {step === 3 && (
           <div>
             <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-              <button onClick={() => setModoNuevo(false)}
-                style={{
-                  flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
-                  background: !modoNuevo ? `${col}20` : 'var(--card)',
-                  border: `1px solid ${!modoNuevo ? col + '55' : 'var(--border)'}`,
-                  color: !modoNuevo ? col : 'var(--text-2)',
-                  fontWeight:600, fontSize:13,
-                }}>
-                Buscar cliente
-              </button>
-              <button onClick={() => setModoNuevo(true)}
-                style={{
-                  flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
-                  background: modoNuevo ? `${col}20` : 'var(--card)',
-                  border: `1px solid ${modoNuevo ? col + '55' : 'var(--border)'}`,
-                  color: modoNuevo ? col : 'var(--text-2)',
-                  fontWeight:600, fontSize:13,
-                }}>
-                Nuevo cliente
-              </button>
+              <button onClick={() => setModoNuevo(false)} style={{
+                flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
+                background: !modoNuevo ? `${col}20` : 'var(--card)',
+                border: `1px solid ${!modoNuevo ? col + '55' : 'var(--border)'}`,
+                color: !modoNuevo ? col : 'var(--text-2)', fontWeight:600, fontSize:13,
+              }}>Buscar cliente</button>
+              <button onClick={() => setModoNuevo(true)} style={{
+                flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
+                background: modoNuevo ? `${col}20` : 'var(--card)',
+                border: `1px solid ${modoNuevo ? col + '55' : 'var(--border)'}`,
+                color: modoNuevo ? col : 'var(--text-2)', fontWeight:600, fontSize:13,
+              }}>Nuevo cliente</button>
             </div>
 
             {!modoNuevo ? (
               <>
                 <input className="sp-input" placeholder="Buscar por nombre…"
                   value={busqCliente} onChange={e => setBusqCliente(e.target.value)}
-                  style={{ marginBottom:10 }}
-                />
+                  style={{ marginBottom:10 }} />
                 {clientes.map(c => (
-                  <button key={c.id} onClick={() => { setClienteId(c.id); setBusqCliente(c.nombre) }}
-                    style={{
-                      width:'100%', display:'flex', alignItems:'center', gap:12,
-                      padding:'12px 14px', borderRadius:12, cursor:'pointer', textAlign:'left',
-                      marginBottom:6,
-                      background: clienteId === c.id ? `${col}15` : 'var(--card)',
-                      border: `1px solid ${clienteId === c.id ? col + '55' : 'var(--border)'}`,
-                      color:'var(--text)',
-                    }}>
+                  <button key={c.id} onClick={() => { setClienteId(c.id); setBusqCliente(c.nombre) }} style={{
+                    width:'100%', display:'flex', alignItems:'center', gap:12,
+                    padding:'12px 14px', borderRadius:12, cursor:'pointer', textAlign:'left', marginBottom:6,
+                    background: clienteId === c.id ? `${col}15` : 'var(--card)',
+                    border: `1px solid ${clienteId === c.id ? col + '55' : 'var(--border)'}`,
+                    color:'var(--text)',
+                  }}>
                     <div style={{
                       width:36, height:36, borderRadius:10, background:`${col}25`,
                       display:'flex', alignItems:'center', justifyContent:'center',
@@ -360,59 +415,61 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 <input className="sp-input" placeholder="Nombre completo *"
                   value={nuevoCliente.nombre} onChange={e => setNuevoCliente(p => ({...p, nombre:e.target.value}))} />
-                <input className="sp-input" placeholder="Teléfono (WhatsApp)"
-                  type="tel" value={nuevoCliente.telefono} onChange={e => setNuevoCliente(p => ({...p, telefono:e.target.value}))} />
+                <input className="sp-input" placeholder="Teléfono (WhatsApp)" type="tel"
+                  value={nuevoCliente.telefono} onChange={e => setNuevoCliente(p => ({...p, telefono:e.target.value}))} />
               </div>
             )}
           </div>
         )}
 
-        {/* Resumen + botones */}
+        {/* ── Resumen ── */}
         {step > 0 && (
           <div style={{
             marginTop:16, padding:'12px 14px', borderRadius:14,
             background:'var(--card)', border:'1px solid var(--border)', marginBottom:16,
           }}>
-            <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:8, fontWeight:600, letterSpacing:0.5 }}>RESUMEN</div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:8, fontWeight:600, letterSpacing:0.5, textTransform:'uppercase' }}>
+              Resumen
+            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               {prof && <span style={{ fontSize:13, color:'var(--text-2)' }}>👤 {prof.nombre}</span>}
-              {serv && <span style={{ fontSize:13, color:'var(--text-2)' }}>✂️ {serv.nombre}</span>}
-              {slot && <span style={{ fontSize:13, color:'var(--text-2)' }}>🕐 {fecha} {slot.label}</span>}
+              {selectedServs.length > 0 && selectedServs.map(s => (
+                <span key={s.id} style={{ fontSize:13, color:'var(--text-2)' }}>✂️ {s.nombre}</span>
+              ))}
+              {duracionTotal > 0 && (
+                <span style={{ fontSize:13, color:'var(--text-2)' }}>⏱ {duracionTotal} min total</span>
+              )}
+              {precioTotal > 0 && (
+                <span style={{ fontSize:13, fontWeight:700, color:col }}>💰 {fmtCOP(precioTotal)} total</span>
+              )}
+              {slot && <span style={{ fontSize:13, color:'var(--text-2)' }}>🕐 {fecha} · {slot.label}</span>}
             </div>
           </div>
         )}
 
+        {/* Botones navegación */}
         <div style={{ display:'flex', gap:10 }}>
           {step > 0 && (
-            <button onClick={() => setStep(s => s - 1)}
-              style={{
-                flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
-                background:'var(--card)', border:'1px solid var(--border)',
-                color:'var(--text-2)', fontWeight:700, fontSize:15,
-              }}>
-              Atrás
-            </button>
+            <button onClick={() => setStep(s => s - 1)} style={{
+              flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
+              background:'var(--card)', border:'1px solid var(--border)',
+              color:'var(--text-2)', fontWeight:700, fontSize:15,
+            }}>Atrás</button>
           )}
           {step < 3 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canNext[step]}
-              style={{
-                flex:2, padding:'15px', borderRadius:14, cursor: canNext[step] ? 'pointer' : 'not-allowed',
-                background: canNext[step] ? col : 'var(--card)',
-                border:'none', color:'#fff', fontWeight:700, fontSize:15,
-                opacity: canNext[step] ? 1 : 0.4,
-                fontFamily:'Outfit',
-              }}>
-              Siguiente
-            </button>
+            <button onClick={() => setStep(s => s + 1)} disabled={!canNext[step]} style={{
+              flex:2, padding:'15px', borderRadius:14,
+              cursor: canNext[step] ? 'pointer' : 'not-allowed',
+              background: canNext[step] ? col : 'var(--card)',
+              border:'none', color:'#fff', fontWeight:700, fontSize:15,
+              opacity: canNext[step] ? 1 : 0.4, fontFamily:'Outfit',
+            }}>Siguiente</button>
           ) : (
-            <button onClick={guardar} disabled={saving || !canNext[3]}
-              style={{
-                flex:2, padding:'15px', borderRadius:14, cursor:'pointer',
-                background: col, border:'none', color:'#fff', fontWeight:700, fontSize:15,
-                opacity: saving ? 0.7 : 1, fontFamily:'Outfit',
-              }}>
-              {saving ? 'Guardando…' : 'Confirmar cita'}
-            </button>
+            <button onClick={guardar} disabled={saving || !canNext[3]} style={{
+              flex:2, padding:'15px', borderRadius:14, cursor:'pointer',
+              background:col, border:'none', color:'#fff', fontWeight:700, fontSize:15,
+              opacity: saving ? 0.7 : 1, fontFamily:'Outfit',
+            }}>{saving ? 'Guardando…' : 'Confirmar cita'}</button>
           )}
         </div>
       </div>

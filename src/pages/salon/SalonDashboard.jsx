@@ -69,6 +69,56 @@ const DEMO_EQUIPO = [
   { id:'p3', nombre:'Isabella Torres',  especialidad:'Manicurista & Nail Art', activo:true, foto_url:null },
 ]
 
+function LinkReservas({ slug, col, showToast }) {
+  const url = `${window.location.origin}/reservar/${slug}`
+
+  function copiar() {
+    navigator.clipboard.writeText(url)
+      .then(() => showToast('Link copiado ✓'))
+      .catch(() => showToast('No se pudo copiar', '#ef4444'))
+  }
+
+  return (
+    <div style={{
+      margin:'12px 16px 0', padding:'14px 16px', borderRadius:16,
+      background:`${col}0e`, border:`1px solid ${col}30`,
+      display:'flex', alignItems:'center', gap:12,
+    }}>
+      <div style={{
+        width:38, height:38, borderRadius:11, background:`${col}20`,
+        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+      }}>
+        <Ico d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" size={17} style={{ color: col }} />
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, marginBottom:2 }}>
+          TU LINK DE RESERVAS
+        </p>
+        <p style={{ fontSize:12, color:'var(--text-2)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+          {url}
+        </p>
+      </div>
+      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+        <button onClick={copiar} style={{
+          padding:'7px 12px', borderRadius:9, border:`1px solid ${col}40`,
+          background:`${col}15`, color:col, fontSize:12, fontWeight:700, cursor:'pointer',
+          whiteSpace:'nowrap',
+        }}>
+          Copiar
+        </button>
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{
+          padding:'7px 12px', borderRadius:9, border:'1px solid var(--border)',
+          background:'transparent', color:'var(--text-2)', fontSize:12, fontWeight:700,
+          cursor:'pointer', whiteSpace:'nowrap', textDecoration:'none',
+          display:'flex', alignItems:'center',
+        }}>
+          Ver
+        </a>
+      </div>
+    </div>
+  )
+}
+
 export default function SalonDashboard() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
@@ -78,7 +128,8 @@ export default function SalonDashboard() {
   const [equipo,      setEquipo]      = useState(isDemo ? DEMO_EQUIPO : [])
   const [ingresosHoy, setIngresosHoy] = useState(isDemo ? 235000 : 0)
   const [loading,     setLoading]     = useState(!isDemo)
-  const [toast,       setToast]       = useState(null)
+  const [stockAlertas, setStockAlertas] = useState(0)
+  const [toast,        setToast]        = useState(null)
 
   const showToast = (msg, color='#22c55e') => {
     setToast({msg,color})
@@ -90,7 +141,7 @@ export default function SalonDashboard() {
     setLoading(true)
     try {
       const fecha = hoy()
-      const [citasRes, equipoRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -98,14 +149,19 @@ export default function SalonDashboard() {
         supabase.from('profesionales')
           .select('id,nombre,foto_url,especialidad,activo')
           .eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+        supabase.from('productos_salon')
+          .select('id,stock,stock_minimo')
+          .eq('tenant_id', tenant.id).eq('activo', true).gt('stock_minimo', 0),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
       const ingresos = citasList.filter(c=>c.estado==='completada')
         .reduce((s,c) => s+(c.servicios?.precio||0), 0)
+      const alertas = (stockRes.data || []).filter(p => p.stock <= p.stock_minimo).length
       setCitas(citasList)
       setEquipo(equipoList)
       setIngresosHoy(ingresos)
+      setStockAlertas(alertas)
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -173,6 +229,11 @@ export default function SalonDashboard() {
           <Ico d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={15} />
           Modo demo — datos de ejemplo. Conecta Supabase para ver tu negocio real.
         </div>
+      )}
+
+      {/* ── Tarjeta: link de reservas ── */}
+      {tenant?.slug && (
+        <LinkReservas slug={tenant.slug} col={col} showToast={showToast} />
       )}
 
       {/* ── Hero ─────────────────────────────────────────── */}
@@ -255,6 +316,25 @@ export default function SalonDashboard() {
         </div>
 
       </div>
+
+      {/* ── Alerta stock bajo ───────────────────────────── */}
+      {stockAlertas > 0 && (
+        <div style={{
+          margin:'0 16px 4px', padding:'12px 16px', borderRadius:14,
+          background:'rgba(251,146,60,0.1)', border:'1px solid rgba(251,146,60,0.28)',
+          display:'flex', alignItems:'center', gap:12,
+        }}>
+          <Ico d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={18} />
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
+              {stockAlertas} producto{stockAlertas !== 1 ? 's' : ''} bajo stock mínimo
+            </div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+              Revisa el módulo de Inventario
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Link portal público ─────────────────────────── */}
       {tenant?.slug && (

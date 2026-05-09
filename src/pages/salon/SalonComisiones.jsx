@@ -50,9 +50,14 @@ export default function SalonComisiones() {
   const [loading,       setLoading]       = useState(!isDemo)
   const [saving,        setSaving]        = useState(null) // profesional_id siendo guardado
   const [liquidando,    setLiquidando]    = useState(false)
-  const [editPct,       setEditPct]       = useState({})  // { [profId]: string }
+  const [editPct,       setEditPct]       = useState({})
+  const [editMeta,      setEditMeta]      = useState({})
   const [toast,         setToast]         = useState(null)
   const [seleccionados, setSeleccionados] = useState(new Set())
+  const [tab,        setTab]        = useState('comisiones')
+  const [desempeno,  setDesempeno]  = useState([])
+  const [mesStr,     setMesStr]     = useState(() => new Date().toISOString().slice(0, 7))
+  const [loadingDes, setLoadingDes] = useState(false)
 
   const showToast = (msg, color = '#22c55e') => {
     setToast({ msg, color })
@@ -82,20 +87,61 @@ export default function SalonComisiones() {
 
   useEffect(() => { cargar() }, [cargar])
 
+  const cargarDesempeno = useCallback(async () => {
+    if (!tenant) return
+    setLoadingDes(true)
+    const [y, m] = mesStr.split('-').map(Number)
+    const inicio = new Date(y, m - 1, 1).toISOString()
+    const fin    = new Date(y, m,     1).toISOString()
+    const { data } = await supabase
+      .from('v_desempeno_prof')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .gte('mes', inicio)
+      .lt('mes', fin)
+    setDesempeno(data || [])
+    setLoadingDes(false)
+  }, [tenant, mesStr])
+
+  useEffect(() => { if (tab === 'desempeno') cargarDesempeno() }, [cargarDesempeno, tab])
+
   async function guardarPorcentaje(profId) {
     const pct = parseFloat(editPct[profId])
     if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Porcentaje inválido (0-100)', '#f87171'); return }
     if (isDemo) { showToast('Demo — conecta Supabase para guardar', '#f59e0b'); return }
     setSaving(profId)
     const existente = rules[profId]
+    const updates = { porcentaje: pct }
+    if (editMeta[profId] !== undefined) {
+      const m = parseFloat(editMeta[profId])
+      if (!isNaN(m) && m >= 0) updates.meta_mensual = m
+    }
     if (existente) {
-      await supabase.from('commission_rules').update({ porcentaje: pct }).eq('id', existente.id)
+      await supabase.from('commission_rules').update(updates).eq('id', existente.id)
     } else {
-      await supabase.from('commission_rules').insert({ tenant_id: tenant.id, profesional_id: profId, porcentaje: pct })
+      await supabase.from('commission_rules').insert({ tenant_id: tenant.id, profesional_id: profId, ...updates })
     }
     setSaving(null)
     setEditPct(p => { const n = { ...p }; delete n[profId]; return n })
+    if (editMeta[profId] !== undefined) setEditMeta(p => { const n = { ...p }; delete n[profId]; return n })
     showToast('Comisión guardada ✓')
+    cargar()
+  }
+
+  async function guardarMeta(profId) {
+    const meta = parseFloat(editMeta[profId])
+    if (isNaN(meta) || meta < 0) { showToast('Meta inválida', '#f87171'); return }
+    if (isDemo) { showToast('Demo — conecta Supabase para guardar', '#f59e0b'); return }
+    setSaving(profId)
+    const existente = rules[profId]
+    if (existente) {
+      await supabase.from('commission_rules').update({ meta_mensual: meta }).eq('id', existente.id)
+    } else {
+      await supabase.from('commission_rules').insert({ tenant_id: tenant.id, profesional_id: profId, meta_mensual: meta, porcentaje: 0 })
+    }
+    setSaving(null)
+    setEditMeta(p => { const n = { ...p }; delete n[profId]; return n })
+    showToast('Meta guardada ✓')
     cargar()
   }
 
@@ -130,6 +176,21 @@ export default function SalonComisiones() {
     </div>
   )
 
+  function prevMes() {
+    setMesStr(s => {
+      const [y, m] = s.split('-').map(Number)
+      const d = new Date(y, m - 2, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })
+  }
+  function nextMes() {
+    setMesStr(s => {
+      const [y, m] = s.split('-').map(Number)
+      const d = new Date(y, m, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })
+  }
+
   return (
     <>
       {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
@@ -143,6 +204,131 @@ export default function SalonComisiones() {
         </div>
       )}
 
+      {/* ── Tabs ─────────────────────────────────────────── */}
+      <div style={{ padding:'16px 16px 0', display:'flex', gap:8 }}>
+        {[['comisiones','Comisiones'],['desempeno','Desempeño']].map(([t, label]) => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding:'8px 18px', borderRadius:20, cursor:'pointer',
+            fontWeight:700, fontSize:13, fontFamily:'Outfit',
+            background: tab === t ? col : 'var(--card)',
+            color: tab === t ? '#fff' : 'var(--text-3)',
+            border: `1px solid ${tab === t ? col : 'var(--border)'}`,
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'desempeno' && (
+        <>
+          {/* ── Selector de mes ───────────────────────────── */}
+          <div style={{ padding:'16px 16px 8px', display:'flex', alignItems:'center', gap:12 }}>
+            <button onClick={prevMes} style={{ width:34, height:34, borderRadius:10,
+              background:'var(--card)', border:'1px solid var(--border)',
+              cursor:'pointer', color:'var(--text-2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Ico d="M15 19l-7-7 7-7" size={16} />
+            </button>
+            <span style={{ flex:1, textAlign:'center', fontSize:14, fontWeight:700, color:'var(--text)', fontFamily:'Outfit' }}>
+              {new Date(mesStr + '-02').toLocaleDateString('es-CO', { month:'long', year:'numeric' })}
+            </span>
+            <button onClick={nextMes} style={{ width:34, height:34, borderRadius:10,
+              background:'var(--card)', border:'1px solid var(--border)',
+              cursor:'pointer', color:'var(--text-2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Ico d="M9 5l7 7-7 7" size={16} />
+            </button>
+          </div>
+
+          {loadingDes ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
+              <div className="sp-spinner" style={{ borderTopColor:col }} />
+            </div>
+          ) : desempeno.length === 0 ? (
+            <div className="sp-empty">
+              <span className="sp-empty-icon">📊</span>
+              <p className="sp-empty-title">Sin datos este mes</p>
+              <p className="sp-empty-sub">No hay citas completadas en el período</p>
+            </div>
+          ) : (
+            <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:12 }}>
+              {desempeno.map((d, i) => {
+                const color      = PROF_COLORS[i % PROF_COLORS.length]
+                const noShowClr  = d.no_show_rate >= 20 ? '#ef4444' : d.no_show_rate >= 10 ? '#f59e0b' : '#22c55e'
+                return (
+                  <div key={d.profesional_id} style={{
+                    borderRadius:18, background:'var(--card)',
+                    border:'1px solid var(--border)', overflow:'hidden',
+                  }}>
+                    {/* Header */}
+                    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
+                      borderBottom:'1px solid var(--border)' }}>
+                      <div style={{ width:44, height:44, borderRadius:12, background:`${color}22`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontFamily:'Outfit', fontWeight:800, fontSize:17, color, flexShrink:0 }}>
+                        {d.nombre?.[0]}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{d.nombre}</div>
+                        <div style={{ fontSize:11, color:'var(--text-3)' }}>{d.especialidad || '—'}</div>
+                      </div>
+                      <div style={{
+                        padding:'4px 10px', borderRadius:20,
+                        background:`${noShowClr}18`, border:`1px solid ${noShowClr}40`,
+                        fontSize:11, fontWeight:700, color:noShowClr,
+                      }}>
+                        {d.no_show_rate ?? 0}% no-show
+                      </div>
+                    </div>
+
+                    {/* Stats grid */}
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:1, background:'var(--border)' }}>
+                      {[
+                        ['Citas',       d.citas_completadas ?? 0, ''],
+                        ['Horas',       d.horas_trabajadas  ?? 0, 'h'],
+                        ['Ingresos',    fmtCOP(d.ingresos_cobrados ?? 0), ''],
+                        ['Comisión',    fmtCOP(d.comision_ganada   ?? 0), ''],
+                      ].map(([lbl, val, unit]) => (
+                        <div key={lbl} style={{ padding:'12px 16px', background:'var(--card)' }}>
+                          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
+                            letterSpacing:0.8, textTransform:'uppercase', marginBottom:4 }}>{lbl}</div>
+                          <div style={{ fontSize:18, fontWeight:800, color:'var(--text)',
+                            fontFamily:'Outfit' }}>{val}{unit}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Meta mensual progress */}
+                    {(() => {
+                      const meta = rules[d.profesional_id]?.meta_mensual
+                      if (!meta || meta <= 0) return null
+                      const pct = Math.min(100, Math.round((d.ingresos_cobrados || 0) / meta * 100))
+                      const barColor = pct >= 100 ? '#22c55e' : pct >= 60 ? col : '#f59e0b'
+                      return (
+                        <div style={{ padding:'12px 16px', background:'var(--card)', borderTop:'1px solid var(--border)' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                            <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
+                              letterSpacing:0.8, textTransform:'uppercase' }}>Meta mensual</span>
+                            <span style={{ fontSize:12, fontWeight:700, color:barColor }}>
+                              {pct}% · {fmtCOP(meta)}
+                            </span>
+                          </div>
+                          <div style={{ height:6, borderRadius:3, background:'var(--border)', overflow:'hidden' }}>
+                            <div style={{ height:'100%', width:`${pct}%`, background:barColor,
+                              borderRadius:3, transition:'width 0.4s' }} />
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <div style={{ height:24 }} />
+        </>
+      )}
+
+      {tab === 'comisiones' && (
+        <>
       {/* ── Sección 1: Configurar porcentajes ─────────────── */}
       <div className="sp-section" style={{ marginTop:20 }}>
         <span className="sp-section-title">Configurar comisiones</span>
@@ -175,35 +361,70 @@ export default function SalonComisiones() {
                   {prof.especialidad || '—'}
                 </div>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-                <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
-                  <input
-                    type="number" min="0" max="100" step="0.5"
-                    value={valor}
-                    onChange={e => setEditPct(p => ({ ...p, [prof.id]: e.target.value }))}
-                    style={{
-                      width:68, padding:'8px 28px 8px 10px', borderRadius:10,
-                      border:`1px solid ${editing ? col : 'var(--border)'}`,
-                      background:'var(--bg)', color:'var(--text)',
-                      fontSize:14, fontWeight:700, fontFamily:'Outfit',
-                      outline:'none', appearance:'textfield',
-                    }}
-                  />
-                  <span style={{ position:'absolute', right:8, fontSize:12,
-                    color:'var(--text-3)', pointerEvents:'none', fontWeight:600 }}>%</span>
+              <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0, alignItems:'flex-end' }}>
+                {/* Porcentaje comisión */}
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
+                    <input
+                      type="number" min="0" max="100" step="0.5"
+                      value={valor}
+                      onChange={e => setEditPct(p => ({ ...p, [prof.id]: e.target.value }))}
+                      style={{
+                        width:64, padding:'7px 24px 7px 9px', borderRadius:10,
+                        border:`1px solid ${editing ? col : 'var(--border)'}`,
+                        background:'var(--bg)', color:'var(--text)',
+                        fontSize:14, fontWeight:700, fontFamily:'Outfit',
+                        outline:'none', appearance:'textfield',
+                      }}
+                    />
+                    <span style={{ position:'absolute', right:7, fontSize:12,
+                      color:'var(--text-3)', pointerEvents:'none', fontWeight:600 }}>%</span>
+                  </div>
+                  {editing && (
+                    <button
+                      onClick={() => guardarPorcentaje(prof.id)}
+                      disabled={saving === prof.id}
+                      style={{
+                        padding:'7px 11px', borderRadius:10, border:'none', cursor:'pointer',
+                        background:col, color:'#fff', fontWeight:700, fontSize:13, fontFamily:'Outfit',
+                        opacity: saving === prof.id ? 0.7 : 1,
+                      }}>
+                      {saving === prof.id ? '…' : '✓'}
+                    </button>
+                  )}
                 </div>
-                {editing && (
-                  <button
-                    onClick={() => guardarPorcentaje(prof.id)}
-                    disabled={saving === prof.id}
-                    style={{
-                      padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
-                      background:col, color:'#fff', fontWeight:700, fontSize:13, fontFamily:'Outfit',
-                      opacity: saving === prof.id ? 0.7 : 1,
-                    }}>
-                    {saving === prof.id ? '…' : 'Guardar'}
-                  </button>
-                )}
+                {/* Meta mensual */}
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
+                    <span style={{ position:'absolute', left:7, fontSize:11,
+                      color:'var(--text-3)', pointerEvents:'none' }}>$</span>
+                    <input
+                      type="number" min="0" step="50000"
+                      placeholder="Meta/mes"
+                      value={editMeta[prof.id] !== undefined ? editMeta[prof.id] : (rule?.meta_mensual ?? '')}
+                      onChange={e => setEditMeta(p => ({ ...p, [prof.id]: e.target.value }))}
+                      style={{
+                        width:80, padding:'7px 7px 7px 16px', borderRadius:10,
+                        border:`1px solid ${editMeta[prof.id] !== undefined ? col : 'var(--border)'}`,
+                        background:'var(--bg)', color:'var(--text)',
+                        fontSize:13, fontWeight:600, fontFamily:'Outfit',
+                        outline:'none', appearance:'textfield',
+                      }}
+                    />
+                  </div>
+                  {editMeta[prof.id] !== undefined && !editing && (
+                    <button
+                      onClick={() => guardarMeta(prof.id)}
+                      disabled={saving === prof.id}
+                      style={{
+                        padding:'7px 11px', borderRadius:10, border:'none', cursor:'pointer',
+                        background:col, color:'#fff', fontWeight:700, fontSize:12, fontFamily:'Outfit',
+                        opacity: saving === prof.id ? 0.7 : 1,
+                      }}>
+                      {saving === prof.id ? '…' : '✓'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -349,6 +570,8 @@ export default function SalonComisiones() {
         </>
       )}
       <div style={{ height:24 }} />
+        </>
+      )}
     </>
   )
 }

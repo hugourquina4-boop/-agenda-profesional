@@ -65,6 +65,8 @@ export default function SalonAgenda() {
   const [esperaDia, setEsperaDia] = useState(0)
 
   // Pagos
+  const [vistaAgenda,  setVistaAgenda]  = useState('mes')
+  const [profesionales,setProfesionales]= useState([])
   const [pago,         setPago]         = useState(null)
   const [loadPago,     setLoadPago]     = useState(false)
   const [pagoForm,     setPagoForm]     = useState(false)
@@ -72,6 +74,16 @@ export default function SalonAgenda() {
   const [pagoMetodo,   setPagoMetodo]   = useState('efectivo')
   const [pagoRef,      setPagoRef]      = useState('')
   const [guardandoPago,setGuardandoPago]= useState(false)
+
+  useEffect(() => {
+    if (!tenant) return
+    supabase.from('profesionales')
+      .select('id,nombre,color')
+      .eq('tenant_id', tenant.id)
+      .eq('activo', true)
+      .order('nombre')
+      .then(({ data }) => setProfesionales(data || []))
+  }, [tenant])
 
   const cargarMes = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
@@ -171,6 +183,116 @@ export default function SalonAgenda() {
   const citasDia  = citasPorDia[selDay] || []
   const accionesCita = selCita ? (ACCIONES[selCita.estado] || []) : []
 
+  // ── Vista Día: grid por profesional ──────────────────────────────────
+  function VistaDia() {
+    const H_START = 7
+    const H_END   = 21
+    const SLOT_H  = 44  // px per 30min
+    const COL_W   = 110
+    const PROFS   = profesionales.length > 0 ? profesionales
+      : [...new Map(citasDia.map(c => [c.profesionales?.nombre, { id: c.profesionales?.nombre, nombre: c.profesionales?.nombre, color: col }])).values()]
+
+    function minOffset(iso) {
+      const [h, m] = iso.substring(11, 16).split(':').map(Number)
+      return ((h - H_START) * 60 + m) / 30 * SLOT_H
+    }
+    function durPx(c) {
+      if (c.fecha_fin) {
+        const dur = (new Date(c.fecha_fin) - new Date(c.fecha_inicio)) / 60000
+        return Math.max(SLOT_H, dur / 30 * SLOT_H)
+      }
+      return Math.max(SLOT_H, (c.servicios?.duracion_min || 60) / 30 * SLOT_H)
+    }
+
+    const TOTAL_H = (H_END - H_START) * 2 * SLOT_H
+
+    return (
+      <div style={{ overflowX:'auto', paddingBottom:80 }}>
+        <div style={{ minWidth: 56 + PROFS.length * COL_W, position:'relative' }}>
+          {/* Header profesionales */}
+          <div style={{
+            display:'grid', gridTemplateColumns:`56px repeat(${PROFS.length}, ${COL_W}px)`,
+            position:'sticky', top:0, zIndex:10, background:'var(--bg)',
+            borderBottom:'2px solid var(--border)', paddingBottom:4,
+          }}>
+            <div />
+            {PROFS.map(p => (
+              <div key={p.id} style={{ padding:'10px 8px', textAlign:'center' }}>
+                <div style={{ width:32, height:32, borderRadius:10, margin:'0 auto 4px',
+                  background:`${p.color || col}25`, display:'flex', alignItems:'center',
+                  justifyContent:'center', fontWeight:800, fontSize:13, color:p.color || col,
+                  fontFamily:'Outfit' }}>
+                  {p.nombre?.[0]}
+                </div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--text)',
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {p.nombre?.split(' ')[0]}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Grid de tiempo */}
+          <div style={{ position:'relative', height:TOTAL_H }}>
+            {/* Líneas de hora */}
+            {Array.from({ length: H_END - H_START }, (_, i) => (
+              <div key={i} style={{ position:'absolute', left:0, right:0, top: i * 2 * SLOT_H, display:'flex' }}>
+                <div style={{ width:56, paddingRight:8, textAlign:'right', fontSize:10,
+                  color:'var(--text-3)', fontWeight:600, transform:'translateY(-6px)', flexShrink:0 }}>
+                  {String(H_START + i).padStart(2,'0')}:00
+                </div>
+                <div style={{ flex:1, height:1, background:'var(--border)' }} />
+              </div>
+            ))}
+            {/* Líneas de media hora */}
+            {Array.from({ length: H_END - H_START }, (_, i) => (
+              <div key={`m${i}`} style={{
+                position:'absolute', left:56, right:0, top:(i*2+1)*SLOT_H,
+                height:1, background:'var(--border)', opacity:0.35,
+              }} />
+            ))}
+
+            {/* Bloques de citas */}
+            {PROFS.map((prof, pi) => {
+              const profCitas = citasDia.filter(c => c.profesionales?.nombre === prof.nombre)
+              return profCitas.map(c => {
+                const top    = minOffset(c.fecha_inicio)
+                const height = durPx(c)
+                const clr    = ESTADO_COLOR[c.estado] || col
+                if (top < 0 || top > TOTAL_H) return null
+                return (
+                  <div key={c.id} onClick={() => setSelCita(c)} style={{
+                    position:'absolute',
+                    top, left: 56 + pi * COL_W + 3,
+                    width: COL_W - 6, height: height - 2,
+                    borderRadius:8, cursor:'pointer',
+                    background:`${clr}18`, border:`1.5px solid ${clr}55`,
+                    padding:'4px 7px', overflow:'hidden',
+                    boxShadow:`0 1px 4px ${clr}22`,
+                  }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:clr, lineHeight:1.3 }}>
+                      {fmtHora(c.fecha_inicio)}
+                    </div>
+                    <div style={{ fontSize:11, fontWeight:600, color:'var(--text)',
+                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
+                    </div>
+                    {height > SLOT_H && (
+                      <div style={{ fontSize:10, color:'var(--text-3)',
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {c.servicios?.nombre}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding:'0 0 16px' }}>
 
@@ -195,6 +317,22 @@ export default function SalonAgenda() {
         </button>
       </div>
 
+      {/* ── Toggle Mes / Día ── */}
+      <div style={{ display:'flex', gap:4, margin:'0 16px 12px',
+        background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+        {[['mes','Mes'],['dia','Día']].map(([v,label]) => (
+          <button key={v} onClick={() => setVistaAgenda(v)} style={{
+            flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
+            background: vistaAgenda === v ? col : 'transparent',
+            color: vistaAgenda === v ? '#fff' : 'var(--text-3)',
+            fontWeight:700, fontSize:13, transition:'all 0.15s',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {vistaAgenda === 'dia' && <VistaDia />}
+
+      {vistaAgenda === 'mes' && (<>
       {/* Cabecera días semana */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', padding:'0 8px', marginBottom:6 }}>
         {DIAS.map(d => (
@@ -319,6 +457,8 @@ export default function SalonAgenda() {
           </div>
         )}
       </div>
+
+      </>)}
 
       {/* ── Sheet detalle + cambio de estado ── */}
       {selCita && (

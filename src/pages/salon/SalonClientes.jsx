@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
@@ -63,7 +63,7 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
-const FORM_VACIO = { nombre:'', telefono:'', email:'', notas:'' }
+const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'' }
 
 export default function SalonClientes() {
   const { tenant } = useTenant()
@@ -85,12 +85,18 @@ export default function SalonClientes() {
   const [editNotas,   setEditNotas]   = useState(false)
   const [notasEdit,   setNotasEdit]   = useState('')
   const [guardandoN,  setGuardandoN]  = useState(false)
+  const [tabCliente,  setTabCliente]  = useState('historial')
+  const [fotos,       setFotos]       = useState([])
+  const [loadFotos,   setLoadFotos]   = useState(false)
+  const [subiendoFoto,setSubiendoFoto]= useState(false)
+  const [tipoFoto,    setTipoFoto]    = useState('resultado')
+  const fotoInputRef = useRef(null)
 
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
     const q = supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, email, notas, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento')
+      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento')
       .eq('tenant_id', tenant.id)
       .order('nombre')
     if (busq.trim()) q.ilike('nombre', `%${busq}%`)
@@ -132,6 +138,8 @@ export default function SalonClientes() {
       nombre:               nuevoForm.nombre.trim(),
       telefono:             nuevoForm.telefono.trim() || null,
       email:                nuevoForm.email.trim() || null,
+      fecha_nacimiento:     nuevoForm.fecha_nacimiento || null,
+      servicios_interes:    nuevoForm.servicios_interes.trim() || null,
       notas:                nuevoForm.notas.trim() || null,
       segmento:             'nuevo',
       num_visitas:          0,
@@ -185,11 +193,47 @@ export default function SalonClientes() {
     cargar()
   }
 
+  async function cargarFotos(clienteId) {
+    setLoadFotos(true)
+    const { data } = await supabase.from('fotos_cliente')
+      .select('*').eq('cliente_id', clienteId).eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: false })
+    setFotos(data || [])
+    setLoadFotos(false)
+  }
+
+  async function subirFoto(e) {
+    const file = e.target.files?.[0]
+    if (!file || !sel) return
+    e.target.value = ''
+    if (file.size > 10 * 1024 * 1024) { showToast('La foto supera 10 MB', false); return }
+    setSubiendoFoto(true)
+    const ext  = file.name.split('.').pop().toLowerCase() || 'jpg'
+    const path = `fotos-clientes/${tenant.id}/${sel.id}/${Date.now()}.${ext}`
+    const { error: uploadErr } = await supabase.storage.from('imagenes').upload(path, file, { cacheControl:'3600', upsert:false })
+    if (uploadErr) { showToast('Error al subir: ' + uploadErr.message, false); setSubiendoFoto(false); return }
+    const { data: urlData } = supabase.storage.from('imagenes').getPublicUrl(path)
+    await supabase.from('fotos_cliente').insert({ tenant_id:tenant.id, cliente_id:sel.id, foto_url:urlData.publicUrl, tipo:tipoFoto })
+    setSubiendoFoto(false)
+    cargarFotos(sel.id)
+    showToast('Foto subida ✓')
+  }
+
+  async function eliminarFoto(fotoId, fotoUrl) {
+    await supabase.from('fotos_cliente').delete().eq('id', fotoId)
+    const storagePath = fotoUrl.split('/imagenes/')[1]
+    if (storagePath) await supabase.storage.from('imagenes').remove([storagePath])
+    setFotos(fs => fs.filter(f => f.id !== fotoId))
+    showToast('Foto eliminada')
+  }
+
   async function abrirCliente(cli) {
     setSel(cli)
+    setTabCliente('historial')
     setNotasEdit(cli.notas || '')
     setEditNotas(false)
     setSaldo(null)
+    setFotos([])
     setLoadHist(true)
     const [{ data: hist }, { data: sp }] = await Promise.all([
       supabase.from('citas')
@@ -207,6 +251,7 @@ export default function SalonClientes() {
     setHistorial(hist || [])
     setSaldo(sp || null)
     setLoadHist(false)
+    cargarFotos(cli.id)
   }
 
   function fmtFecha(iso) {
@@ -263,9 +308,10 @@ export default function SalonClientes() {
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Nuevo cliente</p>
             <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:20 }}>
+              {/* Nombre, teléfono, email */}
               {[
-                { key:'nombre',   label:'NOMBRE *', type:'text', placeholder:'' },
-                { key:'telefono', label:'TELÉFONO',  type:'tel',   placeholder:'' },
+                { key:'nombre',   label:'NOMBRE *', type:'text',  placeholder:'' },
+                { key:'telefono', label:'TELÉFONO',  type:'tel',   placeholder:'Ej: 3001234567' },
                 { key:'email',    label:'EMAIL',     type:'email', placeholder:'' },
               ].map(f => (
                 <div key={f.key}>
@@ -277,15 +323,50 @@ export default function SalonClientes() {
                     onChange={e => setNuevoForm(p => ({ ...p, [f.key]: e.target.value }))} />
                 </div>
               ))}
+
+              {/* Fecha de nacimiento */}
               <div>
                 <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
-                  NOTAS
+                  FECHA DE NACIMIENTO
+                </label>
+                <input className="sp-input" type="date"
+                  value={nuevoForm.fecha_nacimiento}
+                  onChange={e => setNuevoForm(p => ({ ...p, fecha_nacimiento: e.target.value }))}
+                  max={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+
+              {/* Servicios de interés */}
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                  SERVICIOS DE INTERÉS
+                </label>
+                <input className="sp-input" type="text"
+                  placeholder="Ej: Tinte, Corte, Manicura…"
+                  value={nuevoForm.servicios_interes}
+                  onChange={e => setNuevoForm(p => ({ ...p, servicios_interes: e.target.value }))} />
+              </div>
+
+              {/* Notas */}
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                  NOTAS / ALERGIAS
                 </label>
                 <textarea className="sp-input"
                   placeholder="Alergias, preferencias, referencias…"
                   value={nuevoForm.notas}
                   onChange={e => setNuevoForm(p => ({ ...p, notas: e.target.value }))}
                   rows={3} style={{ resize:'vertical', minHeight:80 }} />
+              </div>
+
+              {/* Fidelización — info */}
+              <div style={{
+                padding:'12px 14px', borderRadius:12,
+                background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.18)',
+              }}>
+                <p style={{ fontSize:12, color:'var(--text-3)', margin:0, lineHeight:1.6 }}>
+                  <span style={{ fontWeight:700, color:'#3b82f6' }}>⭐ Fidelización</span> — el saldo de puntos, tier y estadísticas se calculan automáticamente a medida que registres citas.
+                </p>
               </div>
             </div>
             <button onClick={guardarCliente} disabled={guardando} style={{
@@ -510,6 +591,12 @@ export default function SalonClientes() {
                   )}
                 </div>
               )}
+              {sel.servicios_interes && (
+                <div style={{ display:'flex', alignItems:'flex-start', gap:10, fontSize:14, color:'var(--text-2)' }}>
+                  <span style={{ fontSize:16, flexShrink:0 }}>✂️</span>
+                  <span style={{ lineHeight:1.5 }}>{sel.servicios_interes}</span>
+                </div>
+              )}
             </div>
 
             {/* ── Notas ── */}
@@ -574,35 +661,105 @@ export default function SalonClientes() {
               </button>
             </div>
 
-            <p style={{ fontFamily:'Outfit', fontWeight:700, fontSize:16, color:'var(--text)', marginBottom:12 }}>
-              Historial de citas
-            </p>
-            {loadHist ? (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:56, borderRadius:12 }} />)}
-              </div>
-            ) : historial.length === 0 ? (
-              <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>Sin citas anteriores</p>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {historial.map(c => (
-                  <div key={c.id} style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)', border:'1px solid var(--border)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>
-                        {c.servicios?.nombre || '—'}
-                      </span>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: ESTADO_COLOR[c.estado] || '#6b7280', display:'inline-block' }} />
-                        <span style={{ fontSize:11, color:'var(--text-3)' }}>{fmtFechaCorta(c.fecha_inicio)}</span>
+            {/* ── Tabs Historial / Fotos ── */}
+            <div style={{ display:'flex', gap:4, marginBottom:14,
+              background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+              {[['historial','Historial'],['fotos','Fotos 📷']].map(([t, label]) => (
+                <button key={t} onClick={() => setTabCliente(t)} style={{
+                  flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
+                  background: tabCliente === t ? col : 'transparent',
+                  color: tabCliente === t ? '#fff' : 'var(--text-3)',
+                  fontWeight:700, fontSize:13, transition:'all 0.15s',
+                }}>{label}</button>
+              ))}
+            </div>
+
+            {tabCliente === 'historial' && (
+              loadHist ? (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:56, borderRadius:12 }} />)}
+                </div>
+              ) : historial.length === 0 ? (
+                <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>Sin citas anteriores</p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {historial.map(c => (
+                    <div key={c.id} style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)', border:'1px solid var(--border)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>
+                          {c.servicios?.nombre || '—'}
+                        </span>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: ESTADO_COLOR[c.estado] || '#6b7280', display:'inline-block' }} />
+                          <span style={{ fontSize:11, color:'var(--text-3)' }}>{fmtFechaCorta(c.fecha_inicio)}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
+                        {c.profesionales?.nombre?.split(' ')[0] || '—'}
+                        {c.precio_cobrado > 0 ? ` · $${Number(c.precio_cobrado).toLocaleString('es-CO')}` : ''}
                       </div>
                     </div>
-                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
-                      {c.profesionales?.nombre?.split(' ')[0] || '—'}
-                      {c.precio_cobrado > 0 ? ` · $${Number(c.precio_cobrado).toLocaleString('es-CO')}` : ''}
-                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {tabCliente === 'fotos' && (
+              <>
+                {/* Tipo + botón subir */}
+                <div style={{ display:'flex', gap:8, marginBottom:12, alignItems:'center', flexWrap:'wrap' }}>
+                  <div style={{ display:'flex', gap:6, flex:1, flexWrap:'wrap' }}>
+                    {[['antes','Antes'],['despues','Después'],['resultado','Resultado']].map(([t, label]) => (
+                      <button key={t} onClick={() => setTipoFoto(t)} style={{
+                        padding:'6px 12px', borderRadius:9, cursor:'pointer', fontSize:12, fontWeight:700,
+                        border:`1px solid ${tipoFoto === t ? col : 'var(--border)'}`,
+                        background: tipoFoto === t ? `${col}18` : 'transparent',
+                        color: tipoFoto === t ? col : 'var(--text-3)',
+                      }}>{label}</button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                  <input ref={fotoInputRef} type="file" accept="image/*" capture="environment"
+                    style={{ display:'none' }} onChange={subirFoto} />
+                  <button onClick={() => fotoInputRef.current?.click()} disabled={subiendoFoto} style={{
+                    padding:'8px 16px', borderRadius:10, border:'none', cursor:'pointer', flexShrink:0,
+                    background: subiendoFoto ? 'var(--border)' : `linear-gradient(135deg,${col},${col}cc)`,
+                    color: subiendoFoto ? 'var(--text-3)' : '#fff', fontWeight:700, fontSize:13,
+                  }}>
+                    {subiendoFoto ? 'Subiendo…' : '+ Foto'}
+                  </button>
+                </div>
+
+                {loadFotos ? (
+                  <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}>
+                    <div className="sp-spinner" style={{ borderTopColor:col }} />
+                  </div>
+                ) : fotos.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:'28px 0', color:'var(--text-3)' }}>
+                    <div style={{ fontSize:40, marginBottom:10 }}>📷</div>
+                    <p style={{ fontSize:13 }}>Sin fotos aún · Elige tipo y toca "+ Foto"</p>
+                  </div>
+                ) : (
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {fotos.map(f => (
+                      <div key={f.id} style={{ borderRadius:14, overflow:'hidden', position:'relative',
+                        aspectRatio:'1', background:'var(--card)', border:'1px solid var(--border)' }}>
+                        <img src={f.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        <div style={{ position:'absolute', top:6, left:6, padding:'3px 8px', borderRadius:7,
+                          background:'rgba(0,0,0,0.6)', fontSize:10, fontWeight:700, color:'#fff' }}>
+                          {f.tipo === 'antes' ? 'Antes' : f.tipo === 'despues' ? 'Después' : 'Resultado'}
+                        </div>
+                        <button onClick={() => eliminarFoto(f.id, f.foto_url)} style={{
+                          position:'absolute', top:6, right:6, width:26, height:26, borderRadius:8,
+                          background:'rgba(239,68,68,0.85)', border:'none', color:'#fff',
+                          cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+                        }}>
+                          <Ico d="M6 18L18 6M6 6l12 12" size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>
