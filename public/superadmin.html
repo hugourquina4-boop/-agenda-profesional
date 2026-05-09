@@ -237,6 +237,24 @@
 
   <div class="sa-body">
 
+    <!-- MI ACCESO MAESTRO -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="font-size:18px">🔐</div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:13px;font-weight:700;color:var(--txt1)">Mi acceso maestro</div>
+        <div style="font-size:12px;color:var(--txt3)">hugourquina@gmail.com</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="password" id="mi-clave-input" placeholder="Nueva contraseña (≥6 chars)"
+          style="padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--txt1);font-family:inherit;font-size:13px;width:240px"
+          onkeydown="if(event.key==='Enter')resetMiClave()">
+        <button onclick="resetMiClave()"
+          style="padding:8px 16px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">
+          Actualizar clave
+        </button>
+      </div>
+    </div>
+
     <!-- KPIs -->
     <div class="stats-grid">
       <div class="stat-card">
@@ -567,7 +585,7 @@
 <script>
 const SUPABASE_URL = 'https://unpxoamfyushsbyyziyn.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVucHhvYW1meXVzaHNieXl6aXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTUyOTQsImV4cCI6MjA5MjU5MTI5NH0.MvtKlr9QDDc2sgUz6u424eAFiPFEcZvW5xTKbV8STV0'
-const ACCESS_PASS = 'salonpro2026'  // cambia esto
+const EDGE_SECRET = 'salonpro2026'   // secreto para Edge Functions (admin-crear-usuario)
 
 const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -582,28 +600,63 @@ let editandoId    = null
 let accesoSlug    = ''
 let tema = localStorage.getItem('sa-tema') || 'dark'
 
+// ── SHA-256 ───────────────────────────────────────────────────────────
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('')
+}
+
+function getToken() { return sessionStorage.getItem('sa-token') || '' }
+
 // ── INIT ─────────────────────────────────────────────────────────────
-window.onload = () => {
+window.onload = async () => {
   aplicarTema()
-  // verificar sesión guardada
-  if (sessionStorage.getItem('sa-auth') === ACCESS_PASS) mostrarPanel()
+  const saved = sessionStorage.getItem('sa-token')
+  if (saved) {
+    // Re-verificar token en servidor para proteger contra manipulación de sessionStorage
+    const { data } = await db.rpc('salon_verificar_admin', { p_token: saved })
+    if (data === true) { mostrarPanel(); return }
+    sessionStorage.removeItem('sa-token')
+  }
 }
 
 // ── AUTH ──────────────────────────────────────────────────────────────
-function doAuth() {
-  const val = document.getElementById('auth-key').value.trim()
+async function doAuth() {
+  const raw = document.getElementById('auth-key').value.trim()
+  const btn = document.getElementById('auth-btn')
   const err = document.getElementById('auth-err')
-  if (val !== ACCESS_PASS) {
-    err.textContent = 'Clave incorrecta'
+  err.style.display = 'none'
+  if (!raw) return
+
+  btn.disabled = true
+  btn.textContent = 'Verificando…'
+
+  try {
+    const hash = await sha256hex(raw)
+    const { data, error } = await db.rpc('salon_verificar_admin', { p_token: hash })
+
+    if (error) {
+      const msg = error.message || ''
+      err.textContent = msg.includes('bloqueado') ? msg : 'Error de conexión. Verifica que v37 está aplicado en Supabase.'
+      err.style.display = 'block'
+    } else if (data === true) {
+      sessionStorage.setItem('sa-token', hash)
+      mostrarPanel()
+    } else {
+      err.textContent = 'Clave incorrecta'
+      err.style.display = 'block'
+    }
+  } catch(e) {
+    err.textContent = 'Error: ' + e.message
     err.style.display = 'block'
-    return
   }
-  sessionStorage.setItem('sa-auth', val)
-  mostrarPanel()
+
+  btn.disabled = false
+  btn.textContent = 'Entrar'
 }
 
 function doLogout() {
-  sessionStorage.removeItem('sa-auth')
+  sessionStorage.removeItem('sa-token')
   document.getElementById('panel').classList.remove('visible')
   document.getElementById('auth-screen').style.display = 'flex'
   document.getElementById('auth-key').value = ''
@@ -646,9 +699,9 @@ async function cargarTodo() {
 }
 
 async function cargarNegocios() {
-  const { data, error } = await db.from('tenants').select('*').order('created_at', { ascending: false })
-  if (error) { toast('Error cargando negocios', 'error'); return }
-  todosNegocios = data || []
+  const { data, error } = await db.rpc('salon_admin_get_tenants', { p_token: getToken() })
+  if (error) { toast('Error cargando negocios: ' + error.message, 'error'); return }
+  todosNegocios = Array.isArray(data) ? data : (data || [])
   renderTabla()
 }
 
@@ -709,10 +762,9 @@ async function cargarKpis() {
 }
 
 async function cargarUsuarios() {
-  const { data } = await db.from('usuarios_tenant')
-    .select('*, tenants(nombre,slug,color_primario)')
-    .order('created_at', { ascending: false })
-  todosUsuarios = data || []
+  const { data, error } = await db.rpc('salon_admin_get_users', { p_token: getToken() })
+  if (error) { toast('Error cargando usuarios: ' + error.message, 'error'); return }
+  todosUsuarios = Array.isArray(data) ? data : (data || [])
   renderUsuarios()
 }
 
@@ -783,7 +835,7 @@ function renderTabla() {
 function renderUsuarios() {
   const q = (document.getElementById('search-user')?.value || '').toLowerCase()
   const lista = todosUsuarios.filter(u =>
-    !q || (u.user_id||'').toLowerCase().includes(q) || (u.tenants?.nombre||'').toLowerCase().includes(q) || (u.rol||'').toLowerCase().includes(q)
+    !q || (u.email||'').toLowerCase().includes(q) || (u.user_id||'').toLowerCase().includes(q)
   )
   const wrap = document.getElementById('usuarios-wrap')
   if (lista.length === 0) {
@@ -792,15 +844,16 @@ function renderUsuarios() {
   }
   wrap.className = 'usuarios-grid'
   wrap.innerHTML = lista.map(u => {
-    const t = u.tenants
-    const rolClass = u.rol === 'admin' ? 'rol-admin' : u.rol === 'profesional' ? 'rol-profesional' : 'rol-recepcion'
+    const tenants = u.tenants || []
+    const tenantBadges = tenants.map(t =>
+      `<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:var(--surface2);color:var(--txt2)">${esc(t.nombre)} · ${esc(t.rol)}</span>`
+    ).join('')
+    const ultimo = u.last_sign_in ? fmtFecha(u.last_sign_in) : 'Nunca'
     return `<div class="user-card">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        ${t ? `<span class="color-dot" style="background:${t.color_primario||'#f43f5e'}"></span>` : ''}
-        <div class="user-name">${t ? esc(t.nombre) : 'Sin negocio'}</div>
-      </div>
-      <div class="user-meta">ID: ${u.user_id?.slice(0,8)}…</div>
-      <span class="user-rol ${rolClass}">${u.rol}</span>
+      <div class="user-name" style="margin-bottom:4px">${esc(u.email||'sin email')}</div>
+      <div class="user-meta" style="margin-bottom:6px">Último acceso: ${ultimo}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${tenantBadges || '<span style="font-size:11px;color:var(--txt3)">Sin negocios</span>'}</div>
+      <button class="action-btn action-btn-reset" onclick="resetClaveEmail('${esc(u.email)}')">🔑 Reset clave</button>
     </div>`
   }).join('')
 }
@@ -930,7 +983,7 @@ async function guardarNegocio() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-secret': ACCESS_PASS,
+            'x-admin-secret': EDGE_SECRET,
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           },
@@ -1005,8 +1058,10 @@ function eliminarNegocio(id, nombre) {
 
 // ── TOGGLE ESTADO ─────────────────────────────────────────────────────
 async function toggleEstado(id, activo) {
-  const { error } = await db.from('tenants').update({ activo }).eq('id', id)
-  if (error) { toast('Error: ' + error.message, 'error'); return }
+  const { data, error } = await db.rpc('salon_admin_set_activo', {
+    p_token: getToken(), p_tenant_id: id, p_activo: activo
+  })
+  if (error || !data?.ok) { toast('Error: ' + (error?.message || data?.error || 'desconocido'), 'error'); return }
   toast(activo ? 'Negocio activado' : 'Negocio suspendido', 'success')
   await cargarNegocios()
   cargarKpis()
@@ -1065,38 +1120,36 @@ function toggleClave(el, clave) {
 }
 
 async function resetClave(tenantId) {
-  toast('Generando nueva clave…')
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-reset-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-secret': ACCESS_PASS,
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({ tenant_id: tenantId }),
-    })
-    const result = await res.json()
-    if (!res.ok || !result.ok) {
-      toast('Error: ' + (result.error || 'No se pudo generar la clave'), 'error')
-      return
-    }
-    // Actualizar datos locales
-    const t = todosNegocios.find(x => x.id === tenantId)
-    if (t) {
-      t.admin_email      = result.email
-      t.admin_clave_temp = result.clave
-      t.admin_clave_fecha = new Date().toISOString()
-    }
-    renderAccesos()
-    // Mostrar modal con clave
-    document.getElementById('clave-email-txt').textContent = result.email
-    document.getElementById('clave-valor-txt').textContent = result.clave
-    document.getElementById('modal-clave-ov').classList.add('open')
-  } catch (e) {
-    toast('Error de red: ' + e.message, 'error')
+  const t = todosNegocios.find(x => x.id === tenantId)
+  const email = t?.admin_email
+  if (!email) {
+    toast('Este negocio no tiene email admin registrado. Créalo primero.', 'error')
+    return
   }
+  await resetClaveEmail(email, tenantId)
+}
+
+async function resetClaveEmail(email, tenantId) {
+  const pass = 'Salon' + Math.random().toString(36).slice(2,8).toUpperCase()
+  toast('Generando nueva clave…')
+  const { data, error } = await db.rpc('salon_admin_reset_password', {
+    p_token:       getToken(),
+    p_email:       email,
+    p_nueva_clave: pass,
+  })
+  if (error || !data?.ok) {
+    toast('Error: ' + (error?.message || data?.error || 'desconocido'), 'error')
+    return
+  }
+  // Actualizar datos locales
+  if (tenantId) {
+    const t = todosNegocios.find(x => x.id === tenantId)
+    if (t) { t.admin_clave_temp = pass; t.admin_clave_fecha = new Date().toISOString() }
+    renderAccesos()
+  }
+  document.getElementById('clave-email-txt').textContent = email
+  document.getElementById('clave-valor-txt').textContent = pass
+  document.getElementById('modal-clave-ov').classList.add('open')
 }
 
 function copiarTexto(elementId) {
@@ -1226,6 +1279,23 @@ function showPagoErr(msg) {
   const el = document.getElementById('modal-pago-err')
   el.textContent = msg
   el.style.display = 'block'
+}
+
+// ── RESET MI CLAVE ────────────────────────────────────────────────────
+async function resetMiClave() {
+  const pass = document.getElementById('mi-clave-input').value.trim()
+  if (!pass || pass.length < 6) { toast('Mínimo 6 caracteres', 'error'); return }
+  const { data, error } = await db.rpc('salon_admin_reset_password', {
+    p_token:       getToken(),
+    p_email:       'hugourquina@gmail.com',
+    p_nueva_clave: pass,
+  })
+  if (error || !data?.ok) {
+    toast('Error: ' + (error?.message || data?.error || 'desconocido'), 'error')
+    return
+  }
+  document.getElementById('mi-clave-input').value = ''
+  toast('Contraseña de hugourquina@gmail.com actualizada correctamente', 'success')
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────
