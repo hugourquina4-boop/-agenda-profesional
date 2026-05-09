@@ -13,6 +13,7 @@ export function TenantProvider({ children }) {
   const [profesionalId, setProfesionalId] = useState(null)
   const [todosTenants,  setTodosTenants]  = useState([])         // para superadmin
   const [loading,       setLoading]       = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -81,7 +82,8 @@ export function TenantProvider({ children }) {
   useEffect(() => {
     cargar()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') { resetState(); setLoading(false) }
+      if (event === 'SIGNED_OUT')       { resetState(); setLoading(false) }
+      else if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setLoading(false) }
       else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') cargar()
     })
     return () => subscription.unsubscribe()
@@ -95,6 +97,7 @@ export function TenantProvider({ children }) {
       user, tenant, rol, profesionalId,
       todosTenants, esSuperadmin, esProfesional,
       loading, recargar: cargar, seleccionarTenant,
+      passwordRecovery, setPasswordRecovery,
     }}>
       {children}
     </TenantContext.Provider>

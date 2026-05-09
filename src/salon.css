@@ -6,8 +6,8 @@
 
 /* ── Variables ── */
 :root {
-  --bg:          #07080f;
-  --surface:     #0d0f1a;
+  --bg:          #0e1117;
+  --surface:     #141720;
   --card:        rgba(255,255,255,0.035);
   --card-hover:  rgba(255,255,255,0.06);
   --border:      rgba(255,255,255,0.07);

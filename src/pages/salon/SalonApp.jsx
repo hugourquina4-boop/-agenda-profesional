@@ -3,6 +3,7 @@ import SalonLayout from '../../layouts/SalonLayout'
 import { useTenant } from '../../context/TenantContext'
 import { supabase } from '../../lib/supabase'
 import SalonLogin from './SalonLogin'
+import ErrorBoundary from '../../components/ErrorBoundary'
 import '../../salon.css'
 
 const SalonDashboard  = lazy(() => import('./SalonDashboard'))
@@ -127,8 +128,105 @@ function TenantPicker({ todosTenants, onSelect }) {
   )
 }
 
+function SetNewPassword() {
+  const { setPasswordRecovery, recargar } = useTenant()
+  const [pass,    setPass]    = useState('')
+  const [pass2,   setPass2]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
+  const [done,    setDone]    = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (pass !== pass2) { setError('Las contraseñas no coinciden'); return }
+    if (pass.length < 6) { setError('Mínimo 6 caracteres'); return }
+    setError(''); setLoading(true)
+    const { error: err } = await supabase.auth.updateUser({ password: pass })
+    setLoading(false)
+    if (err) { setError(err.message); return }
+    setDone(true)
+    setTimeout(async () => {
+      setPasswordRecovery(false)
+      await recargar()
+    }, 2000)
+  }
+
+  return (
+    <div style={{ minHeight:'100dvh', display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center', padding:24, background:'var(--bg)' }}>
+      <div style={{
+        position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
+        background:`radial-gradient(ellipse 70% 50% at 20% 30%, rgba(244,63,94,0.12) 0%, transparent 70%),
+                    radial-gradient(ellipse 50% 60% at 80% 80%, rgba(168,85,247,0.06) 0%, transparent 70%)`,
+      }} />
+      <div style={{ width:'100%', maxWidth:360, position:'relative', zIndex:1 }}>
+        <div style={{ textAlign:'center', marginBottom:32 }}>
+          <div style={{
+            width:64, height:64, borderRadius:20,
+            background:'linear-gradient(135deg, #f43f5e, #e11d48)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            margin:'0 auto 14px', boxShadow:'0 8px 32px rgba(244,63,94,0.3)',
+          }}>
+            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="white"
+              strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h1 style={{ fontFamily:'Outfit', fontWeight:900, fontSize:26,
+            color:'var(--text)', letterSpacing:'-0.5px', marginBottom:4 }}>Nueva contraseña</h1>
+          <p style={{ fontSize:14, color:'var(--text-3)' }}>Elige una contraseña segura para tu cuenta</p>
+        </div>
+
+        {done ? (
+          <div style={{ textAlign:'center', padding:32 }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+            <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)', marginBottom:8 }}>
+              ¡Contraseña actualizada!
+            </h2>
+            <p style={{ fontSize:14, color:'var(--text-3)' }}>Entrando a tu cuenta…</p>
+          </div>
+        ) : (
+          <div style={{ background:'var(--card)', border:'1px solid var(--border)',
+            borderRadius:24, padding:28, boxShadow:'var(--shadow-sm)' }}>
+            <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600,
+                  letterSpacing:0.5, display:'block', marginBottom:8 }}>NUEVA CONTRASEÑA</label>
+                <input className="sp-input" type="password" placeholder="Mínimo 6 caracteres" required
+                  value={pass} onChange={e => setPass(e.target.value)} autoFocus />
+              </div>
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600,
+                  letterSpacing:0.5, display:'block', marginBottom:8 }}>CONFIRMAR CONTRASEÑA</label>
+                <input className="sp-input" type="password" placeholder="Repite la contraseña" required
+                  value={pass2} onChange={e => setPass2(e.target.value)} />
+              </div>
+              {error && (
+                <div style={{ padding:'12px 14px', borderRadius:12,
+                  background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)',
+                  fontSize:13, color:'#f87171' }}>
+                  {error}
+                </div>
+              )}
+              <button type="submit" disabled={loading} style={{
+                marginTop:4, padding:'16px', borderRadius:14, border:'none', cursor:'pointer',
+                background:'linear-gradient(135deg, #f43f5e, #e11d48)',
+                color:'#fff', fontFamily:'Outfit', fontWeight:700, fontSize:16,
+                boxShadow:'0 4px 20px rgba(244,63,94,0.35)',
+                opacity: loading ? 0.7 : 1, transition:'all 0.2s',
+              }}>
+                {loading ? 'Guardando…' : 'Guardar contraseña'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function SalonApp() {
-  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin } = useTenant()
+  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery } = useTenant()
   const [page,          setPage]          = useState('hoy')
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false)
   const [refreshKey,    setRefreshKey]    = useState(0)
@@ -138,6 +236,9 @@ export default function SalonApp() {
   function handleCitaCreada()  { setRefreshKey(k => k + 1); setPage('hoy') }
 
   if (loading) return <PageLoader />
+
+  // Recovery mode — usuario llegó desde el email de recuperación
+  if (passwordRecovery) return <SetNewPassword />
 
   // No autenticado → mostrar login
   if (!tenant && todosTenants.length === 0) {
@@ -152,7 +253,7 @@ export default function SalonApp() {
 
   function renderPage() {
     switch (page) {
-      case 'hoy':        return <SalonDashboard key={refreshKey} />
+      case 'hoy':        return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} />
       case 'agenda':     return <SalonAgenda />
       case 'clientes':   return <SalonClientes />
       case 'equipo':     return <SalonEquipo />
@@ -182,9 +283,11 @@ export default function SalonApp() {
       todosTenants={todosTenants}
       onCambiarTenant={seleccionarTenant}
     >
-      <Suspense fallback={<PageLoader />}>
-        {renderPage()}
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          {renderPage()}
+        </Suspense>
+      </ErrorBoundary>
 
       {nuevaCitaOpen && (
         <Suspense fallback={null}>
