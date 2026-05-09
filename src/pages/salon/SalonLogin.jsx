@@ -47,6 +47,10 @@ export default function SalonLogin({ onLogin, onRegistro }) {
     setSalon(s)
     setError('')
     setPaso('login')
+    // Actualizar URL para que TenantContext sepa qué tenant cargar tras el login
+    const url = new URL(window.location)
+    url.searchParams.set('tenant', s.slug)
+    window.history.replaceState({}, '', url)
   }
 
   async function handleLogin(e) {

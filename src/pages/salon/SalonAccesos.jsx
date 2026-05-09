@@ -90,11 +90,13 @@ export default function SalonAccesos() {
     const profMap = {}
     ;(profs || []).forEach(p => { if (p.user_id) profMap[p.user_id] = p })
 
-    const usrs = (uts || []).map(u => ({
-      ...u,
-      email:       emailMap[u.user_id] || '',
-      profesional: profMap[u.user_id] || null,
-    }))
+    const usrs = (uts || [])
+      .filter(u => u.rol !== 'superadmin')   // superadmin es gestión interna, no visible aquí
+      .map(u => ({
+        ...u,
+        email:       emailMap[u.user_id] || '',
+        profesional: profMap[u.user_id] || null,
+      }))
 
     setUsuarios(usrs)
     setSinCuenta((profs || []).filter(p => !p.user_id && p.activo))

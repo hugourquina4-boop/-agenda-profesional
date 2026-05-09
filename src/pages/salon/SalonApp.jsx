@@ -72,6 +72,9 @@ function TenantPicker({ todosTenants, onSelect }) {
               disabled={seleccionando}
               onClick={async () => {
                 setSeleccionando(true)
+                const url = new URL(window.location)
+                url.searchParams.set('tenant', t.slug)
+                window.history.replaceState({}, '', url)
                 await onSelect(t.tenant_id)
                 setSeleccionando(false)
               }}
