@@ -130,7 +130,7 @@ BEGIN
     nombre_representante, telefono, direccion, pagina_web, instagram
   )
   VALUES (
-    p_nombre, p_slug, p_ciudad, p_vertical, p_plan, p_color, true,
+    p_nombre, p_slug, p_ciudad, p_vertical::vertical_tipo, p_plan, p_color, true,
     p_representante, p_telefono, p_direccion, p_web, p_instagram
   )
   RETURNING id INTO v_id;
