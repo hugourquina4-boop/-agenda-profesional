@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-09
-> **Versión actual en producción: v1.1** (tag git: v1.1)
+> Actualizado: 2026-05-10
+> **Versión actual en producción: v1.2** (tag git: v1.2)
 
 ---
 
@@ -37,16 +37,17 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 
 ---
 
-## Estado del Sistema — v1.1 (producción)
+## Estado del Sistema — v1.2 (producción)
 
 ### ✅ MÓDULOS COMPLETOS Y EN PRODUCCIÓN
 
 | Módulo | Archivo | Descripción |
 |--------|---------|-------------|
 | Auth — Login selector de salón | SalonLogin.jsx | Selector multi-salón con búsqueda, URL slug actualizada al elegir |
-| Auth — TenantContext multi-tenant | TenantContext.jsx | URL slug > localStorage > lista[0] para selección de tenant |
-| Auth — Accesos y gestión de usuarios | SalonAccesos.jsx | Crear usuarios, reset clave, cambiar rol, suspender. Oculta superadmin. |
+| Auth — TenantContext multi-tenant | TenantContext.jsx | URL slug > localStorage > lista[0]; `tieneAcceso()` filtra nav por rol y permisos de BD |
+| Auth — Accesos y gestión de usuarios | SalonAccesos.jsx | Crear usuarios (RPC `crear_acceso_tenant`), reset clave (RPC `resetear_clave_tenant`), cambiar rol, suspender. Oculta superadmin. |
 | Panel Maestro Superadmin (standalone) | public/superadmin.html | SHA-256 HFURQUINA12, gestión negocios, reset claves, pagos, sin React |
+| Panel Suscripción (React, solo Hugo) | SalonSuperadmin.jsx | 5 KPIs (Total/Activos/Suspendidos/CitasHoy/MRR), 4 tabs (Negocios/Accesos/Pagos/Usuarios), Mi acceso maestro, soft delete negocios |
 | Dashboard hoy | SalonDashboard.jsx | Timeline, stats ingresos, equipo libre/ocupado, alerta stock, onboarding |
 | Agenda Mes / Semana / Día | SalonAgenda.jsx | Toggle 3 vistas, grid por profesional, bloques proporcionales, pago inline |
 | Nueva cita (5 pasos) | SalonNuevaCita.jsx | Horarios, slots, anti-solapamiento, WA confirmación al crear |
@@ -61,9 +62,8 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Inventario de productos | SalonInventario.jsx | CRUD + CSV import (preview → upsert por SKU), subcategoria/marca/codigo/contenido/proveedor |
 | Analytics — KPIs y métricas | SalonAnalytics.jsx | v_kpis_mes, v_revenue_staff, v_retention, gráficos, PDF export |
 | Configuración del negocio | SalonConfig.jsx | Logo, color, WhatsApp, tipología, horario, slots, QR, plan |
-| Superadmin React (dentro del app) | SalonSuperadmin.jsx | Vista interna para Hugo: MRR/ARR, crear negocio con datos de contacto completos |
 | ErrorBoundary — auto-reload chunks | components/ErrorBoundary.jsx | Detecta chunk 404 post-deploy → window.location.reload() automático |
-| Service Worker | public/sw.js | Versión v3, excluye /assets/ (hashes) del caché para evitar chunks rancios |
+| Service Worker | public/sw.js | Versión v3, network-first, excluye /assets/ (hashes) del caché |
 
 ### ✅ EDGE FUNCTIONS OPERATIVAS
 
@@ -73,10 +73,10 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | `notificacion-recordatorio` | Cron cada hora | WA 24h antes + 1h antes |
 | `cumpleanos-clientes` | Cron diario 9am | WA de cumpleaños |
 | `resumen-diario` | Cron diario 9pm | WA al dueño con resumen |
-| `admin-crear-usuario` | SalonAccesos + Superadmin | Crea usuario Supabase Auth sin afectar sesión |
-| `admin-reset-password` | SalonAccesos | Resetea contraseña vía email |
 
-### ✅ SQL APLICADO EN SUPABASE (v1.1 — todos al día)
+**Nota:** `admin-crear-usuario` y `admin-reset-password` fueron reemplazados por RPCs SECURITY DEFINER en v1.2 (`salon_admin_crear_usuario`, `crear_acceso_tenant`, `resetear_clave_tenant`). Ya no existen como Edge Functions.
+
+### ✅ SQL APLICADO EN SUPABASE (v1.2 — todos al día)
 
 ```
 SALON_SETUP_COMPLETO.sql    ✅ Schema base
@@ -92,215 +92,27 @@ v39_horarios_flexibles.sql  ✅ tabla horarios_excepcion + RPCs:
                                get_disponibilidad_dia, get_excepciones_mes
 v40_superadmin_fixes.sql    ✅ fix crear_negocio + superadmin_tenants_info + Hugo vinculado
 v41_inventario_enhanced.sql ✅ subcategoria, marca, codigo, contenido, proveedor en productos_salon
-v42_fix_superadmin_info.sql ✅ APLICADO — columnas contacto en tenants (nombre_representante,
-                               foto_representante, pagina_web, instagram, admin_email),
-                               crear_negocio con 11 parámetros, Hugo re-vinculado a todos los tenants
-v43_rls_tenants_superadmin.sql ✅ APLICADO — policies SELECT en tenants: superadmin_ve_todos + usuario_ve_su_tenant
-v43_salon_admin_crear_usuario.sql ✅ APLICADO — RPC salon_admin_crear_usuario: crea usuario en auth.users directamente
-v44_accesos_tenant.sql      ✅ APLICADO — RPCs crear_acceso_tenant + resetear_clave_tenant
-v45_superadmin_enhanced.sql ✅ APLICADO — deleted_at en tenants + citas_hoy en get_tenants + salon_admin_eliminar_tenant
+v42_fix_superadmin_info.sql ✅ columnas contacto en tenants (nombre_representante, foto_representante,
+                               pagina_web, instagram, admin_email), crear_negocio con 11 parámetros,
+                               Hugo re-vinculado a todos los tenants
+v43_rls_tenants_superadmin.sql    ✅ policies SELECT en tenants: superadmin_ve_todos + usuario_ve_su_tenant
+v43_salon_admin_crear_usuario.sql ✅ RPC salon_admin_crear_usuario: crea usuario en auth.users directamente
+v44_accesos_tenant.sql            ✅ RPCs crear_acceso_tenant + resetear_clave_tenant
+v45_superadmin_enhanced.sql       ✅ deleted_at en tenants + citas_hoy en get_tenants + salon_admin_eliminar_tenant
 ```
 
 ---
 
-## 🚨 Pendientes Críticos (bloquean venta)
+## Pendientes v1.2 (no bloquean uso, pero mejoran la plataforma)
 
-### 1. Control de acceso por rol en UI — URGENTE
-La tabla `permisos_tenant` ya existe en BD (v38 aplicado). Falta conectarla en el frontend.
-
-**Lo que falta:**
-- `SalonLayout.jsx`: leer `get_permisos_tenant(tenant_id)` al cargar sesión → filtrar sidebar según rol
-- `SalonAccesos.jsx` o `SalonConfig.jsx`: UI para que el admin configure qué módulos ve cada rol
-
-**Tabla de permisos por rol (referencia):**
-
-| Módulo | admin | contable | recepcion | profesional |
-|--------|-------|----------|-----------|-------------|
-| Inicio/Dashboard | ✅ | ✅ | ✅ | ✅ |
-| Agenda | ✅ | ❌ | ✅ | ✅ (solo propia) |
-| Clientes | ✅ | ❌ | ✅ | ✅ |
-| Servicios | ✅ | ❌ | ✅ | ✅ |
-| Órdenes en espera | ✅ | ❌ | ✅ | ✅ |
-| Caja | ✅ | ✅ | ❌ | ❌ |
-| Comisiones | ✅ | ✅ | ❌ | ❌ |
-| Inventario | ✅ | ✅ | ❌ | ❌ |
-| Analytics | ✅ | ✅ | ❌ | ❌ |
-| Gastos / Proveedores | ✅ | ✅ | ❌ | ❌ |
-| Equipo | ✅ | ❌ | ❌ | ❌ |
-| Accesos | ✅ | ❌ | ❌ | ❌ |
-| Configuración | ✅ | ❌ | ❌ | ❌ |
-| Bóveda | ✅ | ❌ | ❌ | ❌ |
-| WhatsApp Bot | ✅ | ❌ | ❌ | ❌ |
-
-### 2. Deploy Edge Functions pendientes
+### 1. Deploy Edge Functions WA pendientes
 ```bash
+cd "d:/Proyectos antrigravity/AGENDAS/agenda-saas-v2"
 npx supabase functions deploy cumpleanos-clientes resumen-diario
 ```
 
-### 3. Activar Supabase Schedules (4 crons)
-Ver sección Automatizaciones en SalonConfig para los horarios exactos.
-
----
-
-## 🔷 Módulos v1.2 — En Construcción
-
-### MÓDULO A: Proveedores y Gastos
-**Archivo:** `SalonGastos.jsx`
-**SQL:** `v43_proveedores_gastos.sql`
-
-**Tablas necesarias:**
-```sql
--- proveedores: directorio de proveedores por negocio
-CREATE TABLE proveedores (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  nombre TEXT NOT NULL,
-  contacto TEXT,               -- nombre del contacto en el proveedor
-  telefono TEXT,
-  email TEXT,
-  categoria TEXT,              -- insumos, servicios, tecnologia, arriendo, nomina, otro
-  nit TEXT,                    -- NIT para Colombia
-  direccion TEXT,
-  notas TEXT,
-  activo BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- gastos: registro de todos los egresos del negocio
-CREATE TABLE gastos (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  proveedor_id UUID REFERENCES proveedores(id),   -- opcional
-  concepto TEXT NOT NULL,
-  categoria TEXT NOT NULL,     -- arriendo, servicios_publicos, insumos, nomina, marketing, mantenimiento, otro
-  monto NUMERIC(12,2) NOT NULL,
-  fecha DATE NOT NULL DEFAULT CURRENT_DATE,
-  metodo_pago TEXT DEFAULT 'transferencia',        -- efectivo, transferencia, tarjeta, cheque
-  comprobante_url TEXT,        -- foto/PDF del comprobante (Storage)
-  estado TEXT DEFAULT 'pagado',                   -- pagado, pendiente, vencido
-  fecha_vencimiento DATE,      -- para gastos periódicos con fecha de pago
-  recurrente BOOLEAN DEFAULT false,
-  notas TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**Funcionalidades UI:**
-- Lista de proveedores con CRUD (nombre, contacto, categoría, NIT)
-- Registro de gastos con: concepto, categoría, monto, proveedor (opcional), foto comprobante
-- Vista de gastos por mes con totales por categoría
-- Gastos pendientes de pago (vencidos destacados en rojo)
-- Comparativa ingresos vs gastos (utilidad bruta del mes)
-- Export PDF de gastos del mes
-- Permisos: admin + contable
-
-**SQL próximo:** `v43_proveedores_gastos.sql`
-
----
-
-### MÓDULO B: WhatsApp Bot por Negocio
-**Archivo:** `SalonWhatsApp.jsx`
-**SQL:** `v44_whatsapp_bot.sql`
-**Edge Functions:** `wa-webhook-tenant`, `wa-bot-reply`
-
-**Arquitectura:**
-Cada negocio tiene su propio número de WhatsApp conectado vía Whapi.cloud (o Meta Cloud API). El bot responde automáticamente y se configura desde el panel.
-
-**Tablas necesarias:**
-```sql
--- Configuración WA por negocio
-CREATE TABLE whatsapp_config (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID NOT NULL UNIQUE REFERENCES tenants(id),
-  proveedor TEXT DEFAULT 'whapi',   -- whapi | meta
-  token TEXT,                        -- API token del número (cifrado o via Vault)
-  numero TEXT,                       -- +57300XXXXXXX
-  webhook_secret TEXT,
-  bot_activo BOOLEAN DEFAULT false,
-  horario_bot_inicio TIME DEFAULT '07:00',
-  horario_bot_fin TIME DEFAULT '22:00',
-  fuera_horario_msg TEXT DEFAULT 'Hola, estamos fuera de horario. Atendemos de 7am a 10pm.',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Plantillas de mensajes editables por el negocio
-CREATE TABLE wa_plantillas (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  clave TEXT NOT NULL,              -- confirmacion_cita | recordatorio_24h | recordatorio_1h | cumpleanos | resumen_dia
-  activa BOOLEAN DEFAULT true,
-  mensaje TEXT NOT NULL,            -- con variables: {{nombre}}, {{servicio}}, {{fecha}}, {{hora}}, {{profesional}}
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (tenant_id, clave)
-);
-
--- Historial de mensajes enviados (para métricas)
-CREATE TABLE wa_mensajes_log (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  tipo TEXT NOT NULL,               -- confirmacion | recordatorio | cumpleanos | resumen | bot_reply | manual
-  destinatario TEXT NOT NULL,       -- número del cliente
-  mensaje TEXT,
-  estado TEXT DEFAULT 'enviado',    -- enviado | fallido | pendiente
-  error TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**Funcionalidades UI:**
-- Panel de conexión: vincular número de WhatsApp (token Whapi o Meta)
-- Test de conexión (enviar mensaje de prueba)
-- Editor de plantillas para cada tipo de mensaje con variables disponibles
-- Toggle bot activo/inactivo con horario de atención
-- Mensaje de fuera de horario configurable
-- Respuestas automáticas: horarios del negocio, precios, cómo reservar (configurable)
-- Historial de mensajes del mes con estado (enviado / fallido)
-- Métricas: mensajes enviados por tipo, tasa de entrega
-
-**Flujo del bot:**
-1. Cliente envía WA al número del negocio
-2. Webhook llega a Edge Function `wa-webhook-tenant` → identifica tenant por número
-3. Si bot activo y en horario → `wa-bot-reply` analiza intent y responde con plantilla
-4. Si fuera de horario → mensaje configurado de fuera de horario
-5. Log guardado en `wa_mensajes_log`
-
-**SQL próximo:** `v44_whatsapp_bot.sql`
-
----
-
-### MÓDULO C: Bóveda de Accesos y Contraseñas
-**Archivo:** `SalonBoveda.jsx`
-**SQL:** `v45_boveda_accesos.sql`
-
-**Seguridad:** Las contraseñas NUNCA se guardan en texto plano. Se cifran en el cliente con Web Crypto API (AES-GCM) antes de ir a Supabase. La clave de descifrado se deriva de la contraseña de sesión del admin + salt del negocio. Supabase solo almacena el blob cifrado.
-
-**Tabla necesaria:**
-```sql
-CREATE TABLE boveda_accesos (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  nombre TEXT NOT NULL,            -- "Instagram del negocio", "Google My Business"
-  url TEXT,
-  usuario TEXT,
-  clave_cifrada TEXT,              -- AES-GCM cifrado en cliente antes de INSERT
-  iv TEXT,                         -- initialization vector de AES-GCM (no secreto)
-  categoria TEXT DEFAULT 'otro',   -- redes_sociales | pagos | proveedores | plataformas | email | otro
-  notas TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**Funcionalidades UI:**
-- Lista de accesos por categoría (redes sociales, pagos, plataformas, proveedores, etc.)
-- Agregar acceso: nombre, URL, usuario, contraseña (se cifra en browser antes de guardar)
-- Ver contraseña: descifra en browser, botón copiar, se oculta tras 30 segundos
-- Clave maestra de la bóveda: el admin crea una clave maestra al activar (solo él la conoce)
-- Si se olvida la clave maestra: los accesos cifrados se pierden (no hay recuperación — es el precio de la seguridad real)
-- Búsqueda por nombre o categoría
-- Export cifrado (para backup)
-- Solo acceso: rol `admin`
-
-**SQL próximo:** `v45_boveda_accesos.sql`
+### 2. Activar Supabase Schedules (4 crons)
+Configurar en Supabase Dashboard → Database → Extensions → pg_cron, o en SalonConfig.
 
 ---
 
@@ -321,23 +133,24 @@ CREATE TABLE boveda_accesos (
 
 ### Panel 2: Módulo Superadmin dentro de /salon (React, solo Hugo)
 **URL**: https://project-gnyy8.vercel.app/salon → módulo "Plataforma" en el sidebar
-**Acceso**: Solo usuarios con `rol = 'superadmin'` — completamente oculto para dueños de negocios.
-**Propósito**: **Gestión operativa** — crear negocios nuevos, vincular dueños, asignar credenciales, contratos/planes, verificar pagos.
+**Acceso**: Solo usuarios con `rol = 'superadmin'` en cualquier tenant — completamente oculto para dueños de negocios.
+**`esSuperadmin`**: `rol === 'superadmin' || todosTenants.some(t => t.rol === 'superadmin')` (chequea todos los tenants del usuario, no solo el activo).
 
-**Funciones:**
+**Funciones (v1.2):**
+- 5 KPIs: Total negocios / Activos / Suspendidos / Citas hoy / MRR estimado
+- 4 tabs: Negocios (CRUD + soft delete) / Accesos / Pagos / Usuarios
 - Crear nuevo negocio con datos de contacto completos (representante, teléfono, dirección, web, instagram)
-- Identificar y vincular al dueño del negocio
-- Asignar plan contratado y fecha de vigencia
-- Verificar y registrar pagos de suscripción
-- MRR / ARR de la plataforma
+- Soft delete de negocios: `salon_admin_eliminar_tenant` — pone `activo=false, deleted_at=now()`
+- Mi acceso maestro: widget para verificar/resetear acceso de Hugo a todos los tenants
 
 ### Flujo para nuevo negocio
 
 1. Hugo entra a `/salon` → módulo "Plataforma" (Superadmin React)
 2. Crea negocio: nombre, slug, vertical, plan, contacto, email admin, clave temporal
-3. Admin recibe email + clave temporal
-4. Admin entra a `/salon?tenant=slug` → configura servicios, equipo, horarios
-5. Trabajadores reciben acceso desde módulo `Accesos` del panel
+3. RPC `salon_admin_crear_usuario` crea el usuario en auth.users directamente (SECURITY DEFINER)
+4. Admin recibe email + clave temporal
+5. Admin entra a `/salon?tenant=slug` → configura servicios, equipo, horarios
+6. Trabajadores reciben acceso desde módulo `Accesos` del panel
 
 ---
 
@@ -345,11 +158,13 @@ CREATE TABLE boveda_accesos (
 
 ### Auth
 
-- **Clave maestra Hugo**: SHA-256('HFURQUINA12') — acceso a panel standalone y a todos los tenants como superadmin
-- **Crear usuarios nuevos**: Edge Function `admin-crear-usuario` (x-admin-secret: salonpro2026)
-- **Reset clave dentro de plataforma**: `salon_admin_reset_password` RPC (SECURITY DEFINER, extensions schema para gen_salt)
-- **Recovery email**: `supabase.auth.resetPasswordForEmail` → redirige a `/salon` → handler PASSWORD_RECOVERY en TenantContext
+- **Clave maestra Hugo**: SHA-256('HFURQUINA12') — acceso a panel standalone y a todos los tenants como superadmin. Hash fijo: `e8f3b093450617294857b208734d3da24124fa0c99bcede207ea0584996f5f91`
+- **Crear usuarios nuevos**: RPC `salon_admin_crear_usuario` (SECURITY DEFINER) — opera con privilegios elevados, verificado con ADMIN_HASH, llamado via `fetch()` con anon key para bypass de sesión
+- **Accesos de trabajadores**: RPC `crear_acceso_tenant` — crea usuario y lo vincula al tenant
+- **Reset clave trabajador**: RPC `resetear_clave_tenant` — igual patrón SECURITY DEFINER
+- **Reset clave vía email**: `supabase.auth.resetPasswordForEmail` → redirige a `/salon` → handler PASSWORD_RECOVERY en TenantContext
 - **Superadmin acceso total**: `tenants_del_usuario()` retorna ALL tenants si rol='superadmin'. `crear_negocio()` auto-inserta a Hugo en `usuarios_tenant` del nuevo tenant.
+- **`rpcAnon()`**: helper en SalonSuperadmin — `fetch()` directo con anon key para llamar RPCs SECURITY DEFINER sin depender de la sesión auth activa
 
 ### Datos y Seguridad
 
@@ -359,8 +174,7 @@ CREATE TABLE boveda_accesos (
 - **pgcrypto** en Supabase vive en schema `extensions` — search_path debe incluirlo
 - **Superadmin oculto en Accesos**: filtrar `rol !== 'superadmin'` en SalonAccesos
 - **usuarios_tenant tiene NOT NULL**: nombre y email obligatorios — siempre incluirlos en INSERT
-- **Bóveda cifrada**: clave_cifrada en boveda_accesos es AES-GCM cifrado en cliente. Supabase nunca ve la contraseña en claro. La clave de descifrado NUNCA se guarda en BD.
-- **WA tokens**: los tokens de API de WhatsApp por negocio son sensibles — considerar Supabase Vault para almacenamiento o cifrado equivalente al de bóveda.
+- **Soft delete en tenants**: columna `deleted_at TIMESTAMPTZ`. `salon_admin_get_tenants` filtra `WHERE t.deleted_at IS NULL`
 
 ### UI
 
@@ -385,7 +199,7 @@ activo BOOLEAN
 UNIQUE (tenant_id, user_id)
 ```
 
-### Schema crítico: tenants (v42)
+### Schema crítico: tenants (v42 + v45)
 
 ```
 id UUID PK
@@ -393,6 +207,7 @@ nombre TEXT, slug TEXT UNIQUE, ciudad TEXT, vertical TEXT
 plan TEXT, color_primario TEXT, activo BOOLEAN
 admin_email TEXT, nombre_representante TEXT, foto_representante TEXT
 pagina_web TEXT, instagram TEXT, telefono TEXT, direccion TEXT
+deleted_at TIMESTAMPTZ   (soft delete — v45)
 created_at TIMESTAMPTZ
 ```
 
@@ -411,9 +226,9 @@ UNIQUE INDEX (tenant_id, codigo) WHERE codigo IS NOT NULL AND codigo <> ''
 
 | Versión | Estado | Contenido |
 |---------|--------|-----------|
-| **v1.1** | ✅ En producción (tag git: v1.1) | 17 módulos: agenda, equipo, inventario, analytics, superadmin, WA automático, multi-tenant RLS completo |
-| **v1.2** | 🔷 En construcción | Proveedores + Gastos (v43), WhatsApp Bot por negocio (v44), Bóveda de accesos (v45) |
-| **v1.3** | 📋 Planificado | Control de acceso por rol en UI, billing automático (Wompi), pagos en línea desde portal público |
+| **v1.1** | ✅ En producción (tag git: v1.1) | 17 módulos: agenda, equipo, inventario, analytics, superadmin standalone, WA automático, multi-tenant RLS completo |
+| **v1.2** | ✅ En producción (tag git: v1.2) | Panel Suscripción React completo (SalonSuperadmin), RPCs SECURITY DEFINER para auth, soft delete de negocios, v43/v44/v45 SQL |
+| **v1.3** | 📋 Planificado | Proveedores + Gastos, billing automático (Wompi), pagos en línea desde portal público |
 | **v2.0** | 📋 Futuro | Vertical psicología/salud (historial clínico, consentimientos, cuestionarios integrados), App nativa PWA en tiendas |
 
 ---
@@ -428,23 +243,27 @@ Estado: [lo que está pendiente según este CLAUDE.md]
 ### Antes de iniciar cualquier módulo
 1. Leer: `TenantContext.jsx`, el módulo a modificar, y este CLAUDE.md
 2. Para SQL nuevo: archivo `vXX_nombre.sql` con RLS + tenant_id + GRANT mínimos
-3. Para UI: React + inline CSS, variables salon.css, código splitting con lazy import
-4. Para deploy: `git push` → Vercel auto-despliega
+3. Para UI: React + inline CSS, variables salon.css, code splitting con lazy import
+4. Para deploy:
+   ```bash
+   git add <archivos> && git commit -m "descripción"
+   git push
+   npx vercel deploy --prod --yes   # desde d:/Proyectos antrigravity/AGENDAS/agenda-saas-v2
+   ```
+   ⚠️ `git push` solo actualiza `agenda-profesional` (auto-deploy). La producción real (`project-gnyy8.vercel.app`) **requiere el deploy manual**.
 5. Para Edge Functions: `npx supabase functions deploy <nombre>`
 
 ### Reglas que nunca se rompen
 - Nunca omitir `.eq('tenant_id', tenant.id)` en queries
 - Nunca poner `service_role` en frontend
-- Nunca guardar contraseñas en texto plano (bóveda: cifrar en cliente)
-- Nunca guardar tokens de API de WA en frontend — solo en Edge Function environment o Supabase Vault
 - `get_excepciones_mes` RPC no retorna `id` — usar query directa a `horarios_excepcion` si necesitas el id
 - Al crear cualquier tabla nueva: RLS habilitado + política tenant_id + GRANT específico
+- Las RPCs SECURITY DEFINER (`salon_admin_*`, `crear_acceso_tenant`, `resetear_clave_tenant`) se llaman vía `fetch()` con anon key — nunca con el cliente Supabase autenticado
 
-### SQL próximo (v1.2)
+### SQL próximo (v1.3)
 ```
-v43_proveedores_gastos.sql    → tablas: proveedores, gastos + RLS + índices
-v44_whatsapp_bot.sql          → tablas: whatsapp_config, wa_plantillas, wa_mensajes_log + RLS
-v45_boveda_accesos.sql        → tabla: boveda_accesos + RLS (solo admin) + función cifrado check
+v46_proveedores_gastos.sql    → tablas: proveedores, gastos + RLS + índices
+v47_billing.sql               → tabla suscripciones + pagos Wompi + webhooks
 ```
 
 ---
@@ -452,7 +271,7 @@ v45_boveda_accesos.sql        → tabla: boveda_accesos + RLS (solo admin) + fun
 ## Contexto de Negocio
 
 - **Hugo Urquina** (hugourquina@gmail.com) = Superadmin de toda la plataforma
-- **Negocios activos en v1.1**: glamour-studio, estetica-jess
+- **Negocios activos en v1.2**: glamour-studio, estetica-jess, barbanegra
 - **Modelo**: SaaS B2B para negocios de citas (belleza, bienestar, salud no-clínica)
 - **Competencia**: WeiBook (weibook.co)
 - **Planes**: starter $60K · pro $100K · ultra $140K COP/mes
