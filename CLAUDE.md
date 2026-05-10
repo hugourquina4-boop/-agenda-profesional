@@ -95,6 +95,10 @@ v41_inventario_enhanced.sql ✅ subcategoria, marca, codigo, contenido, proveedo
 v42_fix_superadmin_info.sql ✅ APLICADO — columnas contacto en tenants (nombre_representante,
                                foto_representante, pagina_web, instagram, admin_email),
                                crear_negocio con 11 parámetros, Hugo re-vinculado a todos los tenants
+v43_rls_tenants_superadmin.sql ✅ APLICADO — policies SELECT en tenants: superadmin_ve_todos + usuario_ve_su_tenant
+v43_salon_admin_crear_usuario.sql ✅ APLICADO — RPC salon_admin_crear_usuario: crea usuario en auth.users directamente
+v44_accesos_tenant.sql      ✅ APLICADO — RPCs crear_acceso_tenant + resetear_clave_tenant
+v45_superadmin_enhanced.sql ✅ APLICADO — deleted_at en tenants + citas_hoy en get_tenants + salon_admin_eliminar_tenant
 ```
 
 ---
