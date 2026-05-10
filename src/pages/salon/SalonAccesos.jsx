@@ -1,15 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
-
-// Cliente temporal sin sesión persistente — solo para crear usuarios nuevos
-// No afecta la sesión del admin logueado
-const supabaseTemp = createClient(
-  'https://unpxoamfyushsbyyziyn.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVucHhvYW1meXVzaHNieXl6aXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTUyOTQsImV4cCI6MjA5MjU5MTI5NH0.MvtKlr9QDDc2sgUz6u424eAFiPFEcZvW5xTKbV8STV0',
-  { auth: { persistSession: false, autoRefreshToken: false } }
-)
 
 function Ico({ d, size = 18 }) {
   return (
@@ -23,9 +14,31 @@ function Ico({ d, size = 18 }) {
 const ROL = {
   superadmin: { label:'Superadmin', color:'#f43f5e', desc:'Acceso a todos los negocios' },
   admin:      { label:'Admin',      color:'#8b5cf6', desc:'Acceso total al panel' },
+  contable:   { label:'Contable',   color:'#f59e0b', desc:'Caja, comisiones y analytics' },
   recepcion:  { label:'Recepción',  color:'#10b981', desc:'Agenda y clientes, sin config' },
   profesional:{ label:'Profesional',color:'#3b82f6', desc:'Solo su propia agenda' },
 }
+
+const MODULOS = [
+  { key:'hoy',        label:'Inicio / Dashboard' },
+  { key:'agenda',     label:'Agenda' },
+  { key:'clientes',   label:'Clientes' },
+  { key:'servicios',  label:'Servicios' },
+  { key:'ordenes',    label:'Órdenes en espera' },
+  { key:'caja',       label:'Caja / Ingresos' },
+  { key:'comisiones', label:'Comisiones' },
+  { key:'inventario', label:'Inventario' },
+  { key:'analytics',  label:'Analytics' },
+  { key:'equipo',     label:'Equipo' },
+  { key:'accesos',    label:'Accesos' },
+  { key:'config',     label:'Configuración' },
+]
+
+const ROLES_CONFIG = [
+  { key:'contable',    label:'Contable',    color:'#f59e0b' },
+  { key:'recepcion',   label:'Recepción',   color:'#10b981' },
+  { key:'profesional', label:'Profesional', color:'#3b82f6' },
+]
 
 function genPassword() {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#'
@@ -33,8 +46,11 @@ function genPassword() {
 }
 
 export default function SalonAccesos() {
-  const { tenant, esSuperadmin } = useTenant()
+  const { tenant, esSuperadmin, permisos: permisosCtx, recargarPermisos } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
+
+  const [activeTab,    setActiveTab]    = useState('equipo')  // 'equipo' | 'permisos'
+  const [localPermisos,setLocalPermisos]= useState(null)
 
   const [usuarios,    setUsuarios]    = useState([])
   const [sinCuenta,   setSinCuenta]   = useState([])
@@ -105,6 +121,28 @@ export default function SalonAccesos() {
 
   useEffect(() => { cargar() }, [cargar])
 
+  // Sincronizar permisos del contexto al estado local
+  useEffect(() => {
+    if (permisosCtx && Object.keys(permisosCtx).length > 0) setLocalPermisos(permisosCtx)
+  }, [permisosCtx])
+
+  async function togglePermiso(rol, modulo) {
+    const actual = localPermisos?.[rol]?.[modulo] ?? false
+    const nuevo  = !actual
+    // Optimistic update
+    setLocalPermisos(prev => ({ ...prev, [rol]: { ...(prev?.[rol] || {}), [modulo]: nuevo } }))
+    const { data } = await supabase.rpc('set_permiso_tenant', {
+      p_tenant_id: tenant.id, p_rol: rol, p_modulo: modulo, p_activo: nuevo,
+    })
+    if (!data?.ok) {
+      setLocalPermisos(prev => ({ ...prev, [rol]: { ...(prev?.[rol] || {}), [modulo]: actual } }))
+      showToast('Error al actualizar permiso', false)
+      return
+    }
+    await recargarPermisos()
+    showToast(`${nuevo ? 'Acceso activado' : 'Acceso revocado'}`)
+  }
+
   // ── Cambiar rol ─────────────────────────────────────────────
   async function cambiarRol(userId, nuevoRol) {
     await supabase.from('usuarios_tenant')
@@ -129,7 +167,7 @@ export default function SalonAccesos() {
     setCreandoPara(prof)
     setFormEmail('')
     setFormPass(genPassword())
-    setFormRol('profesional')
+    setFormRol(prof ? 'profesional' : 'profesional')
     setCreError('')
   }
 
@@ -139,42 +177,28 @@ export default function SalonAccesos() {
     }
     setCreando(true); setCreError('')
 
-    // 1. Crear usuario en Supabase Auth con cliente temporal (no afecta sesión del admin)
-    const { data, error: signUpErr } = await supabaseTemp.auth.signUp({
-      email:    formEmail.trim(),
-      password: formPass.trim(),
+    const { data: resultado, error } = await supabase.rpc('crear_acceso_tenant', {
+      p_email:     formEmail.trim(),
+      p_clave:     formPass.trim(),
+      p_tenant_id: tenant.id,
+      p_rol:       formRol,
+      p_nombre:    creandoPara?.nombre || null,
     })
 
-    if (signUpErr) {
+    if (error || !resultado?.ok) {
+      const msg = resultado?.error || error?.message || 'Error creando acceso'
       setCreError(
-        signUpErr.message.includes('already') ? 'Este email ya tiene cuenta en el sistema'
-        : signUpErr.message
+        msg.includes('solo_admin') ? 'Solo el admin puede crear accesos'
+        : msg.includes('clave_minimo') ? 'La clave debe tener al menos 6 caracteres'
+        : msg
       )
       setCreando(false); return
     }
 
-    const newUserId = data?.user?.id
-    if (!newUserId) {
-      setCreError('No se pudo obtener el ID del usuario creado')
-      setCreando(false); return
-    }
-
-    // 2. Vincular al tenant usando función segura (SECURITY DEFINER)
-    const { error: linkErr } = await supabase.rpc('crear_usuario_tenant', {
-      p_user_id:  newUserId,
-      p_tenant_id: tenant.id,
-      p_rol:      formRol,
-    })
-
-    if (linkErr) {
-      setCreError('Usuario creado pero no se pudo vincular al negocio: ' + linkErr.message)
-      setCreando(false); return
-    }
-
-    // 3. Si se crea para un profesional específico, vincular su perfil
+    // Vincular perfil de profesional si aplica
     if (creandoPara?.id) {
       await supabase.from('profesionales')
-        .update({ user_id: newUserId })
+        .update({ user_id: resultado.user_id })
         .eq('id', creandoPara.id)
     }
 
@@ -184,15 +208,19 @@ export default function SalonAccesos() {
     cargar()
   }
 
-  // ── Enviar reset de contraseña ──────────────────────────────
-  async function enviarReset() {
-    if (!resetSheet?.email) return
+  // ── Resetear contraseña directamente (el admin ve y entrega la clave) ───────
+  async function resetearClave() {
+    if (!resetSheet?.email || !resetSheet?.nuevaClave?.trim()) return
     setResetLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(resetSheet.email, {
-      redirectTo: `${baseUrl}/salon`,
+    const { data: resultado, error } = await supabase.rpc('resetear_clave_tenant', {
+      p_email:     resetSheet.email,
+      p_clave:     resetSheet.nuevaClave.trim(),
+      p_tenant_id: tenant.id,
     })
     setResetLoading(false)
-    if (error) { showToast('Error: ' + error.message, false); return }
+    if (error || !resultado?.ok) {
+      showToast((resultado?.error || error?.message || 'Error'), false); return
+    }
     setResetSent(true)
   }
 
@@ -208,26 +236,110 @@ export default function SalonAccesos() {
     <div style={{ padding:'0 16px 80px' }}>
       {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
 
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>
           Accesos
         </h2>
-        <button onClick={() => abrirCrear(null)} style={{
-          padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
-          background:col, color:'#fff', fontWeight:700, fontSize:13,
-        }}>
-          + Nuevo acceso
-        </button>
+        {activeTab === 'equipo' && (
+          <button onClick={() => abrirCrear(null)} style={{
+            padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
+            background:col, color:'#fff', fontWeight:700, fontSize:13,
+          }}>
+            + Nuevo acceso
+          </button>
+        )}
       </div>
-      <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:18 }}>
-        {activos} usuario{activos !== 1 ? 's' : ''} activo{activos !== 1 ? 's' : ''} · {sinCuenta.length} sin cuenta
-      </p>
 
-      {loading ? (
+      {/* ── Tab switcher ── */}
+      <div style={{ display:'flex', gap:4, marginBottom:18, background:'var(--surface)',
+        borderRadius:12, padding:4, border:'1px solid var(--border)' }}>
+        {[
+          { key:'equipo',   label:'Equipo' },
+          { key:'permisos', label:'Permisos por rol' },
+        ].map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
+            flex:1, padding:'8px 12px', borderRadius:9, border:'none', cursor:'pointer',
+            fontWeight:700, fontSize:13, transition:'all 0.15s',
+            background: activeTab === t.key ? col : 'transparent',
+            color:       activeTab === t.key ? '#fff' : 'var(--text-3)',
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {activeTab === 'equipo' && (
+        <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:18 }}>
+          {activos} usuario{activos !== 1 ? 's' : ''} activo{activos !== 1 ? 's' : ''} · {sinCuenta.length} sin cuenta
+        </p>
+      )}
+
+      {/* ── Tab Permisos ── */}
+      {activeTab === 'permisos' && (
+        <div>
+          <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:16, lineHeight:1.5 }}>
+            Define qué módulos puede ver cada rol. <strong style={{ color:'var(--text-2)' }}>Admin</strong> y <strong style={{ color:'var(--text-2)' }}>Superadmin</strong> siempre tienen acceso total.
+          </p>
+          {!localPermisos ? (
+            <div className="sp-skeleton" style={{ height:200, borderRadius:14 }} />
+          ) : (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'separate', borderSpacing:0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign:'left', padding:'8px 12px', fontSize:11, fontWeight:700,
+                      color:'var(--text-3)', letterSpacing:0.8, textTransform:'uppercase' }}>Módulo</th>
+                    {ROLES_CONFIG.map(r => (
+                      <th key={r.key} style={{ textAlign:'center', padding:'8px 10px', fontSize:11,
+                        fontWeight:700, letterSpacing:0.8, textTransform:'uppercase', color:r.color }}>
+                        {r.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {MODULOS.map((mod, idx) => (
+                    <tr key={mod.key} style={{
+                      background: idx % 2 === 0 ? 'var(--card)' : 'transparent',
+                    }}>
+                      <td style={{ padding:'11px 12px', fontSize:13, fontWeight:600,
+                        color:'var(--text-2)', borderRadius: idx === 0 ? '12px 0 0 0' : idx === MODULOS.length-1 ? '0 0 0 12px' : 0 }}>
+                        {mod.label}
+                      </td>
+                      {ROLES_CONFIG.map(r => {
+                        const activo = localPermisos?.[r.key]?.[mod.key] ?? false
+                        return (
+                          <td key={r.key} style={{ textAlign:'center', padding:'11px 10px' }}>
+                            <button onClick={() => togglePermiso(r.key, mod.key)} style={{
+                              width:40, height:22, borderRadius:11, border:'none', cursor:'pointer',
+                              background: activo ? r.color : 'rgba(128,128,128,0.2)',
+                              position:'relative', transition:'background 0.2s', flexShrink:0,
+                              display:'inline-block',
+                            }}>
+                              <div style={{
+                                position:'absolute', top:3,
+                                left: activo ? 21 : 3,
+                                width:16, height:16, borderRadius:8,
+                                background:'#fff', transition:'left 0.18s',
+                                boxShadow:'0 1px 4px rgba(0,0,0,0.25)',
+                              }} />
+                            </button>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab Equipo ── */}
+      {activeTab === 'equipo' && loading ? (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:70, borderRadius:14 }} />)}
         </div>
-      ) : (
+      ) : activeTab === 'equipo' && (
         <>
           {/* ── Usuarios con acceso ── */}
           {usuarios.length > 0 && (
@@ -280,7 +392,7 @@ export default function SalonAccesos() {
                       <div style={{ display:'flex', gap:6, flexShrink:0 }}>
                         {/* Reset contraseña */}
                         <button
-                          onClick={() => { setResetSheet({ user_id:u.user_id, email:u.email }); setResetSent(false) }}
+                          onClick={() => { setResetSheet({ user_id:u.user_id, email:u.email, nuevaClave: genPassword() }); setResetSent(false) }}
                           title="Resetear contraseña"
                           style={{
                             width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
@@ -416,7 +528,7 @@ export default function SalonAccesos() {
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Cambiar rol</p>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
-              {['admin','recepcion','profesional'].map(key => {
+              {['admin','contable','recepcion','profesional'].map(key => {
                 const r = ROL[key]
                 const activo = rolSheet.rol === key
                 return (
@@ -458,41 +570,74 @@ export default function SalonAccesos() {
           <div className="sp-sheet-overlay" onClick={() => { setResetSheet(null); setResetSent(false) }} />
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
-            <p className="sp-sheet-title">Restablecer contraseña</p>
+            <p className="sp-sheet-title">Cambiar clave — {resetSheet.email}</p>
             {resetSent ? (
-              <div style={{ textAlign:'center', padding:'20px 0' }}>
-                <div style={{ fontSize:48, marginBottom:12 }}>📨</div>
-                <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>Email enviado</p>
-                <p style={{ fontSize:13, color:'var(--text-3)', lineHeight:1.6 }}>
-                  Se envió un link de restablecimiento a <b>{resetSheet.email}</b>.
-                  El usuario debe hacer click en el link para crear su nueva contraseña.
+              <div style={{ textAlign:'center', padding:'12px 0 24px' }}>
+                <div style={{ fontSize:40, marginBottom:10 }}>✅</div>
+                <p style={{ fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:12 }}>
+                  Clave actualizada
                 </p>
+                <div style={{
+                  padding:'14px 20px', borderRadius:14, marginBottom:12,
+                  background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.3)',
+                  fontFamily:'monospace', fontSize:20, fontWeight:800,
+                  color:'#4ade80', letterSpacing:2,
+                }}>
+                  {resetSheet.nuevaClave}
+                </div>
+                <p style={{ fontSize:11, color:'var(--text-3)', marginBottom:16 }}>
+                  Copia esta clave antes de cerrar
+                </p>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(resetSheet.nuevaClave).catch(()=>{}); showToast('Clave copiada') }}
+                  style={{
+                    width:'100%', padding:'11px', borderRadius:12, marginBottom:8, cursor:'pointer',
+                    background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.3)',
+                    color:'#4ade80', fontWeight:700, fontSize:13,
+                  }}>Copiar clave</button>
                 <button onClick={() => { setResetSheet(null); setResetSent(false) }} style={{
-                  marginTop:20, width:'100%', padding:'13px', borderRadius:14,
+                  width:'100%', padding:'12px', borderRadius:12,
                   background:col, border:'none', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer',
-                }}>Listo</button>
+                }}>Cerrar</button>
               </div>
             ) : (
-              <>
-                <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:20, lineHeight:1.6 }}>
-                  Se enviará un email a <b style={{ color:'var(--text)' }}>{resetSheet.email}</b> con un link
-                  para que el usuario pueda crear una nueva contraseña.
-                </p>
-                <button onClick={enviarReset} disabled={resetLoading} style={{
-                  width:'100%', padding:'15px', borderRadius:14, cursor:'pointer',
-                  background: resetLoading ? 'var(--border)' : col,
-                  border:'none', color:'#fff',
-                  fontFamily:'Outfit', fontWeight:700, fontSize:15,
-                  opacity: resetLoading ? 0.7 : 1,
-                }}>
-                  {resetLoading ? 'Enviando…' : 'Enviar link de restablecimiento'}
-                </button>
-                <button onClick={() => setResetSheet(null)} style={{
-                  width:'100%', marginTop:8, padding:'13px', borderRadius:14,
-                  background:'transparent', border:'1px solid var(--border)',
-                  color:'var(--text-2)', fontWeight:600, fontSize:14, cursor:'pointer',
-                }}>Cancelar</button>
-              </>
+              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', display:'block', marginBottom:6 }}>
+                    Nueva contraseña
+                  </label>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input
+                      value={resetSheet.nuevaClave || ''}
+                      onChange={e => setResetSheet(s => ({ ...s, nuevaClave: e.target.value }))}
+                      style={{
+                        flex:1, padding:'10px 12px', borderRadius:12,
+                        border:'1px solid var(--border)', background:'var(--bg)',
+                        color:'var(--text)', fontSize:14, outline:'none', fontFamily:'monospace',
+                      }}
+                    />
+                    <button
+                      onClick={() => setResetSheet(s => ({ ...s, nuevaClave: genPassword() }))}
+                      style={{
+                        padding:'10px 12px', borderRadius:12, border:'1px solid var(--border)',
+                        background:'var(--card)', color:'var(--text-2)', cursor:'pointer', fontSize:16,
+                      }}>↺</button>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => { setResetSheet(null); setResetSent(false) }} style={{
+                    flex:1, padding:'12px', borderRadius:12, cursor:'pointer',
+                    background:'transparent', border:'1px solid var(--border)', color:'var(--text-2)', fontWeight:600,
+                  }}>Cancelar</button>
+                  <button onClick={resetearClave} disabled={resetLoading || !resetSheet.nuevaClave?.trim()} style={{
+                    flex:2, padding:'12px', borderRadius:12, border:'none', cursor:'pointer',
+                    background: col, color:'#fff', fontWeight:700, fontSize:14,
+                    opacity: (resetLoading || !resetSheet.nuevaClave?.trim()) ? 0.7 : 1,
+                  }}>
+                    {resetLoading ? 'Cambiando…' : '🔑 Cambiar clave'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </>
@@ -539,7 +684,7 @@ export default function SalonAccesos() {
                   <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600,
                     letterSpacing:0.5, display:'block', marginBottom:6 }}>ROL</label>
                   <div style={{ display:'flex', gap:8 }}>
-                    {['admin','recepcion','profesional'].map(key => {
+                    {['admin','contable','recepcion','profesional'].map(key => {
                       const r = ROL[key]
                       return (
                         <button key={key} type="button" onClick={() => setFormRol(key)} style={{
