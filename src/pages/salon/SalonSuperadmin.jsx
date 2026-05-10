@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAnon } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
 function Ico({ d, size = 18 }) {
@@ -187,7 +187,7 @@ export default function SalonSuperadmin({ onGestionar }) {
     setLoading(true)
     setLoadError(null)
 
-    const { data, error } = await supabase.rpc('salon_admin_get_tenants', { p_token: ADMIN_HASH })
+    const { data, error } = await supabaseAnon.rpc('salon_admin_get_tenants', { p_token: ADMIN_HASH })
 
     if (error) {
       setLoadError(error.message || 'Error al cargar negocios')
@@ -748,131 +748,86 @@ export default function SalonSuperadmin({ onGestionar }) {
           <p className="sp-empty-sub">{buscar ? 'Intenta otra búsqueda' : 'Crea el primer negocio'}</p>
         </div>
       ) : (
-        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
+        <div style={{ padding:'0 16px', marginBottom:24 }}>
+          {/* Cabecera tabla */}
+          <div style={{
+            display:'grid', gridTemplateColumns:'1fr 88px 72px 80px 100px',
+            padding:'6px 12px', marginBottom:4,
+            fontSize:10, fontWeight:700, color:'var(--text-3)',
+            textTransform:'uppercase', letterSpacing:0.8,
+          }}>
+            <span>Negocio</span>
+            <span style={{ textAlign:'center' }}>Días activos</span>
+            <span style={{ textAlign:'center' }}>Plan</span>
+            <span style={{ textAlign:'center' }}>Usuarios</span>
+            <span style={{ textAlign:'right' }}>Acciones</span>
+          </div>
+
           {filtrados.map(n => {
             const col = n.color_primario || '#f43f5e'
+            const dias = n.dias_restantes
+            const diasEl = dias === null
+              ? <span style={{ color:'var(--text-3)' }}>—</span>
+              : dias <= 0
+                ? <span style={{ color:'#f87171', fontWeight:800 }}>Vencido</span>
+                : <span style={{ color: dias <= 7 ? '#f59e0b' : '#4ade80', fontWeight:800 }}>{dias}d</span>
+
             return (
               <div key={n.tenant_id} style={{
-                borderRadius:18, background:'var(--card)',
-                border:'1px solid var(--border)', overflow:'hidden',
+                display:'grid', gridTemplateColumns:'1fr 88px 72px 80px 100px',
+                alignItems:'center', gap:0,
+                borderRadius:14, background:'var(--card)',
+                border:`1px solid var(--border)`,
+                borderLeft:`3px solid ${col}`,
+                marginBottom:8, padding:'12px 14px',
                 opacity: n.activo ? 1 : 0.55,
               }}>
-                {/* Accent bar */}
-                <div style={{ height:3, background:`linear-gradient(90deg,${col},${col}55)` }} />
 
-                {/* Header */}
-                <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px' }}>
-                  <div style={{
-                    width:46, height:46, borderRadius:13, flexShrink:0,
-                    background:`linear-gradient(135deg,${col},${col}88)`,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontFamily:'Outfit', fontWeight:900, fontSize:19, color:'#fff',
-                    boxShadow:`0 4px 12px ${col}44`,
-                  }}>
-                    {n.nombre?.[0]?.toUpperCase()}
+                {/* Negocio */}
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)',
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                    {n.nombre}
+                    {!n.activo && (
+                      <span style={{ marginLeft:6, fontSize:9, fontWeight:700,
+                        background:'rgba(239,68,68,0.15)', color:'#f87171',
+                        padding:'2px 5px', borderRadius:4 }}>INACTIVO</span>
+                    )}
                   </div>
-
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{n.nombre}</span>
-                      <PlanBadge plan={n.plan} />
-                      {!n.activo && (
-                        <span style={{
-                          padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:700,
-                          background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.25)',
-                          color:'#f87171',
-                        }}>INACTIVO</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--text-3)', display:'flex', gap:6, flexWrap:'wrap' }}>
-                      <span>/{n.slug}</span>
-                      {n.ciudad && <><span>·</span><span>{n.ciudad}</span></>}
-                      {n.vertical && <><span>·</span><span>{n.vertical}</span></>}
-                    </div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                    /{n.slug}{n.ciudad ? ` · ${n.ciudad}` : ''}
                   </div>
+                </div>
 
+                {/* Días activos */}
+                <div style={{ textAlign:'center', fontFamily:'Outfit', fontSize:13 }}>
+                  {diasEl}
+                </div>
+
+                {/* Plan */}
+                <div style={{ display:'flex', justifyContent:'center' }}>
+                  <PlanBadge plan={n.plan} />
+                </div>
+
+                {/* Usuarios */}
+                <div style={{ textAlign:'center', fontFamily:'Outfit',
+                  fontSize:15, fontWeight:800, color:'var(--text)' }}>
+                  {n.usuarios_count ?? 0}
+                </div>
+
+                {/* Acciones */}
+                <div style={{ display:'flex', justifyContent:'flex-end', gap:6 }}>
                   <button
                     onClick={() => gestionar(n.tenant_id)}
                     disabled={!!gestionando}
                     style={{
-                      padding:'8px 14px', borderRadius:10, border:`1px solid ${col}40`,
-                      background:`${col}15`, color:col, fontWeight:700, fontSize:12,
-                      cursor:'pointer', flexShrink:0,
+                      padding:'5px 10px', borderRadius:8, border:`1px solid ${col}40`,
+                      background:`${col}18`, color:col, fontWeight:700, fontSize:11,
+                      cursor:'pointer', whiteSpace:'nowrap',
                       opacity: gestionando === n.tenant_id ? 0.6 : 1,
                     }}>
-                    {gestionando === n.tenant_id ? '…' : 'Gestionar →'}
+                    {gestionando === n.tenant_id ? '…' : 'Entrar'}
                   </button>
-                </div>
-
-                {/* Stats */}
-                <div style={{
-                  display:'grid', gridTemplateColumns:'1fr 1fr',
-                  gap:1, background:'var(--border)',
-                  borderTop:'1px solid var(--border)',
-                }}>
-                  {[
-                    ['Días de plan', n.dias_restantes !== null
-                      ? (n.dias_restantes <= 0
-                          ? <span style={{ color:'#f87171' }}>Vencido</span>
-                          : <span style={{ color: n.dias_restantes <= 7 ? '#f59e0b' : '#4ade80' }}>{n.dias_restantes}d</span>)
-                      : '—'],
-                    ['Usuarios', n.usuarios_count ?? 0],
-                  ].map(([lbl, val]) => (
-                    <div key={lbl} style={{ padding:'10px 8px', background:'var(--card)', textAlign:'center' }}>
-                      <div style={{ fontSize:15, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>{val}</div>
-                      <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:600,
-                        textTransform:'uppercase', letterSpacing:0.4 }}>{lbl}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Contacto */}
-                {(n.nombre_representante || n.telefono || n.instagram || n.pagina_web || n.direccion) && (
-                  <div style={{
-                    padding:'10px 16px', borderTop:'1px solid var(--border)',
-                    display:'flex', flexWrap:'wrap', gap:'6px 16px',
-                  }}>
-                    {n.nombre_representante && (
-                      <span style={{ fontSize:11, color:'var(--text-3)', display:'flex', alignItems:'center', gap:4 }}>
-                        <Ico d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" size={12} />
-                        {n.nombre_representante}
-                      </span>
-                    )}
-                    {n.telefono && (
-                      <span style={{ fontSize:11, color:'var(--text-3)', display:'flex', alignItems:'center', gap:4 }}>
-                        <Ico d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" size={12} />
-                        {n.telefono}
-                      </span>
-                    )}
-                    {n.instagram && (
-                      <span style={{ fontSize:11, color:'#c084fc', display:'flex', alignItems:'center', gap:3 }}>
-                        @{n.instagram}
-                      </span>
-                    )}
-                    {n.pagina_web && (
-                      <a href={n.pagina_web} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize:11, color:'#60a5fa', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}>
-                        <Ico d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" size={12} />
-                        Web
-                      </a>
-                    )}
-                    {n.direccion && (
-                      <span style={{ fontSize:11, color:'var(--text-3)', display:'flex', alignItems:'center', gap:3 }}>
-                        <Ico d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" size={12} />
-                        {n.direccion}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div style={{ padding:'8px 16px', display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:600 }}>MRR:</span>
-                  <span style={{ fontSize:12, fontWeight:800, color:PLAN_COLOR[n.plan] || '#60a5fa',
-                    fontFamily:'Outfit' }}>
-                    {fmtCOP(PLAN_PRECIO[n.plan] || 49000)}/mes
-                  </span>
-                  <span style={{ flex:1 }} />
                   <button
                     onClick={() => setResetModal({
                       titulo: `Resetear clave — ${n.nombre}`,
@@ -880,14 +835,12 @@ export default function SalonSuperadmin({ onGestionar }) {
                       tenantId: n.tenant_id,
                     })}
                     style={{
-                      padding:'5px 11px', borderRadius:8, cursor:'pointer',
-                      border:'1px solid rgba(245,158,11,0.3)',
+                      padding:'5px 8px', borderRadius:8, cursor:'pointer',
+                      border:'1px solid rgba(245,158,11,0.25)',
                       background:'rgba(245,158,11,0.08)',
                       color:'#fbbf24', fontWeight:700, fontSize:11,
-                      display:'flex', alignItems:'center', gap:5,
                     }}>
-                    <Ico d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" size={12} />
-                    Resetear clave
+                    🔑
                   </button>
                 </div>
               </div>
