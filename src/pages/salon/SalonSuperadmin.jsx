@@ -1,6 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, supabaseAnon } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
+
+const SB_URL  = 'https://unpxoamfyushsbyyziyn.supabase.co'
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVucHhvYW1meXVzaHNieXl6aXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTUyOTQsImV4cCI6MjA5MjU5MTI5NH0.MvtKlr9QDDc2sgUz6u424eAFiPFEcZvW5xTKbV8STV0'
+
+async function rpcAnon(fn, params) {
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SB_ANON,
+      'Authorization': `Bearer ${SB_ANON}`,
+    },
+    body: JSON.stringify(params),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json?.message || json?.error || `HTTP ${res.status}`)
+  return json
+}
 
 function Ico({ d, size = 18 }) {
   return (
@@ -187,16 +205,16 @@ export default function SalonSuperadmin({ onGestionar }) {
     setLoading(true)
     setLoadError(null)
 
-    const { data, error } = await supabaseAnon.rpc('salon_admin_get_tenants', { p_token: ADMIN_HASH })
-
-    if (error) {
-      setLoadError(error.message || 'Error al cargar negocios')
+    let tenants
+    try {
+      const data = await rpcAnon('salon_admin_get_tenants', { p_token: ADMIN_HASH })
+      tenants = Array.isArray(data) ? data : (data || [])
+    } catch (e) {
+      setLoadError(e.message || 'Error al cargar negocios')
       setNegocios([])
       setLoading(false)
       return
     }
-
-    const tenants = Array.isArray(data) ? data : (data || [])
     const hoy = new Date()
 
     const conMetricas = await Promise.all(tenants.map(async t => {
