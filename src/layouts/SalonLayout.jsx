@@ -63,7 +63,7 @@ const PAGE_LABEL = {
   hoy:'Inicio', agenda:'Agenda', clientes:'Clientes',
   equipo:'Equipo', servicios:'Servicios', caja:'Ingresos',
   ordenes:'Órdenes', inventario:'Inventario', comisiones:'Comisiones', analytics:'Analytics',
-  accesos:'Accesos', config:'Configuración', superadmin:'Suscripción',
+  accesos:'Accesos', config:'Configuración', superadmin:'Plataforma',
 }
 
 export default function SalonLayout({ page, onNavigate, onNuevaCita, children }) {
@@ -181,7 +181,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
         {esSuperadmin && (
           <>
             <div className="sp-sb-sep" />
-            <div className="sp-sb-group">Suscripción</div>
+            <div className="sp-sb-group">Plataforma</div>
             <SbItem k="superadmin" label="Suscripción" />
           </>
         )}
@@ -262,7 +262,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Menú</p>
             <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16 }}>
-              {[...navNegocio,...navSistema,...(esSuperadmin ? [{key:'superadmin',label:'Suscripción'}] : [])].map(item => (
+              {[...navNegocio,...navSistema,...(esSuperadmin ? [{key:'superadmin',label:'Plataforma'}] : [])].map(item => (
                 <button key={item.key} onClick={() => nav(item.key)} style={{
                   display:'flex',alignItems:'center',gap:10,
                   padding:'14px 16px',borderRadius:14,cursor:'pointer',textAlign:'left',
