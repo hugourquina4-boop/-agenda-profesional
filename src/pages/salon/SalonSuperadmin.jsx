@@ -316,16 +316,15 @@ function FormNuevoNegocio({ onCreado, showToast, onCancel }) {
       // 2. Crear usuario admin si se dio email
       if (form.email_admin.trim()) {
         const clave = form.clave_admin.trim() || genClave()
-        const { data: uData, error: uErr } = await supabase.functions.invoke('admin-crear-usuario', {
-          headers: { 'x-admin-secret': ADMIN_SECRET },
-          body: {
-            email:     form.email_admin.trim(),
-            password:  clave,
-            tenant_id: tenantId,
-            rol:       'admin',
-          },
+        const resultado = await rpcAnon('salon_admin_crear_usuario', {
+          p_token:     ADMIN_HASH,
+          p_email:     form.email_admin.trim(),
+          p_clave:     clave,
+          p_tenant_id: tenantId,
+          p_rol:       'admin',
+          p_nombre:    form.representante || null,
         })
-        if (uErr || uData?.error) throw new Error(uData?.error || uErr?.message || 'Error creando usuario')
+        if (!resultado?.ok) throw new Error(resultado?.error || 'Error creando usuario')
 
         onCreado({
           negocio: form.nombre.trim(),

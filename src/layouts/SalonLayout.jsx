@@ -63,11 +63,16 @@ const PAGE_LABEL = {
   hoy:'Inicio', agenda:'Agenda', clientes:'Clientes',
   equipo:'Equipo', servicios:'Servicios', caja:'Ingresos',
   ordenes:'Órdenes', inventario:'Inventario', comisiones:'Comisiones', analytics:'Analytics',
-  accesos:'Accesos', config:'Configuración', superadmin:'Plataforma',
+  accesos:'Accesos', config:'Configuración', superadmin:'Suscripción',
 }
 
 export default function SalonLayout({ page, onNavigate, onNuevaCita, children }) {
-  const { tenant, esSuperadmin } = useTenant()
+  const { tenant, esSuperadmin, tieneAcceso } = useTenant()
+
+  const navPrincipal = NAV_PRINCIPAL.filter(i => tieneAcceso(i.key))
+  const navNegocio   = NAV_NEGOCIO.filter(i => tieneAcceso(i.key))
+  const navSistema   = NAV_SISTEMA.filter(i => tieneAcceso(i.key))
+  const navMobile    = NAV_MOBILE.filter(i => i.fab || i.mas || tieneAcceso(i.key))
 
   const [masOpen, setMasOpen] = useState(false)
   const [theme,   setTheme]   = useState(() => localStorage.getItem('sp-theme') || 'light')
@@ -156,22 +161,28 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
           </div>
         </div>
 
-        <div className="sp-sb-group">Principal</div>
-        {NAV_PRINCIPAL.map(i => <SbItem key={i.key} k={i.key} label={i.label} />)}
+        {navPrincipal.length > 0 && <>
+          <div className="sp-sb-group">Principal</div>
+          {navPrincipal.map(i => <SbItem key={i.key} k={i.key} label={i.label} />)}
+        </>}
 
-        <div className="sp-sb-sep" />
-        <div className="sp-sb-group">Negocio</div>
-        {NAV_NEGOCIO.map(i => <SbItem key={i.key} k={i.key} label={i.label} />)}
+        {navNegocio.length > 0 && <>
+          <div className="sp-sb-sep" />
+          <div className="sp-sb-group">Negocio</div>
+          {navNegocio.map(i => <SbItem key={i.key} k={i.key} label={i.label} />)}
+        </>}
 
-        <div className="sp-sb-sep" />
-        <div className="sp-sb-group">Sistema</div>
-        {NAV_SISTEMA.map(i => <SbItem key={i.key} k={i.key} label={i.label} />)}
+        {navSistema.length > 0 && <>
+          <div className="sp-sb-sep" />
+          <div className="sp-sb-group">Sistema</div>
+          {navSistema.map(i => <SbItem key={i.key} k={i.key} label={i.label} />)}
+        </>}
 
         {esSuperadmin && (
           <>
             <div className="sp-sb-sep" />
-            <div className="sp-sb-group">Plataforma</div>
-            <SbItem k="superadmin" label="Superadmin" />
+            <div className="sp-sb-group">Suscripción</div>
+            <SbItem k="superadmin" label="Suscripción" />
           </>
         )}
 
@@ -251,7 +262,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Menú</p>
             <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16 }}>
-              {[...NAV_NEGOCIO,...NAV_SISTEMA,...(esSuperadmin ? [{key:'superadmin',label:'Plataforma'}] : [])].map(item => (
+              {[...navNegocio,...navSistema,...(esSuperadmin ? [{key:'superadmin',label:'Suscripción'}] : [])].map(item => (
                 <button key={item.key} onClick={() => nav(item.key)} style={{
                   display:'flex',alignItems:'center',gap:10,
                   padding:'14px 16px',borderRadius:14,cursor:'pointer',textAlign:'left',
@@ -282,7 +293,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
 
       {/* ── NAV móvil ─────────────────────────────────────── */}
       <nav className="sp-nav">
-        {NAV_MOBILE.map(item => {
+        {navMobile.map(item => {
           if (item.fab) return (
             <div key="fab" style={{ display:'flex',alignItems:'center',justifyContent:'center',flex:1 }}>
               <button className="sp-fab"
