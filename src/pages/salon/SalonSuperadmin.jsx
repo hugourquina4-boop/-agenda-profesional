@@ -41,6 +41,7 @@ function PlanBadge({ plan }) {
 const FORM_INICIAL = { nombre:'', slug:'', ciudad:'', vertical:'salon', plan:'starter', color:'#f43f5e', email_dueno:'', password_temp:'', representante:'', telefono:'', direccion:'', web:'', instagram:'' }
 
 const ADMIN_SECRET = 'salonpro2026'
+const ADMIN_HASH   = 'e8f3b093450617294857b208734d3da24124fa0c99bcede207ea0584996f5f91'
 
 // Modal para resetear contraseña (por email o por tenant)
 function ModalResetClave({ titulo, emailInicial, tenantId, onClose, showToast }) {
@@ -186,26 +187,33 @@ export default function SalonSuperadmin({ onGestionar }) {
     setLoading(true)
     setLoadError(null)
 
-    const { data: tenants, error } = await supabase.rpc('superadmin_get_tenants')
+    const { data, error } = await supabase.rpc('salon_admin_get_tenants', { p_token: ADMIN_HASH })
 
     if (error) {
-      console.error('[Superadmin] Error:', error)
       setLoadError(error.message || 'Error al cargar negocios')
       setNegocios([])
       setLoading(false)
       return
     }
 
-    const lista = (tenants || []).map(t => ({
-      ...t,
-      tenant_id:           t.id,
-      citas_mes:           0,
-      ingresos_mes:        0,
-      total_profesionales: 0,
-      total_clientes:      0,
+    const tenants = Array.isArray(data) ? data : (data || [])
+    const hoy = new Date()
+
+    const conMetricas = await Promise.all(tenants.map(async t => {
+      const { count: usuarios } = await supabase
+        .from('usuarios_tenant')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', t.id)
+        .eq('activo', true)
+        .neq('rol', 'superadmin')
+
+      const vence = t.fecha_vencimiento ? new Date(t.fecha_vencimiento) : null
+      const diasRestantes = vence ? Math.ceil((vence - hoy) / 86400000) : null
+
+      return { ...t, tenant_id: t.id, usuarios_count: usuarios || 0, dias_restantes: diasRestantes }
     }))
 
-    setNegocios(lista)
+    setNegocios(conMetricas)
     setLoading(false)
   }, [])
 
@@ -276,11 +284,11 @@ export default function SalonSuperadmin({ onGestionar }) {
     n.slug?.toLowerCase().includes(buscar.toLowerCase())
   )
 
-  const activos     = negocios.filter(n => n.activo)
-  const mrr         = activos.reduce((s, n) => s + (PLAN_PRECIO[n.plan] || 49000), 0)
-  const arr         = mrr * 12
-  const citasMes    = negocios.reduce((s, n) => s + Number(n.citas_mes || 0), 0)
-  const ingresosMes = negocios.reduce((s, n) => s + Number(n.ingresos_mes || 0), 0)
+  const activos      = negocios.filter(n => n.activo)
+  const mrr          = activos.reduce((s, n) => s + (PLAN_PRECIO[n.plan] || 49000), 0)
+  const arr          = mrr * 12
+  const totalUsuarios = negocios.reduce((s, n) => s + (n.usuarios_count || 0), 0)
+  const ingresosMes  = 0
 
   if (!esSuperadmin) return (
     <div className="sp-empty">
@@ -644,7 +652,7 @@ export default function SalonSuperadmin({ onGestionar }) {
           ['Negocios', negocios.length, '#60a5fa'],
           ['Activos',  activos.length,  '#4ade80'],
           ['MRR',      fmtCOP(mrr),     '#c084fc'],
-          ['Citas/mes', citasMes,       '#fb923c'],
+          ['Usuarios', totalUsuarios,   '#fb923c'],
         ].map(([lbl, val, c]) => (
           <div key={lbl} style={{ padding:'14px 10px', background:'var(--card)', textAlign:'center' }}>
             <div style={{ fontSize:17, fontWeight:900, color:c, fontFamily:'Outfit', lineHeight:1 }}>{val}</div>
@@ -798,15 +806,17 @@ export default function SalonSuperadmin({ onGestionar }) {
 
                 {/* Stats */}
                 <div style={{
-                  display:'grid', gridTemplateColumns:'repeat(4,1fr)',
+                  display:'grid', gridTemplateColumns:'1fr 1fr',
                   gap:1, background:'var(--border)',
                   borderTop:'1px solid var(--border)',
                 }}>
                   {[
-                    ['Citas/mes',   n.citas_mes ?? 0],
-                    ['Ingresos',    fmtCOP(n.ingresos_mes ?? 0)],
-                    ['Profes.',     n.total_profesionales ?? 0],
-                    ['Clientes',    n.total_clientes ?? 0],
+                    ['Días de plan', n.dias_restantes !== null
+                      ? (n.dias_restantes <= 0
+                          ? <span style={{ color:'#f87171' }}>Vencido</span>
+                          : <span style={{ color: n.dias_restantes <= 7 ? '#f59e0b' : '#4ade80' }}>{n.dias_restantes}d</span>)
+                      : '—'],
+                    ['Usuarios', n.usuarios_count ?? 0],
                   ].map(([lbl, val]) => (
                     <div key={lbl} style={{ padding:'10px 8px', background:'var(--card)', textAlign:'center' }}>
                       <div style={{ fontSize:15, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>{val}</div>
