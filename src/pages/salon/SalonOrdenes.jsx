@@ -435,21 +435,39 @@ export default function SalonOrdenes() {
               {servsFiltrados.length > 0 && (
                 <div style={{
                   marginTop:4, background:'var(--card)', border:'1px solid var(--border)',
-                  borderRadius:12, overflow:'hidden', maxHeight:200, overflowY:'auto',
+                  borderRadius:12, overflow:'hidden', maxHeight:220, overflowY:'auto',
                 }}>
-                  {servsFiltrados.map(s => (
-                    <button key={s.id} onClick={() => agregarServicio(s)} style={{
-                      display:'flex', justifyContent:'space-between', alignItems:'center',
-                      width:'100%', padding:'10px 14px', textAlign:'left',
-                      background:'transparent', border:'none', borderBottom:'1px solid var(--border)',
-                      color:'var(--text)', fontSize:13, cursor:'pointer',
-                    }}>
-                      <span>{s.nombre}</span>
-                      <span style={{ color:col, fontWeight:700, fontSize:12 }}>
-                        ${Number(s.precio).toLocaleString('es-CO')}
-                      </span>
-                    </button>
-                  ))}
+                  {servsFiltrados.map(s => {
+                    const enCarrito = formItems.some(i => i.servicio_id === s.id)
+                    return (
+                      <button key={s.id} onClick={() => agregarServicio(s)} style={{
+                        display:'flex', justifyContent:'space-between', alignItems:'center',
+                        width:'100%', padding:'11px 14px', textAlign:'left',
+                        background: enCarrito ? `${col}14` : 'transparent',
+                        border:'none', borderBottom:'1px solid var(--border)',
+                        color: enCarrito ? col : 'var(--text)', fontSize:13, cursor:'pointer',
+                        transition:'background 0.15s',
+                      }}>
+                        <span style={{ fontWeight: enCarrito ? 700 : 400 }}>{s.nombre}</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                          <span style={{ color: enCarrito ? col : 'var(--text-3)', fontWeight:700, fontSize:12 }}>
+                            ${Number(s.precio).toLocaleString('es-CO')}
+                          </span>
+                          {enCarrito && (
+                            <span style={{
+                              width:18, height:18, borderRadius:5, background:col,
+                              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                            }}>
+                              <svg width={10} height={10} viewBox="0 0 24 24" fill="none"
+                                stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

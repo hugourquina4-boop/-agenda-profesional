@@ -157,18 +157,19 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
       if (!slot)           { showToast('Selecciona un horario'); setSaving(false); return }
       if (!servIds.length) { showToast('Selecciona al menos un servicio'); setSaving(false); return }
 
-      const { error } = await supabase.from('citas').insert({
+      const { data: citaNew, error } = await supabase.from('citas').insert({
         tenant_id:      tenant.id,
         profesional_id: profId,
-        servicio_id:    servIds[0],        // servicio principal
-        servicios_ids:  servIds,           // todos los servicios
+        servicio_id:    servIds[0],
+        servicios_ids:  servIds,
         cliente_id:     cliId,
         fecha_inicio:   slot.inicio,
         fecha_fin:      slot.fin,
         estado:         'confirmada',
         precio_cobrado: precioTotal || null,
-      })
+      }).select('id').single()
       if (error) throw error
+      if (citaNew?.id) supabase.functions.invoke('notificacion-cita', { body: { cita_id: citaNew.id } }).catch(() => {})
       onCreada?.()
       onClose()
     } catch (e) {
@@ -275,8 +276,9 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
             {/* Lista agrupada por categoría */}
             {Object.entries(porCategoria).map(([cat, items]) => (
               <div key={cat} style={{ marginBottom:16 }}>
-                <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
-                  textTransform:'uppercase', marginBottom:8 }}>
+                <p style={{ fontSize:11, fontWeight:700, color:'var(--text-2)', letterSpacing:1,
+                  textTransform:'uppercase', marginBottom:8, marginTop:4,
+                  borderBottom:'1px solid var(--border)', paddingBottom:4 }}>
                   {cat}
                 </p>
                 <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
@@ -287,8 +289,9 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
                         display:'flex', alignItems:'center', justifyContent:'space-between',
                         padding:'13px 14px', borderRadius:13, cursor:'pointer', textAlign:'left',
                         background: sel ? `${col}15` : 'var(--card)',
-                        border: `1px solid ${sel ? col + '55' : 'var(--border)'}`,
+                        border: `2px solid ${sel ? col : 'var(--border)'}`,
                         color:'var(--text)',
+                        transition:'border-color 0.15s, background 0.15s',
                       }}>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontWeight:700, fontSize:14, color: sel ? col : 'var(--text)' }}>
@@ -313,7 +316,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
                             display:'flex', alignItems:'center', justifyContent:'center',
                             transition:'all 0.15s',
                           }}>
-                            {sel && <Ico d="M5 13l4 4L19 7" size={12} style={{ color:'#fff' }} />}
+                            {sel && <Ico d="M5 13l4 4L19 7" size={12} />}
                           </div>
                         </div>
                       </button>
@@ -447,30 +450,39 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
           </div>
         )}
 
-        {/* Botones navegación */}
-        <div style={{ display:'flex', gap:10 }}>
-          {step > 0 && (
-            <button onClick={() => setStep(s => s - 1)} style={{
-              flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
-              background:'var(--card)', border:'1px solid var(--border)',
-              color:'var(--text-2)', fontWeight:700, fontSize:15,
-            }}>Atrás</button>
-          )}
-          {step < 3 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canNext[step]} style={{
-              flex:2, padding:'15px', borderRadius:14,
-              cursor: canNext[step] ? 'pointer' : 'not-allowed',
-              background: canNext[step] ? col : 'var(--card)',
-              border:'none', color:'#fff', fontWeight:700, fontSize:15,
-              opacity: canNext[step] ? 1 : 0.4, fontFamily:'Outfit',
-            }}>Siguiente</button>
-          ) : (
-            <button onClick={guardar} disabled={saving || !canNext[3]} style={{
-              flex:2, padding:'15px', borderRadius:14, cursor:'pointer',
-              background:col, border:'none', color:'#fff', fontWeight:700, fontSize:15,
-              opacity: saving ? 0.7 : 1, fontFamily:'Outfit',
-            }}>{saving ? 'Guardando…' : 'Confirmar cita'}</button>
-          )}
+        {/* Botones navegación — sticky al fondo del sheet */}
+        <div style={{
+          position:'sticky', bottom:0,
+          background:'var(--sheet-bg, #0d0f1a)',
+          padding:'12px 0 0',
+          marginTop:8,
+          borderTop:`1px solid var(--border)`,
+        }}>
+          <div style={{ display:'flex', gap:10 }}>
+            {step > 0 && (
+              <button onClick={() => setStep(s => s - 1)} style={{
+                flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
+                background:'var(--card)', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:700, fontSize:15,
+              }}>Atrás</button>
+            )}
+            {step < 3 ? (
+              <button onClick={() => setStep(s => s + 1)} disabled={!canNext[step]} style={{
+                flex:2, padding:'15px', borderRadius:14,
+                cursor: canNext[step] ? 'pointer' : 'not-allowed',
+                background: canNext[step] ? col : 'var(--card)',
+                border:'none', color: canNext[step] ? '#fff' : 'var(--text-3)',
+                fontWeight:700, fontSize:15,
+                opacity: canNext[step] ? 1 : 0.5, fontFamily:'Outfit',
+              }}>Siguiente</button>
+            ) : (
+              <button onClick={guardar} disabled={saving || !canNext[3]} style={{
+                flex:2, padding:'15px', borderRadius:14, cursor:'pointer',
+                background:col, border:'none', color:'#fff', fontWeight:700, fontSize:15,
+                opacity: saving ? 0.7 : 1, fontFamily:'Outfit',
+              }}>{saving ? 'Guardando…' : 'Confirmar cita'}</button>
+            )}
+          </div>
         </div>
       </div>
     </>

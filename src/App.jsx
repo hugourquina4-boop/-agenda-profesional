@@ -107,7 +107,8 @@ export default function App() {
           <Route path="/reservar/:slug" element={<SalonPortal />} />
           <Route path="/agenda/:slug"   element={<SalonPortal />} />
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/salon" replace />} />
+          <Route path="*" element={<Navigate to="/salon" replace />} />
         </Routes>
       </BrowserRouter>
     </TenantProvider>

@@ -177,6 +177,22 @@ export default function SalonEquipo() {
     setExpandedDia(null)
   }
 
+  function activarLunesViernes() {
+    const laboral = new Set(['lunes','martes','miercoles','jueves','viernes'])
+    setHorarios(hs => hs.map(h => ({ ...h, activo: laboral.has(h.dia) })))
+    setExpandedDia(null)
+  }
+
+  function activarTodos() {
+    setHorarios(hs => hs.map(h => ({ ...h, activo: true })))
+    setExpandedDia(null)
+  }
+
+  function desactivarTodos() {
+    setHorarios(hs => hs.map(h => ({ ...h, activo: false })))
+    setExpandedDia(null)
+  }
+
   function setDiaSlots(dia, newSlots) {
     setHorarios(hs => hs.map(h => {
       if (h.dia !== dia) return h
@@ -654,13 +670,30 @@ export default function SalonEquipo() {
         <>
           <div className="sp-sheet-overlay" onClick={() => setProfH(null)} />
           <div className="sp-sheet" style={{ paddingBottom:80 }}>
-            <div className="sp-sheet-handle" />
-            <p className="sp-sheet-title" style={{ marginBottom:4 }}>
-              Horarios · {profH.nombre.split(' ')[0]}
-            </p>
-            <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:20 }}>
-              Días y horarios de atención
-            </p>
+            {/* Header pegajoso */}
+            <div className="sp-sheet-hdr">
+              <div className="sp-sheet-handle" />
+              <p className="sp-sheet-title" style={{ marginBottom:4 }}>
+                Horarios · {profH.nombre.split(' ')[0]}
+              </p>
+              <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:10 }}>
+                Días y horarios de atención
+              </p>
+              {/* Presets de días */}
+              <div style={{ display:'flex', gap:6, marginBottom:4 }}>
+                {[
+                  { label:'Lun–Vie', fn: activarLunesViernes },
+                  { label:'Todos',   fn: activarTodos },
+                  { label:'Ninguno', fn: desactivarTodos },
+                ].map(p => (
+                  <button key={p.label} onClick={p.fn} style={{
+                    padding:'5px 11px', borderRadius:8, border:`1px solid ${col}40`,
+                    background:`${col}12`, color:col, fontSize:11, fontWeight:700,
+                    cursor:'pointer', fontFamily:'Plus Jakarta Sans,sans-serif',
+                  }}>{p.label}</button>
+                ))}
+              </div>
+            </div>
 
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
               {DIAS_SEMANA.map(d => {
@@ -762,16 +795,22 @@ export default function SalonEquipo() {
         <>
           <div className="sp-sheet-overlay" onClick={() => { setExcProf(null); setExcForm(null) }} />
           <div className="sp-sheet" style={{ paddingBottom:80 }}>
-            <div className="sp-sheet-handle" />
-            <p className="sp-sheet-title" style={{ marginBottom:4 }}>
-              {excForm
-                ? (excForm.isNew ? 'Nueva excepción' : 'Editar excepción')
-                : `Excepciones · ${excProf.nombre.split(' ')[0]}`
-              }
-            </p>
-            <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:16 }}>
-              {excForm ? 'Ajuste para una fecha específica' : 'Toca un día para modificar su horario'}
-            </p>
+            {/* Header pegajoso */}
+            <div className="sp-sheet-hdr">
+              <div className="sp-sheet-handle" />
+              <p className="sp-sheet-title" style={{ marginBottom:4 }}>
+                {excForm
+                  ? (excForm.isNew ? 'Nueva excepción' : 'Editar excepción')
+                  : `Excepciones · ${excProf.nombre.split(' ')[0]}`
+                }
+              </p>
+              <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:4 }}>
+                {excForm
+                  ? <strong style={{ color:'var(--text-2)', fontWeight:700 }}>{formatFecha(excForm.fecha)}</strong>
+                  : 'Toca un día para modificar su horario'
+                }
+              </p>
+            </div>
 
             {!excForm ? (
               <>
@@ -884,8 +923,13 @@ export default function SalonEquipo() {
                   {/* Grid horario si trabaja */}
                   {excForm.activo && (
                     <div>
-                      <div style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, marginBottom:8 }}>
-                        HORARIO — {excForm.slots.length > 0 ? `${excForm.hora_inicio} — ${excForm.hora_fin}` : 'Sin selección'}
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                        <span style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5 }}>
+                          HORARIO
+                        </span>
+                        <span style={{ fontSize:13, fontWeight:700, color:'var(--text-2)' }}>
+                          {excForm.slots.length > 0 ? `${excForm.hora_inicio} — ${excForm.hora_fin}` : 'Sin selección'}
+                        </span>
                       </div>
                       <div style={{ maxHeight:280, overflowY:'auto' }}>
                         <HorarioGrid
