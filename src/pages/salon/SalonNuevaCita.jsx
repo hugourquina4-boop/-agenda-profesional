@@ -191,11 +191,20 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
       {toast && <div className="sp-toast show" style={{ background: toast.color }}>{toast.msg}</div>}
 
       <div className="sp-sheet-overlay" onClick={onClose} />
-      <div className="sp-sheet" style={{ paddingBottom: 80 }}>
-        <div className="sp-sheet-handle" />
+      <div className="sp-sheet" style={{
+        padding: 0,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Handle — fuera del scroll */}
+        <div className="sp-sheet-handle" style={{ flexShrink: 0, margin: '12px auto 0' }} />
+
+        {/* Body scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '0 20px' }}>
 
         {/* Header */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, marginTop:8 }}>
           <p className="sp-sheet-title" style={{ margin:0 }}>Nueva cita</p>
           <button onClick={onClose} style={{
             width:32, height:32, borderRadius:10, border:'1px solid var(--border)',
@@ -450,13 +459,16 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
           </div>
         )}
 
-        {/* Botones navegación — sticky al fondo del sheet */}
+        {/* Espaciado final del área scrollable */}
+        <div style={{ height: 8 }} />
+        </div>{/* fin body scrollable */}
+
+        {/* Footer fijo — fuera del scroll, siempre visible */}
         <div style={{
-          position:'sticky', bottom:0,
-          background:'var(--sheet-bg, #0d0f1a)',
-          padding:'12px 0 0',
-          marginTop:8,
-          borderTop:`1px solid var(--border)`,
+          flexShrink: 0,
+          padding: '12px 20px 20px',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--sheet-bg)',
         }}>
           <div style={{ display:'flex', gap:10 }}>
             {step > 0 && (
