@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-16 (sesión 2)
-> **Versión actual en producción: v1.3-dev** (sin tag aún)
+> Actualizado: 2026-05-16 (sesión 3)
+> **Versión actual en producción: v1.3-dev** (commit 46cc3b6)
 
 ---
 
@@ -37,7 +37,7 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 
 ---
 
-## Estado del Sistema — v1.2 (producción)
+## Estado del Sistema — v1.3-dev (producción, sesión 3)
 
 ### ✅ MÓDULOS COMPLETOS Y EN PRODUCCIÓN
 
@@ -53,7 +53,8 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Nueva cita (5 pasos) | SalonNuevaCita.jsx | Horarios, slots, anti-solapamiento, WA confirmación al crear |
 | Portal público | SalonPortal.jsx | Reservas online, precios dinámicos, lista de espera, WA confirmación |
 | Servicios CRUD | SalonServicios.jsx | 4 tabs: Detalles, Precio (base+oferta+duración), Equipo (profesionales asignados), Recordatorio (template WA con preview) |
-| Equipo CRUD + horarios táctiles + calendario excepciones | SalonEquipo.jsx | HorarioGrid drag-to-select, MiniCalendar visual para excepciones por fecha (verde=especial, rojo=ausente) |
+| Equipo CRUD + horarios táctiles + calendario excepciones | SalonEquipo.jsx | HorarioGrid drag-to-select, MiniCalendar visual para excepciones por fecha (verde=especial, rojo=ausente). Fix: props ImageUploader corregidas, try/catch en guardar(), color picker |
+| Mensajería WA | SalonMensajeria.jsx | Lista clientes con filtros (todos/mayorista/cumpleaños/sin visita 30d), 6 plantillas con sustitución {{nombre}}/{{negocio}}, wa.me links directos |
 | HorarioGrid (componente reutilizable) | components/HorarioGrid.jsx | Drag-to-select táctil, pointer capture, exports: rangeToSlots, slotsToRange, slotsToFranjas |
 | Clientes CRUD + historial + fotos | SalonClientes.jsx | Cumpleaños, segmento, historial, galería, CSV export + import, tipo_precio (Normal/Mayorista), badge MAYOR en lista, toggle rápido en detalle |
 | Caja — Registro de cobros | SalonCaja.jsx | Tabla pagos, tabs Por cobrar/Cobrado, métodos pago, PDF export, breakdown por método, anulación, # movimiento, especialista en historial |
@@ -120,7 +121,7 @@ v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + d
 
 ### Pendientes confirmados (no deployados)
 
-1. **Módulo Mensajería** (Sprint 4) — ver tabla de roadmap abajo
+1. ~~**Módulo Mensajería**~~ ✅ DEPLOYADO (sesión 3)
 2. **Módulo Proveedores + Gastos** (Sprint 3) — SQL v49 + UI pendiente
 3. **Control de acceso por rol en UI** — tabla `permisos_tenant` existe en BD, falta conectar en SalonLayout sidebar
 4. **Roles granulares por módulo** — Sprint 3 pendiente
