@@ -72,6 +72,9 @@
 }
 
 .sp-root > * { position: relative; z-index: 1; }
+/* sp-main must NOT create a stacking context — sheets inside it (z-index 300/301)
+   must compare against root context to appear above sp-nav (z-index 200) */
+.sp-root > .sp-main { z-index: auto; }
 
 /* Headings */
 .sp-root h1, .sp-root h2, .sp-root h3, .sp-root h4 {

@@ -11,6 +11,89 @@ function Ico({ d, size = 18 }) {
   )
 }
 
+const MESES_CAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+function CalendarioPicker({ value, onChange, col }) {
+  const hoy = new Date().toISOString().split('T')[0]
+  const [nav, setNav] = useState(() => {
+    const [y, m] = value.split('-')
+    return { y: parseInt(y), m: parseInt(m) }
+  })
+
+  function changeNav(delta) {
+    setNav(p => {
+      let m = p.m + delta, y = p.y
+      if (m > 12) { m = 1; y++ }
+      if (m < 1)  { m = 12; y-- }
+      return { y, m }
+    })
+  }
+
+  const daysInMonth = new Date(nav.y, nav.m, 0).getDate()
+  const firstDow    = new Date(nav.y, nav.m - 1, 1).getDay()
+  const startOff    = (firstDow + 6) % 7
+
+  const cells = []
+  for (let i = 0; i < startOff; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  const chev = (dir) => (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d={dir === 'l' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} />
+    </svg>
+  )
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <button type="button" onClick={() => changeNav(-1)} style={{
+          width:36, height:36, borderRadius:10, border:'1px solid var(--border)',
+          background:'transparent', color:'var(--text-2)', cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>{chev('l')}</button>
+        <span style={{ fontWeight:700, fontSize:15, color:'var(--text)' }}>
+          {MESES_CAL[nav.m - 1]} {nav.y}
+        </span>
+        <button type="button" onClick={() => changeNav(1)} style={{
+          width:36, height:36, borderRadius:10, border:'1px solid var(--border)',
+          background:'transparent', color:'var(--text-2)', cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>{chev('r')}</button>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:4 }}>
+        {['L','M','X','J','V','S','D'].map(d => (
+          <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:'var(--text-3)', padding:'2px 0' }}>{d}</div>
+        ))}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`} />
+          const dateStr    = `${nav.y}-${String(nav.m).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const isPast     = dateStr < hoy
+          const isSelected = dateStr === value
+          const isToday    = dateStr === hoy
+          return (
+            <button key={dateStr} type="button" disabled={isPast}
+              onClick={() => onChange(dateStr)}
+              style={{
+                aspectRatio:'1', minHeight:36, borderRadius:8, border:'none',
+                cursor: isPast ? 'default' : 'pointer',
+                background: isSelected ? col : isToday ? `${col}18` : 'transparent',
+                outline: isToday && !isSelected ? `1.5px solid ${col}60` : 'none',
+                color: isSelected ? '#fff' : isPast ? 'var(--text-3)' : 'var(--text)',
+                fontSize:13, fontWeight: isSelected || isToday ? 700 : 400,
+                opacity: isPast ? 0.3 : 1,
+              }}>
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const STEP_LABELS = ['Profesional', 'Servicios', 'Fecha y hora', 'Cliente']
 const DIA_KEY = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado']
 
@@ -340,10 +423,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         {/* ── Step 2 — Fecha y hora ── */}
         {step === 2 && (
           <div>
-            <input type="date" value={fecha} min={new Date().toISOString().slice(0,10)}
-              onChange={e => { setFecha(e.target.value); setSlot(null) }}
-              className="sp-input" style={{ marginBottom:16 }}
-            />
+            <CalendarioPicker value={fecha} col={col} onChange={d => { setFecha(d); setSlot(null) }} />
             {sinHorario ? (
               <div style={{ textAlign:'center', padding:'24px 0' }}>
                 <p style={{ fontSize:22, marginBottom:8 }}>😴</p>
@@ -460,13 +540,14 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         )}
 
         {/* Espaciado final del área scrollable */}
-        <div style={{ height: 8 }} />
+        <div style={{ height: 16 }} />
         </div>{/* fin body scrollable */}
 
         {/* Footer fijo — fuera del scroll, siempre visible */}
         <div style={{
           flexShrink: 0,
-          padding: '12px 20px 20px',
+          padding: '12px 20px',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
           borderTop: '1px solid var(--border)',
           background: 'var(--sheet-bg)',
         }}>
