@@ -317,13 +317,13 @@ export default function SalonEquipo() {
   // ── Profesional edit ─────────────────────────────────────────
   function abrir(prof) {
     setSel(prof)
-    setForm({ nombre: prof.nombre, especialidad: prof.especialidad || '', telefono: prof.telefono || '', foto_url: prof.foto_url || '', activo: prof.activo })
+    setForm({ nombre: prof.nombre, especialidad: prof.especialidad || '', telefono: prof.telefono || '', foto_url: prof.foto_url || '', color: prof.color || COLORS[0], activo: prof.activo })
     setNuevo(false)
   }
 
   function abrirNuevo() {
     setSel({ id: null })
-    setForm({ nombre:'', especialidad:'', telefono:'', foto_url:'', activo:true })
+    setForm({ nombre:'', especialidad:'', telefono:'', foto_url:'', color: COLORS[profs.length % COLORS.length], activo:true })
     setNuevo(true)
   }
 
@@ -337,16 +337,29 @@ export default function SalonEquipo() {
 
   async function guardar() {
     if (!form.nombre?.trim()) { showToast('Nombre requerido', false); return }
+    if (!tenant?.id) { showToast('Error de sesión — recarga la página', false); return }
     setSaving(true)
-    const payload = { nombre: form.nombre.trim(), especialidad: form.especialidad, telefono: form.telefono, foto_url: form.foto_url?.trim() || null, activo: form.activo }
-    const { error } = nuevo
-      ? await supabase.from('profesionales').insert({ ...payload, tenant_id: tenant.id })
-      : await supabase.from('profesionales').update(payload).eq('id', sel.id)
-    setSaving(false)
-    if (error) { showToast(error.message, false); return }
-    showToast(nuevo ? 'Profesional creado' : 'Cambios guardados')
-    cerrarSheet()
-    cargar()
+    try {
+      const payload = {
+        nombre:      form.nombre.trim(),
+        especialidad: form.especialidad || null,
+        telefono:    form.telefono || null,
+        foto_url:    form.foto_url?.trim() || null,
+        color:       form.color || col,
+        activo:      form.activo,
+      }
+      const { error } = nuevo
+        ? await supabase.from('profesionales').insert({ ...payload, tenant_id: tenant.id })
+        : await supabase.from('profesionales').update(payload).eq('id', sel.id)
+      if (error) { showToast(error.message, false); return }
+      showToast(nuevo ? 'Profesional creado' : 'Cambios guardados')
+      cerrarSheet()
+      cargar()
+    } catch (e) {
+      showToast('Error inesperado: ' + e.message, false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function eliminar() {
@@ -484,7 +497,7 @@ export default function SalonEquipo() {
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {profs.map((p, i) => {
-            const color = COLORS[i % COLORS.length]
+            const color = p.color || COLORS[i % COLORS.length]
             return (
               <div key={p.id} style={{
                 display:'flex', alignItems:'center', gap:12,
@@ -591,6 +604,25 @@ export default function SalonEquipo() {
                 folder="profesionales"
                 accent={col}
               />
+
+              {/* Selector de color */}
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:8 }}>COLOR</label>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {COLORS.map(c => (
+                    <button key={c} type="button" onClick={() => setForm(f => ({ ...f, color: c }))}
+                      style={{
+                        width:32, height:32, borderRadius:9, cursor:'pointer', flexShrink:0,
+                        background: c, border:'none',
+                        boxShadow: form.color === c
+                          ? `0 0 0 2px var(--card), 0 0 0 4px ${c}`
+                          : '0 1px 3px rgba(0,0,0,0.3)',
+                        transform: form.color === c ? 'scale(1.15)' : 'scale(1)',
+                        transition:'all 0.15s',
+                      }} />
+                  ))}
+                </div>
+              </div>
 
               {/* Toggle activo */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -991,11 +1023,11 @@ export default function SalonEquipo() {
                   }
                 </div>
                 <ImageUploader
-                  bucket="salon-fotos"
-                  path={`${tenant?.id}/propietario`}
-                  currentUrl={ownerForm.foto_representante}
-                  onUploaded={url => setOwnerForm(f => ({ ...f, foto_representante: url }))}
-                  label="Subir foto"
+                  label="FOTO"
+                  value={ownerForm.foto_representante || ''}
+                  onChange={url => setOwnerForm(f => ({ ...f, foto_representante: url }))}
+                  folder="propietarios"
+                  accent={col}
                 />
               </div>
 
