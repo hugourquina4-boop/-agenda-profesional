@@ -119,7 +119,7 @@ function LinkReservas({ slug, col, showToast }) {
   )
 }
 
-export default function SalonDashboard() {
+export default function SalonDashboard({ onNavigate }) {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
   const isDemo = !tenant
@@ -128,8 +128,9 @@ export default function SalonDashboard() {
   const [equipo,      setEquipo]      = useState(isDemo ? DEMO_EQUIPO : [])
   const [ingresosHoy, setIngresosHoy] = useState(isDemo ? 235000 : 0)
   const [loading,     setLoading]     = useState(!isDemo)
-  const [stockAlertas, setStockAlertas] = useState(0)
-  const [toast,        setToast]        = useState(null)
+  const [stockAlertas,  setStockAlertas]  = useState(0)
+  const [serviciosCount, setServiciosCount] = useState(null)
+  const [toast,          setToast]          = useState(null)
 
   const showToast = (msg, color='#22c55e') => {
     setToast({msg,color})
@@ -141,7 +142,7 @@ export default function SalonDashboard() {
     setLoading(true)
     try {
       const fecha = hoy()
-      const [citasRes, equipoRes, stockRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -152,6 +153,9 @@ export default function SalonDashboard() {
         supabase.from('productos_salon')
           .select('id,stock,stock_minimo')
           .eq('tenant_id', tenant.id).eq('activo', true).gt('stock_minimo', 0),
+        supabase.from('servicios')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id).eq('activo', true),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -162,6 +166,7 @@ export default function SalonDashboard() {
       setEquipo(equipoList)
       setIngresosHoy(ingresos)
       setStockAlertas(alertas)
+      setServiciosCount(servRes.count ?? 0)
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -228,6 +233,69 @@ export default function SalonDashboard() {
         }}>
           <Ico d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={15} />
           Modo demo — datos de ejemplo. Conecta Supabase para ver tu negocio real.
+        </div>
+      )}
+
+      {/* ── Onboarding: primer acceso con salón vacío ── */}
+      {!isDemo && serviciosCount === 0 && equipo.length === 0 && (
+        <div style={{
+          margin:'16px 16px 0', borderRadius:18,
+          background:`linear-gradient(135deg,${col}12,${col}06)`,
+          border:`1px solid ${col}30`, overflow:'hidden',
+        }}>
+          <div style={{ padding:'20px 20px 4px' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'var(--text)', marginBottom:4 }}>
+              🎉 ¡Bienvenido a Salón Pro!
+            </div>
+            <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:16 }}>
+              Configura tu salón en 3 pasos para empezar a recibir reservas.
+            </div>
+          </div>
+          {[
+            {
+              num:1, label:'Agrega tus servicios', done: false,
+              icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+              page:'servicios', desc:'Cortes, tintes, tratamientos…',
+            },
+            {
+              num:2, label:'Agrega tu equipo', done: false,
+              icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+              page:'equipo', desc:'Profesionales y sus horarios.',
+            },
+            {
+              num:3, label:'Comparte tu link de reservas', done: false,
+              icon:'M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z',
+              page:'config', desc:'QR + link en Configuración.',
+            },
+          ].map((step, i) => (
+            <div key={i} style={{
+              display:'flex', alignItems:'center', gap:12,
+              padding:'12px 20px',
+              borderTop: i === 0 ? `1px solid ${col}20` : `1px solid ${col}15`,
+            }}>
+              <div style={{
+                width:28, height:28, borderRadius:8, flexShrink:0,
+                background:`${col}20`, display:'flex', alignItems:'center',
+                justifyContent:'center', color:col,
+              }}>
+                <Ico d={step.icon} size={14} />
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{step.label}</div>
+                <div style={{ fontSize:11, color:'var(--text-3)' }}>{step.desc}</div>
+              </div>
+              <div style={{
+                fontSize:11, fontWeight:700, color:col,
+                padding:'5px 12px', borderRadius:8,
+                background:`${col}15`, border:`1px solid ${col}30`,
+                cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+              }}
+                onClick={() => onNavigate?.(step.page)}>
+                Ir →
+              </div>
+            </div>
+          ))}
+          <div style={{ height:8 }} />
         </div>
       )}
 

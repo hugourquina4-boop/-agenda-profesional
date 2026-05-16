@@ -24,9 +24,16 @@ function genClave() {
   return p.charAt(0).toUpperCase() + p.slice(1) + '!'
 }
 
-const PLAN_PRECIO = { starter: 60000, pro: 100000, ultra: 140000 }
-const PLAN_COLOR  = { starter: '#f43f5e', pro: '#a855f7', ultra: '#f59e0b' }
-const PLANES      = ['starter', 'pro', 'ultra']
+const PLAN_PRECIO  = { basico: 80000, pro: 160000, premium: 200000, starter: 80000, ultra: 200000 }
+const PLAN_COLOR   = { basico: '#f43f5e', pro: '#a855f7', premium: '#f59e0b', starter: '#f43f5e', ultra: '#f59e0b' }
+const PLANES       = ['basico', 'pro', 'premium']
+const PLAN_DETALLE = {
+  basico:   { label: 'Básico',   max_usuarios: 2,    mensajeria: false },
+  pro:      { label: 'Pro',      max_usuarios: 10,   mensajeria: false },
+  premium:  { label: 'Premium',  max_usuarios: null, mensajeria: true  },
+  starter:  { label: 'Básico',   max_usuarios: 2,    mensajeria: false },
+  ultra:    { label: 'Premium',  max_usuarios: null, mensajeria: true  },
+}
 const VERTICALES  = ['salon', 'barberia', 'spa', 'estetica', 'unas']
 const COLORES     = ['#f43f5e','#a855f7','#3b82f6','#22c55e','#f59e0b','#06b6d4','#ec4899','#14b8a6']
 
@@ -44,13 +51,13 @@ function fmtFecha(s) {
 
 // ── Componentes UI ────────────────────────────────────────────────────────────
 function PlanBadge({ plan }) {
-  const c = PLAN_COLOR[plan] || '#9ca3af'
+  const c     = PLAN_COLOR[plan] || '#9ca3af'
+  const label = PLAN_DETALLE[plan]?.label || plan || '—'
   return (
     <span style={{
       padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700,
       color: c, background: `${c}18`, border: `1px solid ${c}35`,
-      textTransform: 'lowercase',
-    }}>{plan || '—'}</span>
+    }}>{label}</span>
   )
 }
 
@@ -139,9 +146,17 @@ function ModalClave({ data, onClose }) {
 
 // ── Modal editar plan ─────────────────────────────────────────────────────────
 function ModalEditar({ negocio, onClose, onSaved, showToast }) {
-  const [plan,   setPlan]   = useState(negocio.plan || 'starter')
+  const [plan,   setPlan]   = useState(() => PLANES.includes(negocio.plan) ? negocio.plan : 'basico')
   const [vence,  setVence]  = useState(negocio.fecha_vencimiento?.split('T')[0] || '')
   const [saving, setSaving] = useState(false)
+
+  // Renovar +1 mes desde hoy o desde fecha actual
+  function renovarMes() {
+    const base = vence ? new Date(vence) : new Date()
+    if (base < new Date()) base.setTime(new Date().getTime())
+    base.setMonth(base.getMonth() + 1)
+    setVence(base.toISOString().split('T')[0])
+  }
 
   async function guardar() {
     setSaving(true)
@@ -163,26 +178,62 @@ function ModalEditar({ negocio, onClose, onSaved, showToast }) {
     color: 'var(--text)', fontSize: 13, outline: 'none',
   }
 
+  const det = PLAN_DETALLE[plan] || {}
+
   return (
     <>
       <div className="sp-sheet-overlay" onClick={onClose} />
       <div className="sp-sheet">
         <div className="sp-sheet-handle" />
-        <p className="sp-sheet-title">Editar — {negocio.nombre}</p>
+        <p className="sp-sheet-title">Suscripción — {negocio.nombre}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Datos negocio (lectura) */}
+          <div style={{
+            padding: '10px 12px', borderRadius: 12, background: 'var(--bg)',
+            border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-3)',
+            display: 'flex', flexDirection: 'column', gap: 4,
+          }}>
+            {negocio.admin_email && <div>📧 {negocio.admin_email}</div>}
+            {negocio.telefono    && <div>📞 {negocio.telefono}</div>}
+            {negocio.instagram   && <div>📷 {negocio.instagram}</div>}
+            {negocio.pagina_web  && <div>🌐 {negocio.pagina_web}</div>}
+            {negocio.ciudad      && <div>📍 {negocio.ciudad}</div>}
+          </div>
+
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>Plan</label>
             <select value={plan} onChange={e => setPlan(e.target.value)} style={inpStyle}>
-              {PLANES.map(p => (
-                <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)} — {fmtCOP(PLAN_PRECIO[p])}/mes</option>
-              ))}
+              {PLANES.map(p => {
+                const d = PLAN_DETALLE[p]
+                const extras = d.mensajeria ? ' · +Mensajería' : ''
+                const usuarios = d.max_usuarios ? ` · ${d.max_usuarios} usuarios` : ' · ilimitado'
+                return (
+                  <option key={p} value={p}>{d.label} — {fmtCOP(PLAN_PRECIO[p])}/mes{usuarios}{extras}</option>
+                )
+              })}
             </select>
+            {det.label && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-3)', display: 'flex', gap: 8 }}>
+                <span>{det.max_usuarios ? `Hasta ${det.max_usuarios} usuarios` : 'Usuarios ilimitados'}</span>
+                {det.mensajeria && <span style={{ color: '#22c55e' }}>✓ Mensajería incluida</span>}
+              </div>
+            )}
           </div>
+
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>Vencimiento</label>
-            <input type="date" value={vence} onChange={e => setVence(e.target.value)} style={inpStyle} />
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>Fecha de vencimiento</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="date" value={vence} onChange={e => setVence(e.target.value)} style={{ ...inpStyle, flex: 1 }} />
+              <button onClick={renovarMes} title="Sumar 1 mes" style={{
+                padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border)',
+                background: 'var(--card)', color: 'var(--text-2)', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
+              }}>+1 mes</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button onClick={onClose} style={{
               flex: 1, padding: '11px', borderRadius: 12, cursor: 'pointer',
               background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-2)',
@@ -444,6 +495,131 @@ function FormNuevoNegocio({ onCreado, showToast, onCancel }) {
   )
 }
 
+// ── Tab Mensajes — broadcast a negocios ───────────────────────────────────────
+function MensajesTab({ negocios, cardStyle }) {
+  const [mensaje,       setMensaje]       = useState('')
+  const [destinatarios, setDestinatarios] = useState('activos')
+  const [copiado,       setCopiado]       = useState(false)
+
+  const activos = negocios.filter(n => n.activo)
+  const lista   = destinatarios === 'todos'   ? negocios
+    : destinatarios === 'activos' ? activos
+    : activos.filter(n => n.plan === destinatarios)
+
+  const grupos = [
+    ['todos',   `Todos (${negocios.length})`],
+    ['activos', `Activos (${activos.length})`],
+    ...PLANES.map(p => [`${p}`, `${PLAN_DETALLE[p]?.label} (${activos.filter(n=>n.plan===p).length})`]),
+  ]
+
+  function copiarNumeros() {
+    const nums = lista.map(n => n.whatsapp || n.telefono).filter(Boolean).join('\n')
+    if (!nums) return
+    navigator.clipboard.writeText(nums).then(() => {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2200)
+    })
+  }
+
+  function abrirWA(tel) {
+    const num   = tel.replace(/\D/g, '')
+    const texto = encodeURIComponent(mensaje.trim() || 'Hola, te escribimos desde Salón Pro.')
+    window.open(`https://wa.me/${num}?text=${texto}`, '_blank')
+  }
+
+  return (
+    <div style={{ margin: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* Textarea mensaje */}
+      <div style={cardStyle}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Mensaje</p>
+        <textarea
+          value={mensaje}
+          onChange={e => setMensaje(e.target.value)}
+          placeholder="Hola! Te recordamos que tu suscripción Salón Pro vence pronto. Para renovar contáctanos…"
+          rows={5}
+          style={{
+            width: '100%', padding: '10px 12px', borderRadius: 12, boxSizing: 'border-box',
+            border: '1px solid var(--border)', background: 'var(--bg)',
+            color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'none',
+            fontFamily: 'inherit', lineHeight: 1.5,
+          }}
+        />
+        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, textAlign: 'right' }}>
+          {mensaje.length} / 1000 caracteres
+        </div>
+      </div>
+
+      {/* Selector destinatarios */}
+      <div style={cardStyle}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Destinatarios</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {grupos.map(([k, l]) => (
+            <button key={k} onClick={() => setDestinatarios(k)} style={{
+              padding: '7px 14px', borderRadius: 9, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: destinatarios === k ? 'var(--accent)' : 'var(--card)',
+              color: destinatarios === k ? '#fff' : 'var(--text-2)',
+              border: `1px solid ${destinatarios === k ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Lista de destinatarios */}
+      {lista.length > 0 ? (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{lista.length} negocios</p>
+            <button onClick={copiarNumeros} style={{
+              padding: '6px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+              background: copiado ? 'rgba(34,197,94,0.1)' : 'var(--bg)',
+              color: copiado ? '#4ade80' : 'var(--text-3)',
+              border: `1px solid ${copiado ? 'rgba(34,197,94,0.3)' : 'var(--border)'}`,
+            }}>{copiado ? '✓ Copiados' : 'Copiar números'}</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {lista.map(n => {
+              const tel = n.whatsapp || n.telefono
+              const col = n.color_primario || '#f43f5e'
+              return (
+                <div key={n.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 12px', borderRadius: 10,
+                  background: 'var(--bg)', border: '1px solid var(--border)',
+                  opacity: n.activo ? 1 : 0.5,
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                    background: `${col}22`, display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 13, fontWeight: 800, color: col,
+                  }}>{(n.nombre || '?')[0]}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{n.nombre}</div>
+                    {tel && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>{tel}</div>}
+                  </div>
+                  <PlanBadge plan={n.plan} />
+                  {tel && (
+                    <button onClick={() => abrirWA(tel)} style={{
+                      padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(34,197,94,0.3)',
+                      background: 'rgba(34,197,94,0.08)', color: '#4ade80',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    }}>WA</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-3)' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+          <div style={{ fontSize: 13 }}>Sin destinatarios en este grupo</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function SalonSuperadmin({ onGestionar }) {
   const { user } = useTenant()
@@ -683,23 +859,25 @@ export default function SalonSuperadmin({ onGestionar }) {
           </div>
         )}
 
-        {/* ── Tab bar ──────────────────────────────────────────── */}
+        {/* ── Tab bar (scrollable en móvil) ─────────────────────── */}
         <div style={{
           display: 'flex', gap: 0, margin: '16px 16px 0',
           borderBottom: '2px solid var(--border)',
+          overflowX: 'auto', scrollbarWidth: 'none',
         }}>
           {[
             ['negocios',  'Negocios'],
             ['accesos',   '🔑 Accesos'],
             ['pagos',     '💳 Pagos'],
+            ['mensajes',  '📢 Mensajes'],
             ['usuarios',  'Usuarios'],
           ].map(([key, lbl]) => (
             <button key={key} onClick={() => { setTab(key); setMostrarForm(false) }} style={{
-              padding: '10px 18px', border: 'none', cursor: 'pointer',
+              padding: '10px 16px', border: 'none', cursor: 'pointer',
               background: 'transparent', fontSize: 13, fontWeight: 700,
               color: tab === key ? 'var(--accent)' : 'var(--text-3)',
               borderBottom: `2px solid ${tab === key ? 'var(--accent)' : 'transparent'}`,
-              marginBottom: -2,
+              marginBottom: -2, whiteSpace: 'nowrap', flexShrink: 0,
             }}>{lbl}</button>
           ))}
         </div>
@@ -897,46 +1075,78 @@ export default function SalonSuperadmin({ onGestionar }) {
         ════════════════════════════════════════════════════════ */}
         {tab === 'pagos' && (
           <div style={{ margin: '12px 16px 0' }}>
-            <div style={{ ...cardStyle, marginBottom: 12, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 4 }}>Registro automático de pagos — próximamente en v1.3</p>
-              <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6 }}>
-                Por ahora puedes extender la suscripción de cada negocio actualizando la fecha de vencimiento desde el botón Editar en la pestaña Negocios.
-              </p>
+            {/* Resumen rápido */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+              {[
+                { lbl: 'MRR',          val: fmtCOP(mrr),                                     col: '#4ade80' },
+                { lbl: 'Vence ≤ 7d',   val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; return v && Math.ceil((v - new Date()) / 86400000) <= 7 }).length, col: '#f87171' },
+                { lbl: 'Vence ≤ 30d',  val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; const d = v ? Math.ceil((v - new Date()) / 86400000) : null; return d !== null && d > 7 && d <= 30 }).length, col: '#f59e0b' },
+              ].map(({ lbl, val, col }) => (
+                <div key={lbl} style={{ ...cardStyle, textAlign: 'center', padding: '12px 8px', borderTop: `3px solid ${col}` }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: col, fontFamily: 'Outfit' }}>{val}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>{lbl}</div>
+                </div>
+              ))}
             </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activos.map(n => {
+              {negocios.map(n => {
                 const precio = PLAN_PRECIO[n.plan] || 0
                 const vence  = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null
                 const dias   = vence ? Math.ceil((vence - new Date()) / 86400000) : null
-                const diasColor = !dias ? '#9ca3af' : dias < 7 ? '#ef4444' : dias < 30 ? '#f59e0b' : '#22c55e'
+                const diasColor = !dias ? '#9ca3af' : dias < 0 ? '#ef4444' : dias < 7 ? '#f97316' : dias < 30 ? '#f59e0b' : '#22c55e'
+                const urgente = dias !== null && dias <= 7
                 return (
-                  <div key={n.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div key={n.id} style={{
+                    ...cardStyle, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                    borderLeft: `3px solid ${urgente ? '#f87171' : (n.color_primario || 'var(--border)')}`,
+                    opacity: n.activo ? 1 : 0.55,
+                  }}>
                     <div style={{ flex: 1, minWidth: 140 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.nombre}</div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                         <PlanBadge plan={n.plan} />
                         {precio > 0 && (
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>{fmtCOP(precio)}/mes</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmtCOP(precio)}/mes</span>
                         )}
+                        {!n.activo && <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }}>SUSPENDIDO</span>}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'center', minWidth: 110 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Vencimiento</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{fmtFecha(n.fecha_vencimiento)}</div>
+                    <div style={{ textAlign: 'center', minWidth: 100 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Vence</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmtFecha(n.fecha_vencimiento)}</div>
                       {dias !== null && (
                         <div style={{ fontSize: 11, fontWeight: 700, color: diasColor, marginTop: 2 }}>
-                          {dias > 0 ? `${dias} días restantes` : 'VENCIDO'}
+                          {dias > 0 ? `${dias}d` : dias === 0 ? 'Hoy' : 'VENCIDO'}
                         </div>
                       )}
                     </div>
-                    <button onClick={() => setEditModal(n)} style={btnOutline('#60a5fa')}>
-                      Renovar suscripción
+                    <button onClick={() => setEditModal(n)} style={{
+                      ...btnOutline('#60a5fa'),
+                      background: urgente ? 'rgba(239,68,68,0.1)' : undefined,
+                      borderColor: urgente ? 'rgba(239,68,68,0.4)' : undefined,
+                      color: urgente ? '#f87171' : '#60a5fa',
+                    }}>
+                      {urgente ? '⚠ Renovar' : 'Renovar'}
                     </button>
                   </div>
                 )
               })}
+              {negocios.length === 0 && !loading && (
+                <div className="sp-empty">
+                  <span className="sp-empty-icon">💳</span>
+                  <p className="sp-empty-title">Sin negocios</p>
+                </div>
+              )}
             </div>
           </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            TAB: MENSAJES
+        ════════════════════════════════════════════════════════ */}
+        {tab === 'mensajes' && (
+          <MensajesTab negocios={negocios} cardStyle={cardStyle} />
         )}
 
         {/* ════════════════════════════════════════════════════════

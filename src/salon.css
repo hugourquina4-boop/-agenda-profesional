@@ -1332,3 +1332,197 @@
 }
 .sp-theme-btn:active { transform: scale(0.9); }
 .sp-root.sp-light .sp-theme-btn { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TABS SCROLLABLES (carrusel horizontal)
+   Usar en contenedores de tabs/filtros que pueden desbordar en móvil
+   ═══════════════════════════════════════════════════════════════════ */
+.sp-tabs-scroll {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  gap: 0;
+}
+.sp-tabs-scroll::-webkit-scrollbar { display: none; }
+
+.sp-tab-btn {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--text-3);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  scroll-snap-align: start;
+}
+.sp-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Filtros/chips scrollables */
+.sp-chips-scroll {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 8px;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.sp-chips-scroll::-webkit-scrollbar { display: none; }
+
+/* Chip removible */
+.sp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: default;
+}
+.sp-chip-x {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.sp-chip-x:hover { background: rgba(255,255,255,0.2); }
+.sp-root.sp-light .sp-chip-x { background: rgba(0,0,0,0.06); }
+.sp-root.sp-light .sp-chip-x:hover { background: rgba(0,0,0,0.12); }
+
+/* Chip activo con color accent */
+.sp-chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent-glow);
+  color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAP TARGETS MÍNIMOS — mobile first
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Inputs: mínimo 48px alto para evitar zoom en iOS */
+.sp-input {
+  min-height: 48px;
+  font-size: 16px; /* evita zoom automático iOS */
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  box-sizing: border-box;
+}
+.sp-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.sp-input::placeholder { color: var(--text-3); }
+select.sp-input { cursor: pointer; }
+textarea.sp-input { min-height: 80px; resize: vertical; }
+
+/* Botones: mínimo 44px alto (tap target iOS) */
+.sp-btn {
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+.sp-btn:active { transform: scale(0.97); }
+.sp-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.sp-btn-accent {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+.sp-btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+.sp-btn-ghost {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+.sp-root.sp-light .sp-btn-ghost { background: rgba(0,0,0,0.04); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SKELETON LOADERS mejorados
+   ═══════════════════════════════════════════════════════════════════ */
+.sp-skeleton-row {
+  height: 52px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.sp-skeleton-card {
+  height: 120px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PAGINACIÓN
+   ═══════════════════════════════════════════════════════════════════ */
+.sp-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+.sp-pagination-btn {
+  min-width: 36px; height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.sp-pagination-btn:hover  { border-color: var(--accent); color: var(--accent); }
+.sp-pagination-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sp-pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.sp-pagination-info {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-right: 4px;
+}

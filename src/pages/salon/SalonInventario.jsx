@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
@@ -24,6 +24,8 @@ const CATEGORIAS = [
   { key:'color',       label:'Color'       },
   { key:'tratamiento', label:'Tratamiento' },
   { key:'retail',      label:'Retail'      },
+  { key:'unas',        label:'Uñas'        },
+  { key:'insumos',     label:'Insumos'     },
   { key:'herramienta', label:'Herramienta' },
   { key:'otro',        label:'Otro'        },
 ]
@@ -33,28 +35,109 @@ const CAT_COLOR = {
   color:       '#a855f7',
   tratamiento: '#22c55e',
   retail:      '#f59e0b',
+  unas:        '#ec4899',
+  insumos:     '#84cc16',
   herramienta: '#06b6d4',
   otro:        '#71717a',
 }
 
+const CAT_EMOJI = {
+  capilar:'💇', color:'🎨', tratamiento:'✨',
+  retail:'🛍️', unas:'💅', insumos:'🧴', herramienta:'✂️', otro:'📦',
+}
+
+const CAT_OPTS = CATEGORIAS.filter(c => c.key !== 'todos')
+
 const FORM_VACIO = {
-  nombre:'', categoria:'retail', precio_venta:'', precio_costo:'',
-  stock:'', stock_minimo:'0', unidad:'unidad', notas:'',
+  nombre:'', categoria:'retail', subcategoria:'', marca:'',
+  codigo:'', contenido:'', unidad:'unidad', proveedor:'',
+  precio_venta:'', precio_costo:'', stock:'', stock_minimo:'0', notas:'',
+}
+
+const CSV_HEADERS = 'nombre,categoria,subcategoria,marca,contenido,unidad,precio_costo,precio_venta,stock,stock_minimo,codigo,proveedor,notas'
+const CSV_EJEMPLO = 'Shampoo Hidratante,capilar,shampoo,Wella,500,ml,15000,25000,10,3,SH-WL-500,Distribuidora Norte,Para cabello seco'
+
+// ── CSV parser ───────────────────────────────────────────────────────────────
+function parseCSVLine(line) {
+  const result = []
+  let cur = '', inQ = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++ }
+      else inQ = !inQ
+    } else if (ch === ',' && !inQ) {
+      result.push(cur); cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  result.push(cur)
+  return result
+}
+
+function parseCSV(text, tenantId) {
+  const clean = text.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = clean.split('\n').filter(l => l.trim())
+  if (lines.length < 2) return { rows: [], errors: ['El archivo está vacío o solo tiene encabezados'] }
+
+  const headers = parseCSVLine(lines[0]).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
+  if (!headers.includes('nombre')) return { rows: [], errors: ['Columna requerida faltante: nombre'] }
+
+  const validCats = CAT_OPTS.map(c => c.key)
+  const rows = [], errors = []
+
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCSVLine(lines[i])
+    const o = {}
+    headers.forEach((h, idx) => { o[h] = vals[idx]?.trim().replace(/^"|"$/g, '') || '' })
+
+    if (!o.nombre) { errors.push(`Fila ${i + 1}: nombre vacío — omitida`); continue }
+
+    let cat = o.categoria?.toLowerCase() || 'otro'
+    if (!validCats.includes(cat)) {
+      errors.push(`Fila ${i + 1}: categoría '${o.categoria}' desconocida → 'otro'`)
+      cat = 'otro'
+    }
+
+    rows.push({
+      tenant_id:    tenantId,
+      nombre:       o.nombre,
+      categoria:    cat,
+      subcategoria: o.subcategoria || null,
+      marca:        o.marca || null,
+      codigo:       o.codigo || null,
+      contenido:    parseFloat(o.contenido) || null,
+      unidad:       o.unidad || 'unidad',
+      proveedor:    o.proveedor || null,
+      precio_costo: parseFloat(o.precio_costo) || 0,
+      precio_venta: parseFloat(o.precio_venta) || 0,
+      stock:        parseInt(o.stock) || 0,
+      stock_minimo: parseInt(o.stock_minimo) || 0,
+      notas:        o.notas || null,
+      activo:       true,
+    })
+  }
+
+  return { rows, errors }
 }
 
 export default function SalonInventario() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [productos,   setProductos]   = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [catFiltro,   setCatFiltro]   = useState('todos')
-  const [busqueda,    setBusqueda]    = useState('')
-  const [modal,       setModal]       = useState(null) // null | 'nuevo' | producto
-  const [form,        setForm]        = useState(FORM_VACIO)
-  const [saving,      setSaving]      = useState(false)
-  const [toast,       setToast]       = useState(null)
-  const [confirmDel,  setConfirmDel]  = useState(null)
+  const [productos,     setProductos]     = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [catFiltro,     setCatFiltro]     = useState('todos')
+  const [busqueda,      setBusqueda]      = useState('')
+  const [modal,         setModal]         = useState(null)
+  const [form,          setForm]          = useState(FORM_VACIO)
+  const [saving,        setSaving]        = useState(false)
+  const [toast,         setToast]         = useState(null)
+  const [confirmDel,    setConfirmDel]    = useState(null)
+  const [csvModal,      setCsvModal]      = useState(null)
+  const [csvImporting,  setCsvImporting]  = useState(false)
+  const fileInputRef = useRef(null)
 
   function showToast(msg, ok = true) {
     setToast({ msg, ok })
@@ -85,11 +168,16 @@ export default function SalonInventario() {
     setForm({
       nombre:       p.nombre,
       categoria:    p.categoria,
+      subcategoria: p.subcategoria || '',
+      marca:        p.marca || '',
+      codigo:       p.codigo || '',
+      contenido:    p.contenido != null ? String(p.contenido) : '',
+      unidad:       p.unidad,
+      proveedor:    p.proveedor || '',
       precio_venta: String(p.precio_venta),
       precio_costo: String(p.precio_costo),
       stock:        String(p.stock),
       stock_minimo: String(p.stock_minimo),
-      unidad:       p.unidad,
       notas:        p.notas || '',
     })
     setModal(p)
@@ -104,18 +192,23 @@ export default function SalonInventario() {
       tenant_id:    tenant.id,
       nombre:       form.nombre.trim(),
       categoria:    form.categoria,
+      subcategoria: form.subcategoria.trim() || null,
+      marca:        form.marca.trim() || null,
+      codigo:       form.codigo.trim() || null,
+      contenido:    parseFloat(form.contenido) || null,
+      unidad:       form.unidad.trim() || 'unidad',
+      proveedor:    form.proveedor.trim() || null,
       precio_venta: parseFloat(form.precio_venta) || 0,
       precio_costo: parseFloat(form.precio_costo) || 0,
       stock:        parseInt(form.stock) || 0,
       stock_minimo: parseInt(form.stock_minimo) || 0,
-      unidad:       form.unidad.trim() || 'unidad',
       notas:        form.notas.trim() || null,
     }
     let error
     if (modal === 'nuevo') {
-      ({ error } = await supabase.from('productos_salon').insert(payload))
+      ;({ error } = await supabase.from('productos_salon').insert(payload))
     } else {
-      ({ error } = await supabase.from('productos_salon').update(payload).eq('id', modal.id))
+      ;({ error } = await supabase.from('productos_salon').update(payload).eq('id', modal.id))
     }
     setSaving(false)
     if (error) { showToast(error.message, false); return }
@@ -139,14 +232,74 @@ export default function SalonInventario() {
     cargar()
   }
 
+  // ── CSV import ───────────────────────────────────────────────────────────
+  function onFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const result = parseCSV(ev.target.result, tenant.id)
+      setCsvModal(result)
+    }
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  function descargarPlantilla() {
+    const csv = `${CSV_HEADERS}\n${CSV_EJEMPLO}`
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'plantilla_inventario.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function confirmarImportCSV() {
+    if (!csvModal?.rows?.length) return
+    setCsvImporting(true)
+
+    const conCodigo  = csvModal.rows.filter(r => r.codigo)
+    const sinCodigo  = csvModal.rows.filter(r => !r.codigo)
+    const errs = []
+
+    if (conCodigo.length) {
+      const { error } = await supabase.from('productos_salon')
+        .upsert(conCodigo, { onConflict: 'tenant_id,codigo' })
+      if (error) errs.push(error.message)
+    }
+    if (sinCodigo.length) {
+      const { error } = await supabase.from('productos_salon').insert(sinCodigo)
+      if (error) errs.push(error.message)
+    }
+
+    setCsvImporting(false)
+    if (errs.length) { showToast(errs[0], false); return }
+    showToast(`${csvModal.rows.length} productos importados ✓`)
+    setCsvModal(null)
+    cargar()
+  }
+
+  // ── Filtros ──────────────────────────────────────────────────────────────
   const filtrados = productos.filter(p => {
     const catOk = catFiltro === 'todos' || p.categoria === catFiltro
-    const busOk = !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+    const q = busqueda.toLowerCase()
+    const busOk = !busqueda ||
+      p.nombre.toLowerCase().includes(q) ||
+      (p.marca        && p.marca.toLowerCase().includes(q)) ||
+      (p.codigo       && p.codigo.toLowerCase().includes(q)) ||
+      (p.subcategoria && p.subcategoria.toLowerCase().includes(q)) ||
+      (p.proveedor    && p.proveedor.toLowerCase().includes(q))
     return catOk && busOk
   })
 
-  const valorTotal   = filtrados.reduce((s, p) => s + p.stock * p.precio_costo, 0)
-  const bajosStock   = productos.filter(p => p.stock <= p.stock_minimo && p.stock_minimo > 0).length
+  const valorTotal = filtrados.reduce((s, p) => s + p.stock * p.precio_costo, 0)
+  const bajosStock = productos.filter(p => p.stock <= p.stock_minimo && p.stock_minimo > 0).length
+
+  // ── Shared label style ──────────────────────────────────────────────────
+  const lbl = {
+    fontSize:11, color:'var(--text-3)', fontWeight:700,
+    letterSpacing:0.5, display:'block', marginBottom:7, textTransform:'uppercase',
+  }
 
   return (
     <div style={{ padding:'0 16px 80px' }}>
@@ -159,7 +312,7 @@ export default function SalonInventario() {
         }}>{toast.msg}</div>
       )}
 
-      {/* ── KPIs rápidos ── */}
+      {/* ── KPIs ── */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:16, marginBottom:16 }}>
         <div style={{ padding:'14px 16px', borderRadius:16, background:'var(--card)', border:'1px solid var(--border)' }}>
           <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.8, textTransform:'uppercase', marginBottom:6 }}>Valor inventario</div>
@@ -173,27 +326,37 @@ export default function SalonInventario() {
         </div>
       </div>
 
-      {/* ── Búsqueda + botón ── */}
-      <div style={{ display:'flex', gap:10, marginBottom:12 }}>
+      {/* ── Búsqueda + botones ── */}
+      <div style={{ display:'flex', gap:8, marginBottom:12 }}>
         <div style={{ flex:1, position:'relative' }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)' }}>
             <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={16} />
           </span>
           <input
             className="sp-input"
-            placeholder="Buscar producto…"
+            placeholder="Buscar por nombre, marca, SKU…"
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             style={{ paddingLeft:36 }}
           />
         </div>
+        <button onClick={() => fileInputRef.current?.click()} style={{
+          padding:'0 12px', borderRadius:12, border:'1px solid var(--border)',
+          background:'var(--card)', color:'var(--text-2)',
+          fontWeight:700, fontSize:12, cursor:'pointer', whiteSpace:'nowrap',
+          display:'flex', alignItems:'center', gap:5,
+        }}>
+          <Ico d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" size={15} />
+          CSV
+        </button>
+        <input ref={fileInputRef} type="file" accept=".csv" style={{ display:'none' }} onChange={onFileChange} />
         <button onClick={abrirNuevo} style={{
-          padding:'0 16px', borderRadius:12, border:'none', cursor:'pointer',
+          padding:'0 14px', borderRadius:12, border:'none', cursor:'pointer',
           background:`linear-gradient(135deg,${col},${col}cc)`,
           color:'#fff', fontWeight:700, fontSize:13, whiteSpace:'nowrap',
-          display:'flex', alignItems:'center', gap:6,
+          display:'flex', alignItems:'center', gap:5,
         }}>
-          <Ico d="M12 4v16m8-8H4" size={16} /> Agregar
+          <Ico d="M12 4v16m8-8H4" size={15} /> Agregar
         </button>
       </div>
 
@@ -212,7 +375,7 @@ export default function SalonInventario() {
         ))}
       </div>
 
-      {/* ── Lista de productos ── */}
+      {/* ── Lista ── */}
       {loading ? (
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:8 }}>
           {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:80, borderRadius:14 }} />)}
@@ -221,13 +384,19 @@ export default function SalonInventario() {
         <div className="sp-empty">
           <span className="sp-empty-icon">📦</span>
           <p className="sp-empty-title">Sin productos</p>
-          <p className="sp-empty-sub">Agrega tu primer producto al inventario</p>
+          <p className="sp-empty-sub">Agrega tu primer producto o importa desde CSV</p>
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
           {filtrados.map(p => {
-            const clr   = CAT_COLOR[p.categoria] || col
-            const bajo  = p.stock_minimo > 0 && p.stock <= p.stock_minimo
+            const clr  = CAT_COLOR[p.categoria] || col
+            const bajo = p.stock_minimo > 0 && p.stock <= p.stock_minimo
+            const desc = [
+              p.marca,
+              p.contenido ? `${p.contenido} ${p.unidad}` : p.unidad,
+              `costo ${fmtCOP(p.precio_costo)}`,
+              `venta ${fmtCOP(p.precio_venta)}`,
+            ].filter(Boolean).join(' · ')
             return (
               <div key={p.id} style={{
                 borderRadius:14, background:'var(--card)',
@@ -235,12 +404,9 @@ export default function SalonInventario() {
                 overflow:'hidden',
               }}>
                 <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px' }}>
-                  {/* Categoría dot */}
                   <div style={{ width:40, height:40, borderRadius:12, background:`${clr}20`,
                     display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    <span style={{ fontSize:18 }}>
-                      {p.categoria==='capilar'?'💇':p.categoria==='color'?'🎨':p.categoria==='tratamiento'?'✨':p.categoria==='retail'?'🛍️':p.categoria==='herramienta'?'✂️':'📦'}
-                    </span>
+                    <span style={{ fontSize:18 }}>{CAT_EMOJI[p.categoria] || '📦'}</span>
                   </div>
 
                   <div style={{ flex:1, minWidth:0 }}>
@@ -256,12 +422,16 @@ export default function SalonInventario() {
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize:11, color:'var(--text-3)' }}>
-                      {p.unidad} · costo {fmtCOP(p.precio_costo)} · venta {fmtCOP(p.precio_venta)}
+                    <div style={{ fontSize:11, color:'var(--text-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {desc}
                     </div>
+                    {(p.codigo || p.subcategoria) && (
+                      <div style={{ fontSize:10, color:'var(--text-3)', marginTop:2 }}>
+                        {[p.subcategoria, p.codigo].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Acciones */}
                   <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0 }}>
                     <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color: bajo ? '#f59e0b' : 'var(--text)' }}>
                       {p.stock} <span style={{ fontSize:11, fontWeight:500, color:'var(--text-3)' }}>{p.unidad}s</span>
@@ -318,69 +488,98 @@ export default function SalonInventario() {
             </div>
 
             <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              {/* Nombre */}
               <div>
-                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                  display:'block', marginBottom:7, textTransform:'uppercase' }}>Nombre *</label>
+                <label style={lbl}>Nombre *</label>
                 <input className="sp-input" value={form.nombre}
-                  onChange={e => set('nombre', e.target.value)} placeholder="Ej: Shampoo Hidratante 500ml" />
+                  onChange={e => set('nombre', e.target.value)} placeholder="Ej: Shampoo Hidratante" />
               </div>
 
+              {/* Categoría + Subcategoría */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
-                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                    display:'block', marginBottom:7, textTransform:'uppercase' }}>Categoría</label>
+                  <label style={lbl}>Categoría</label>
                   <select className="sp-input" value={form.categoria}
                     onChange={e => set('categoria', e.target.value)}>
-                    {CATEGORIAS.filter(c => c.key !== 'todos').map(c => (
-                      <option key={c.key} value={c.key}>{c.label}</option>
-                    ))}
+                    {CAT_OPTS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                    display:'block', marginBottom:7, textTransform:'uppercase' }}>Unidad</label>
-                  <input className="sp-input" value={form.unidad}
-                    onChange={e => set('unidad', e.target.value)} placeholder="unidad, ml, kg…" />
+                  <label style={lbl}>Subcategoría</label>
+                  <input className="sp-input" value={form.subcategoria}
+                    onChange={e => set('subcategoria', e.target.value)} placeholder="shampoo, tinte…" />
                 </div>
               </div>
 
+              {/* Marca + Código */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
-                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                    display:'block', marginBottom:7, textTransform:'uppercase' }}>Precio costo ($)</label>
+                  <label style={lbl}>Marca</label>
+                  <input className="sp-input" value={form.marca}
+                    onChange={e => set('marca', e.target.value)} placeholder="Wella, L'Oreal…" />
+                </div>
+                <div>
+                  <label style={lbl}>Código / SKU</label>
+                  <input className="sp-input" value={form.codigo}
+                    onChange={e => set('codigo', e.target.value)} placeholder="SH-WL-500" />
+                </div>
+              </div>
+
+              {/* Contenido + Unidad */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <label style={lbl}>Contenido (cantidad)</label>
+                  <input className="sp-input" type="number" min="0" step="0.1"
+                    value={form.contenido} onChange={e => set('contenido', e.target.value)} placeholder="500" />
+                </div>
+                <div>
+                  <label style={lbl}>Unidad</label>
+                  <input className="sp-input" value={form.unidad}
+                    onChange={e => set('unidad', e.target.value)} placeholder="ml, g, unidad…" />
+                </div>
+              </div>
+
+              {/* Proveedor */}
+              <div>
+                <label style={lbl}>Proveedor</label>
+                <input className="sp-input" value={form.proveedor}
+                  onChange={e => set('proveedor', e.target.value)} placeholder="Distribuidora Norte…" />
+              </div>
+
+              {/* Precios */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <label style={lbl}>Precio costo ($)</label>
                   <input className="sp-input" type="number" min="0" step="100"
                     value={form.precio_costo} onChange={e => set('precio_costo', e.target.value)} placeholder="0" />
                 </div>
                 <div>
-                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                    display:'block', marginBottom:7, textTransform:'uppercase' }}>Precio venta ($)</label>
+                  <label style={lbl}>Precio venta ($)</label>
                   <input className="sp-input" type="number" min="0" step="100"
                     value={form.precio_venta} onChange={e => set('precio_venta', e.target.value)} placeholder="0" />
                 </div>
               </div>
 
+              {/* Stock */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
-                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                    display:'block', marginBottom:7, textTransform:'uppercase' }}>Stock actual</label>
+                  <label style={lbl}>Stock actual</label>
                   <input className="sp-input" type="number" min="0"
                     value={form.stock} onChange={e => set('stock', e.target.value)} placeholder="0" />
                 </div>
                 <div>
-                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                    display:'block', marginBottom:7, textTransform:'uppercase' }}>Stock mínimo</label>
+                  <label style={lbl}>Stock mínimo</label>
                   <input className="sp-input" type="number" min="0"
                     value={form.stock_minimo} onChange={e => set('stock_minimo', e.target.value)} placeholder="0" />
                 </div>
               </div>
 
+              {/* Notas */}
               <div>
-                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-                  display:'block', marginBottom:7, textTransform:'uppercase' }}>Notas (opcional)</label>
+                <label style={lbl}>Notas (opcional)</label>
                 <textarea className="sp-input" rows={2} value={form.notas}
                   onChange={e => set('notas', e.target.value)}
-                  placeholder="Proveedor, referencia, observaciones…"
-                  style={{ resize:'none' }} />
+                  placeholder="Observaciones…" style={{ resize:'none' }} />
               </div>
 
               <button onClick={guardar} disabled={saving} style={{
@@ -391,6 +590,114 @@ export default function SalonInventario() {
               }}>
                 {saving ? 'Guardando…' : modal === 'nuevo' ? 'Agregar producto' : 'Guardar cambios'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal CSV preview ── */}
+      {csvModal !== null && (
+        <div
+          style={{ position:'fixed', inset:0, zIndex:110, display:'flex', alignItems:'flex-end',
+            background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget && !csvImporting) setCsvModal(null) }}
+        >
+          <div style={{
+            width:'100%', maxWidth:600, margin:'0 auto',
+            background:'var(--bg)', borderRadius:'24px 24px 0 0',
+            padding:'20px 20px 40px', maxHeight:'88dvh', overflowY:'auto',
+          }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:'var(--border)', margin:'0 auto 18px' }} />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+              <h3 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:17, color:'var(--text)' }}>
+                Importar CSV
+              </h3>
+              <button onClick={descargarPlantilla} style={{
+                padding:'6px 12px', borderRadius:9, border:'1px solid var(--border)',
+                background:'var(--card)', color:'var(--text-2)', fontSize:12, fontWeight:700, cursor:'pointer',
+                display:'flex', alignItems:'center', gap:5,
+              }}>
+                <Ico d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={14} />
+                Plantilla
+              </button>
+            </div>
+
+            {/* Errores de parseo */}
+            {csvModal.errors?.length > 0 && (
+              <div style={{ background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)',
+                borderRadius:12, padding:'10px 14px', marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>
+                  Advertencias ({csvModal.errors.length})
+                </div>
+                {csvModal.errors.map((e, i) => (
+                  <div key={i} style={{ fontSize:11, color:'var(--text-3)', marginBottom:2 }}>• {e}</div>
+                ))}
+              </div>
+            )}
+
+            {csvModal.rows.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text-3)', fontSize:14 }}>
+                No se encontraron filas válidas en el archivo.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize:13, color:'var(--text-3)', marginBottom:10 }}>
+                  <strong style={{ color:'var(--text)' }}>{csvModal.rows.length}</strong> productos listos para importar.
+                  Los que tienen código SKU se actualizarán si ya existen.
+                </div>
+
+                {/* Preview tabla */}
+                <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border)', marginBottom:16 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+                    <thead>
+                      <tr style={{ background:'var(--card)' }}>
+                        {['Nombre','Categoría','Marca','Contenido','Costo','Venta','Stock','SKU'].map(h => (
+                          <th key={h} style={{ padding:'8px 10px', textAlign:'left', color:'var(--text-3)',
+                            fontWeight:700, letterSpacing:0.5, whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvModal.rows.slice(0, 20).map((r, i) => (
+                        <tr key={i} style={{ borderTop:'1px solid var(--border)' }}>
+                          <td style={{ padding:'7px 10px', color:'var(--text)', fontWeight:600, maxWidth:140,
+                            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.nombre}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-2)' }}>{r.categoria}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-2)' }}>{r.marca || '—'}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-2)' }}>{r.contenido ? `${r.contenido} ${r.unidad}` : r.unidad}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-2)' }}>{fmtCOP(r.precio_costo)}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-2)' }}>{fmtCOP(r.precio_venta)}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-2)' }}>{r.stock}</td>
+                          <td style={{ padding:'7px 10px', color:'var(--text-3)', fontFamily:'monospace' }}>{r.codigo || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {csvModal.rows.length > 20 && (
+                    <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text-3)', textAlign:'center',
+                      borderTop:'1px solid var(--border)' }}>
+                      …y {csvModal.rows.length - 20} más
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setCsvModal(null)} disabled={csvImporting} style={{
+                flex:1, padding:'13px', borderRadius:12, cursor:'pointer',
+                background:'var(--card)', border:'1px solid var(--border)', color:'var(--text-2)', fontWeight:700,
+              }}>Cancelar</button>
+              {csvModal.rows.length > 0 && (
+                <button onClick={confirmarImportCSV} disabled={csvImporting} style={{
+                  flex:2, padding:'13px', borderRadius:12, border:'none', cursor:'pointer',
+                  background: csvImporting ? 'var(--border)' : `linear-gradient(135deg,${col},${col}cc)`,
+                  color: csvImporting ? 'var(--text-3)' : '#fff',
+                  fontFamily:'Outfit', fontWeight:800, fontSize:15,
+                }}>
+                  {csvImporting ? 'Importando…' : `Importar ${csvModal.rows.length} productos`}
+                </button>
+              )}
             </div>
           </div>
         </div>

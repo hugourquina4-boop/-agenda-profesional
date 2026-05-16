@@ -58,6 +58,7 @@ export default function SalonComisiones() {
   const [desempeno,  setDesempeno]  = useState([])
   const [mesStr,     setMesStr]     = useState(() => new Date().toISOString().slice(0, 7))
   const [loadingDes, setLoadingDes] = useState(false)
+  const [generandoPDF, setGenerandoPDF] = useState(null)
 
   const showToast = (msg, color = '#22c55e') => {
     setToast({ msg, color })
@@ -104,6 +105,158 @@ export default function SalonComisiones() {
   }, [tenant, mesStr])
 
   useEffect(() => { if (tab === 'desempeno') cargarDesempeno() }, [cargarDesempeno, tab])
+
+  async function descargarPDFProf(d, i) {
+    setGenerandoPDF(d.profesional_id)
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+      const color = PROF_COLORS[i % PROF_COLORS.length]
+      const hex2rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]
+
+      const mesLabel = new Date(mesStr + '-02').toLocaleDateString('es-CO', { month:'long', year:'numeric' })
+      const salonNombre = tenant?.nombre || 'Salón Pro'
+
+      // Header band
+      const [r,g,b] = hex2rgb(color)
+      doc.setFillColor(r, g, b)
+      doc.rect(0, 0, 210, 32, 'F')
+      doc.setTextColor(255,255,255)
+      doc.setFontSize(18)
+      doc.setFont('helvetica','bold')
+      doc.text('Liquidación de Comisiones', 14, 13)
+      doc.setFontSize(10)
+      doc.setFont('helvetica','normal')
+      doc.text(`${salonNombre}  ·  ${mesLabel}`, 14, 21)
+      doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
+
+      // Professional name
+      doc.setTextColor(40, 40, 40)
+      doc.setFontSize(16)
+      doc.setFont('helvetica','bold')
+      doc.text(d.nombre || '—', 14, 46)
+      doc.setFontSize(10)
+      doc.setFont('helvetica','normal')
+      doc.setTextColor(100,100,100)
+      doc.text(d.especialidad || '—', 14, 53)
+
+      // Divider
+      doc.setDrawColor(220,220,220)
+      doc.line(14, 58, 196, 58)
+
+      // Stats grid (2×2)
+      const stats = [
+        ['Citas completadas', `${d.citas_completadas ?? 0}`],
+        ['Horas trabajadas',  `${d.horas_trabajadas  ?? 0} h`],
+        ['Ingresos generados', fmtCOP(d.ingresos_cobrados ?? 0)],
+        ['Comisión ganada',    fmtCOP(d.comision_ganada   ?? 0)],
+      ]
+      const cellW = 88, cellH = 22
+      const startX = 14, startY = 64
+      stats.forEach(([label, val], idx) => {
+        const col2 = startX + (idx % 2) * (cellW + 8)
+        const row2 = startY + Math.floor(idx / 2) * (cellH + 4)
+        doc.setFillColor(248,248,248)
+        doc.roundedRect(col2, row2, cellW, cellH, 3, 3, 'F')
+        doc.setFontSize(8)
+        doc.setFont('helvetica','normal')
+        doc.setTextColor(120,120,120)
+        doc.text(label.toUpperCase(), col2 + 4, row2 + 7)
+        doc.setFontSize(13)
+        doc.setFont('helvetica','bold')
+        doc.setTextColor(40,40,40)
+        doc.text(val, col2 + 4, row2 + 17)
+      })
+
+      // Meta progress (if exists)
+      const meta = rules[d.profesional_id]?.meta_mensual
+      let yPos = startY + 2 * (cellH + 4) + 12
+      if (meta && meta > 0) {
+        const pct = Math.min(100, Math.round((d.ingresos_cobrados || 0) / meta * 100))
+        doc.setFontSize(9)
+        doc.setFont('helvetica','bold')
+        doc.setTextColor(80,80,80)
+        doc.text('META MENSUAL', 14, yPos)
+        doc.setFont('helvetica','normal')
+        doc.setTextColor(120,120,120)
+        doc.text(`${pct}%  ·  meta: ${fmtCOP(meta)}`, 60, yPos)
+        yPos += 5
+        // Bar background
+        doc.setFillColor(230,230,230)
+        doc.roundedRect(14, yPos, 182, 5, 2, 2, 'F')
+        // Bar fill
+        const barR = pct >= 100 ? [34,197,94] : pct >= 60 ? hex2rgb(color) : [245,158,11]
+        doc.setFillColor(barR[0], barR[1], barR[2])
+        doc.roundedRect(14, yPos, 182 * pct / 100, 5, 2, 2, 'F')
+        yPos += 14
+      }
+
+      // Comisiones individuales table
+      doc.setDrawColor(220,220,220)
+      doc.line(14, yPos, 196, yPos)
+      yPos += 6
+      doc.setFontSize(10)
+      doc.setFont('helvetica','bold')
+      doc.setTextColor(40,40,40)
+      doc.text('Detalle de comisiones pendientes', 14, yPos)
+      yPos += 8
+
+      const propias = comisiones.filter(c => c.profesional_id === d.profesional_id)
+      if (propias.length === 0) {
+        doc.setFontSize(9)
+        doc.setFont('helvetica','italic')
+        doc.setTextColor(150,150,150)
+        doc.text('Sin comisiones pendientes', 14, yPos)
+      } else {
+        // Table header
+        doc.setFillColor(245,245,245)
+        doc.rect(14, yPos - 4, 182, 8, 'F')
+        doc.setFontSize(8)
+        doc.setFont('helvetica','bold')
+        doc.setTextColor(100,100,100)
+        doc.text('FECHA', 16, yPos + 1)
+        doc.text('SERVICIO', 60, yPos + 1)
+        doc.text('COMISIÓN', 160, yPos + 1)
+        yPos += 10
+        propias.forEach(com => {
+          const fecha = new Date(com.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })
+          doc.setFontSize(9)
+          doc.setFont('helvetica','normal')
+          doc.setTextColor(60,60,60)
+          doc.text(fecha, 16, yPos)
+          doc.text(fmtCOP(com.monto_servicio), 60, yPos)
+          doc.setFont('helvetica','bold')
+          doc.text(fmtCOP(com.monto_comision), 160, yPos)
+          yPos += 7
+          if (yPos > 270) { doc.addPage(); yPos = 20 }
+        })
+        // Total
+        doc.setDrawColor(220,220,220)
+        doc.line(14, yPos, 196, yPos)
+        yPos += 6
+        const totalCom = propias.reduce((s,c) => s + (c.monto_comision || 0), 0)
+        doc.setFontSize(11)
+        doc.setFont('helvetica','bold')
+        doc.setTextColor(r, g, b)
+        doc.text(`Total a pagar: ${fmtCOP(totalCom)}`, 14, yPos)
+      }
+
+      // Footer
+      doc.setFontSize(7)
+      doc.setFont('helvetica','normal')
+      doc.setTextColor(180,180,180)
+      doc.text('Salón Pro · salud.vercel.app', 14, 290)
+      doc.text(new Date().toISOString().slice(0,10), 170, 290)
+
+      const nombre = (d.nombre || 'profesional').replace(/\s+/g,'-').toLowerCase()
+      doc.save(`liquidacion-${nombre}-${mesStr}.pdf`)
+    } catch(e) {
+      console.error('[PDF]', e)
+      showToast('Error generando PDF', '#f87171')
+    } finally {
+      setGenerandoPDF(null)
+    }
+  }
 
   async function guardarPorcentaje(profId) {
     const pct = parseFloat(editPct[profId])
@@ -270,12 +423,29 @@ export default function SalonComisiones() {
                         <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{d.nombre}</div>
                         <div style={{ fontSize:11, color:'var(--text-3)' }}>{d.especialidad || '—'}</div>
                       </div>
-                      <div style={{
-                        padding:'4px 10px', borderRadius:20,
-                        background:`${noShowClr}18`, border:`1px solid ${noShowClr}40`,
-                        fontSize:11, fontWeight:700, color:noShowClr,
-                      }}>
-                        {d.no_show_rate ?? 0}% no-show
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <div style={{
+                          padding:'4px 10px', borderRadius:20,
+                          background:`${noShowClr}18`, border:`1px solid ${noShowClr}40`,
+                          fontSize:11, fontWeight:700, color:noShowClr,
+                        }}>
+                          {d.no_show_rate ?? 0}% no-show
+                        </div>
+                        <button
+                          onClick={() => descargarPDFProf(d, i)}
+                          disabled={generandoPDF === d.profesional_id}
+                          title="Descargar liquidación PDF"
+                          style={{
+                            width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
+                            background:'var(--bg)', cursor:'pointer', display:'flex',
+                            alignItems:'center', justifyContent:'center', color:'var(--text-3)',
+                            opacity: generandoPDF === d.profesional_id ? 0.5 : 1, flexShrink:0,
+                          }}>
+                          {generandoPDF === d.profesional_id
+                            ? <div className="sp-spinner" style={{ width:14, height:14, borderWidth:2, borderTopColor:color }} />
+                            : <Ico d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" size={15} />
+                          }
+                        </button>
                       </div>
                     </div>
 

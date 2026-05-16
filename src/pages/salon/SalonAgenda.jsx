@@ -183,6 +183,107 @@ export default function SalonAgenda() {
   const citasDia  = citasPorDia[selDay] || []
   const accionesCita = selCita ? (ACCIONES[selCita.estado] || []) : []
 
+  // ── Helpers de navegación semana/día ─────────────────────────────────
+  function shiftDia(n) {
+    const d = new Date(selDay + 'T12:00:00')
+    d.setDate(d.getDate() + n)
+    const iso = d.toISOString().slice(0, 10)
+    setSelDay(iso)
+    setViewDate(new Date(d.getFullYear(), d.getMonth(), 1))
+  }
+
+  function semanaLabel() {
+    const pivot = new Date(selDay + 'T12:00:00')
+    const dow = pivot.getDay()
+    const lunes = new Date(pivot)
+    lunes.setDate(pivot.getDate() - (dow === 0 ? 6 : dow - 1))
+    const dom = new Date(lunes)
+    dom.setDate(lunes.getDate() + 6)
+    const fmtShort = d => d.toLocaleDateString('es-CO', { day:'numeric', month:'short' })
+    return `${fmtShort(lunes)} – ${fmtShort(dom)}`
+  }
+
+  // ── Vista Semana: 7 columnas día ──────────────────────────────────────
+  function VistaSemana() {
+    const pivot = new Date(selDay + 'T12:00:00')
+    const dow   = pivot.getDay()
+    const lunes = new Date(pivot)
+    lunes.setDate(pivot.getDate() - (dow === 0 ? 6 : dow - 1))
+    const diasSemana = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(lunes)
+      d.setDate(lunes.getDate() + i)
+      return d.toISOString().slice(0, 10)
+    })
+    const hoyIso = today.toISOString().slice(0, 10)
+
+    return (
+      <div style={{ overflowX:'auto', paddingBottom:80 }}>
+        <div style={{ display:'flex', minWidth: 7 * 78 }}>
+          {diasSemana.map(iso => {
+            const dc     = citasPorDia[iso] || []
+            const fecha  = new Date(iso + 'T12:00:00')
+            const esHoy  = iso === hoyIso
+            const esSel  = iso === selDay
+            const diaNom = DIAS[fecha.getDay()]
+            const diaNum = fecha.getDate()
+            return (
+              <div key={iso} style={{ flex:1, minWidth:78, borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column' }}>
+                {/* Cabecera del día */}
+                <button
+                  onClick={() => { setSelDay(iso); setVistaAgenda('dia') }}
+                  style={{
+                    width:'100%', padding:'10px 2px 8px', textAlign:'center',
+                    background:'transparent', border:'none', cursor:'pointer',
+                    borderBottom:'2px solid var(--border)',
+                  }}>
+                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:0.5,
+                    color: esHoy ? col : 'var(--text-3)', textTransform:'uppercase' }}>
+                    {diaNom}
+                  </div>
+                  <div style={{
+                    width:28, height:28, borderRadius:8, margin:'4px auto 0',
+                    background: esSel ? col : esHoy ? `${col}22` : 'transparent',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'Outfit', fontWeight:800, fontSize:15,
+                    color: esSel ? '#fff' : esHoy ? col : 'var(--text)',
+                  }}>{diaNum}</div>
+                </button>
+
+                {/* Citas del día */}
+                <div style={{ padding:'5px 3px', display:'flex', flexDirection:'column', gap:3 }}>
+                  {dc.length === 0
+                    ? <div style={{ height:8 }} />
+                    : dc.slice(0, 7).map(c => {
+                        const clr = ESTADO_COLOR[c.estado] || col
+                        return (
+                          <button key={c.id} onClick={() => setSelCita(c)} style={{
+                            width:'100%', padding:'5px 4px', borderRadius:6, textAlign:'left',
+                            background:`${clr}18`, border:`1px solid ${clr}40`, cursor:'pointer',
+                          }}>
+                            <div style={{ fontSize:9, fontWeight:800, color:clr, lineHeight:1.2 }}>
+                              {fmtHora(c.fecha_inicio)}
+                            </div>
+                            <div style={{ fontSize:10, fontWeight:600, color:'var(--text)',
+                              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
+                            </div>
+                          </button>
+                        )
+                      })
+                  }
+                  {dc.length > 7 && (
+                    <div style={{ fontSize:9, color:'var(--text-3)', textAlign:'center',
+                      fontWeight:700, paddingTop:2 }}>+{dc.length - 7} más</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   // ── Vista Día: grid por profesional ──────────────────────────────────
   function VistaDia() {
     const H_START = 7
@@ -296,31 +397,42 @@ export default function SalonAgenda() {
   return (
     <div style={{ padding:'0 0 16px' }}>
 
-      {/* ── Navegación mes ── */}
+      {/* ── Navegación (mes / semana / día) ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', marginBottom:12 }}>
-        <button onClick={() => setViewDate(new Date(year, month - 1, 1))} style={{
-          width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
-          background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
-          display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
+        <button
+          onClick={() => {
+            if (vistaAgenda === 'mes')    setViewDate(new Date(year, month - 1, 1))
+            if (vistaAgenda === 'semana') shiftDia(-7)
+            if (vistaAgenda === 'dia')    shiftDia(-1)
+          }}
+          style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
+            background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Ico d="M15 19l-7-7 7-7" size={18} />
         </button>
-        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>
-          {MESES[month]} {year}
+        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:vistaAgenda==='dia'?16:20,
+          color:'var(--text)', textAlign:'center', flex:1, margin:'0 8px' }}>
+          {vistaAgenda === 'mes'    && `${MESES[month]} ${year}`}
+          {vistaAgenda === 'semana' && semanaLabel()}
+          {vistaAgenda === 'dia'    && new Date(selDay+'T12:00:00').toLocaleDateString('es-CO',{ weekday:'long', day:'numeric', month:'long' })}
         </h2>
-        <button onClick={() => setViewDate(new Date(year, month + 1, 1))} style={{
-          width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
-          background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
-          display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
+        <button
+          onClick={() => {
+            if (vistaAgenda === 'mes')    setViewDate(new Date(year, month + 1, 1))
+            if (vistaAgenda === 'semana') shiftDia(+7)
+            if (vistaAgenda === 'dia')    shiftDia(+1)
+          }}
+          style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
+            background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Ico d="M9 5l7 7-7 7" size={18} />
         </button>
       </div>
 
-      {/* ── Toggle Mes / Día ── */}
+      {/* ── Toggle Mes / Semana / Día ── */}
       <div style={{ display:'flex', gap:4, margin:'0 16px 12px',
         background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
-        {[['mes','Mes'],['dia','Día']].map(([v,label]) => (
+        {[['mes','Mes'],['semana','Sem'],['dia','Día']].map(([v,label]) => (
           <button key={v} onClick={() => setVistaAgenda(v)} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
             background: vistaAgenda === v ? col : 'transparent',
@@ -330,7 +442,8 @@ export default function SalonAgenda() {
         ))}
       </div>
 
-      {vistaAgenda === 'dia' && <VistaDia />}
+      {vistaAgenda === 'semana' && <VistaSemana />}
+      {vistaAgenda === 'dia'    && <VistaDia />}
 
       {vistaAgenda === 'mes' && (<>
       {/* Cabecera días semana */}

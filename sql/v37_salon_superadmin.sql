@@ -111,6 +111,7 @@ BEGIN
 
   UPDATE auth.users
   SET encrypted_password = crypt(trim(p_nueva_clave), gen_salt('bf')),
+      email_confirmed_at = COALESCE(email_confirmed_at, now()),
       updated_at         = now()
   WHERE id = v_user_id;
 

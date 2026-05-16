@@ -90,7 +90,93 @@ export default function SalonClientes() {
   const [loadFotos,   setLoadFotos]   = useState(false)
   const [subiendoFoto,setSubiendoFoto]= useState(false)
   const [tipoFoto,    setTipoFoto]    = useState('resultado')
-  const fotoInputRef = useRef(null)
+  const fotoInputRef  = useRef(null)
+  const csvInputRef   = useRef(null)
+
+  const [importModal,   setImportModal]   = useState(false)
+  const [importData,    setImportData]    = useState([])
+  const [importando,    setImportando]    = useState(false)
+
+  function parseCSVRow(line) {
+    const result = []; let cur = ''; let inQ = false
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++ }
+        else inQ = !inQ
+      } else if (line[i] === ',' && !inQ) { result.push(cur); cur = '' }
+      else cur += line[i]
+    }
+    result.push(cur)
+    return result
+  }
+
+  function handleCSVFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target.result.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      const lines = text.split('\n').filter(l => l.trim())
+      if (lines.length < 2) { showToast('El archivo no tiene datos', false); return }
+      const rawHeaders = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g,'_'))
+      const rows = lines.slice(1).map(line => {
+        const vals = parseCSVRow(line)
+        const obj = {}
+        rawHeaders.forEach((h, i) => { obj[h] = vals[i]?.trim() || '' })
+        return obj
+      }).filter(r => r.nombre?.trim())
+      if (!rows.length) { showToast('No se encontraron filas con nombre', false); return }
+      setImportData(rows)
+      setImportModal(true)
+    }
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  async function importarClientes() {
+    if (!importData.length) return
+    setImportando(true)
+    const rows = importData.map(r => ({
+      tenant_id:         tenant.id,
+      nombre:            r.nombre?.trim(),
+      telefono:          r.telefono?.trim()          || null,
+      email:             r.email?.trim()             || null,
+      fecha_nacimiento:  r.fecha_nacimiento?.match(/^\d{4}-\d{2}-\d{2}$/) ? r.fecha_nacimiento : null,
+      servicios_interes: r.servicios_interes?.trim() || null,
+      notas:             r.notas?.trim()             || null,
+      segmento:          'nuevo',
+      num_visitas:       0,
+      total_gastado:     0,
+      puntos_fidelizacion: 0,
+    }))
+    const { error } = await supabase.from('clientes_agenda').insert(rows)
+    setImportando(false)
+    if (error) { showToast('Error al importar: ' + error.message, false); return }
+    showToast(`${rows.length} clientes importados ✓`)
+    setImportModal(false)
+    setImportData([])
+    cargar()
+  }
+
+  function exportarCSV() {
+    const cols = ['nombre','telefono','email','fecha_nacimiento','segmento','num_visitas','total_gastado','ticket_promedio','ultima_visita','servicios_interes','notas']
+    const header = cols.join(',')
+    const rows = clientesFiltrados.map(c =>
+      cols.map(k => {
+        const v = c[k] ?? ''
+        const s = String(v).replace(/"/g, '""')
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s
+      }).join(',')
+    )
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `clientes-${tenant?.slug || 'salon'}-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
@@ -300,6 +386,75 @@ export default function SalonClientes() {
         </>
       )}
 
+      {/* ── Import CSV preview ── */}
+      {importModal && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => { setImportModal(false); setImportData([]) }} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">Importar clientes — CSV</p>
+
+            <div style={{
+              padding:'12px 14px', borderRadius:12, marginBottom:16,
+              background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)',
+              fontSize:13, color:'#4ade80', fontWeight:600,
+            }}>
+              {importData.length} cliente{importData.length !== 1 ? 's' : ''} listos para importar
+            </div>
+
+            <div style={{ fontSize:11, color:'var(--text-3)', fontWeight:700,
+              letterSpacing:0.8, textTransform:'uppercase', marginBottom:8 }}>
+              Vista previa (primeros 5)
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:20, maxHeight:220, overflowY:'auto' }}>
+              {importData.slice(0, 5).map((r, i) => (
+                <div key={i} style={{
+                  padding:'10px 12px', borderRadius:10,
+                  background:'var(--card)', border:'1px solid var(--border)',
+                }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{r.nombre}</div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>
+                    {[r.telefono, r.email].filter(Boolean).join(' · ') || 'Sin contacto'}
+                  </div>
+                </div>
+              ))}
+              {importData.length > 5 && (
+                <div style={{ textAlign:'center', fontSize:12, color:'var(--text-3)', padding:'6px 0' }}>
+                  y {importData.length - 5} más…
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              padding:'10px 14px', borderRadius:10, marginBottom:20,
+              background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.2)',
+              fontSize:11, color:'#93c5fd', lineHeight:1.6,
+            }}>
+              Columnas reconocidas: <b>nombre</b>, telefono, email, fecha_nacimiento (YYYY-MM-DD), servicios_interes, notas
+            </div>
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => { setImportModal(false); setImportData([]) }} style={{
+                flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
+                background:'transparent', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:14,
+              }}>
+                Cancelar
+              </button>
+              <button onClick={importarClientes} disabled={importando} style={{
+                flex:2, padding:'12px', borderRadius:14, border:'none', cursor:'pointer',
+                background:`linear-gradient(135deg,${col},${col}cc)`,
+                color:'#fff', fontWeight:700, fontSize:14,
+                opacity: importando ? 0.7 : 1,
+              }}>
+                {importando ? 'Importando…' : `Importar ${importData.length} clientes`}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ── Nuevo cliente ── */}
       {showNuevo && (
         <>
@@ -384,14 +539,38 @@ export default function SalonClientes() {
       <div style={{ padding:'12px 16px 12px', position:'sticky', top:0, background:'var(--bg)', zIndex:10 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
           <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)', margin:0 }}>Clientes</h2>
-          <button onClick={() => setShowNuevo(true)} style={{
-            display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
-            background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13,
-            cursor:'pointer', fontFamily:'Plus Jakarta Sans',
-          }}>
-            <Ico d="M12 4v16m8-8H4" size={15} />
-            Agregar
-          </button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => csvInputRef.current?.click()} title="Importar CSV"
+              style={{
+                display:'flex', alignItems:'center', gap:5, padding:'9px 13px', borderRadius:12,
+                background:'var(--card)', border:'1px solid var(--border)',
+                color:'var(--text-2)', fontWeight:600, fontSize:13, cursor:'pointer',
+              }}>
+              <Ico d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" size={15} />
+              Importar
+            </button>
+            {clientes.length > 0 && (
+              <button onClick={exportarCSV} title="Exportar CSV"
+                style={{
+                  display:'flex', alignItems:'center', gap:5, padding:'9px 13px', borderRadius:12,
+                  background:'var(--card)', border:'1px solid var(--border)',
+                  color:'var(--text-2)', fontWeight:600, fontSize:13, cursor:'pointer',
+                }}>
+                <Ico d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" size={15} />
+                CSV
+              </button>
+            )}
+            <input ref={csvInputRef} type="file" accept=".csv,text/csv"
+              onChange={handleCSVFile} style={{ display:'none' }} />
+            <button onClick={() => setShowNuevo(true)} style={{
+              display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
+              background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13,
+              cursor:'pointer', fontFamily:'Plus Jakarta Sans',
+            }}>
+              <Ico d="M12 4v16m8-8H4" size={15} />
+              Agregar
+            </button>
+          </div>
         </div>
         <div style={{ position:'relative', marginBottom:10 }}>
           <div style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)' }}>

@@ -229,7 +229,7 @@ function SetNewPassword() {
 }
 
 export default function SalonApp() {
-  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery } = useTenant()
+  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso } = useTenant()
   const [page,          setPage]          = useState('hoy')
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false)
   const [refreshKey,    setRefreshKey]    = useState(0)
@@ -255,6 +255,10 @@ export default function SalonApp() {
   }
 
   function renderPage() {
+    // Guard: superadmin requiere esSuperadmin; demás módulos requieren tieneAcceso
+    const acceso = page === 'superadmin' ? esSuperadmin : tieneAcceso(page)
+    if (!acceso) return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} />
+
     switch (page) {
       case 'hoy':        return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} />
       case 'agenda':     return <SalonAgenda />

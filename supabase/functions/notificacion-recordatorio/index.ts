@@ -14,39 +14,55 @@ function fmtFecha(iso: string) {
 }
 
 async function enviarWA(telefono: string, mensaje: string) {
-  if (!WA_TOKEN || !WA_PHONE_ID) return
+  if (!WA_TOKEN || !WA_PHONE_ID) return false
   const num = telefono.replace(/\D/g, '')
   const intl = num.startsWith('57') ? num : `57${num}`
-  await fetch(`https://graph.facebook.com/v20.0/${WA_PHONE_ID}/messages`, {
+  const res = await fetch(`https://graph.facebook.com/v20.0/${WA_PHONE_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product:'whatsapp', to:intl, type:'text', text:{ body:mensaje } }),
   })
+  return res.ok
+}
+
+function nowBogota() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone:'America/Bogota' }))
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
-  // Mañana en zona Colombia
-  const bogota = new Date(new Date().toLocaleString('en-US', { timeZone:'America/Bogota' }))
-  bogota.setDate(bogota.getDate() + 1)
-  const manana = bogota.toISOString().slice(0, 10)
+  const ahora = nowBogota()
 
-  const { data: citas } = await db
-    .from('citas')
-    .select(`
-      id, fecha_inicio,
-      clientes_agenda ( nombre, telefono ),
-      profesionales   ( nombre ),
-      servicios       ( nombre ),
-      tenants         ( nombre )
-    `)
-    .gte('fecha_inicio', `${manana}T00:00:00`)
-    .lte('fecha_inicio', `${manana}T23:59:59`)
-    .in('estado', ['confirmada', 'pendiente'])
+  // Ventana 24h: citas entre mañana 00:00 y mañana 23:59
+  const manana = new Date(ahora)
+  manana.setDate(manana.getDate() + 1)
+  const mananaInicio = manana.toISOString().slice(0, 10) + 'T00:00:00'
+  const mananaFin    = manana.toISOString().slice(0, 10) + 'T23:59:59'
 
-  let enviados = 0
-  for (const c of (citas || [])) {
+  // Ventana 1h: citas en los próximos 55-75 min (margen de ±10 min)
+  const en55min = new Date(ahora.getTime() + 55 * 60 * 1000)
+  const en75min = new Date(ahora.getTime() + 75 * 60 * 1000)
+
+  const [res24h, res1h] = await Promise.all([
+    db.from('citas')
+      .select('id, fecha_inicio, clientes_agenda(nombre,telefono), profesionales(nombre), servicios(nombre), tenants(nombre)')
+      .gte('fecha_inicio', mananaInicio)
+      .lte('fecha_inicio', mananaFin)
+      .in('estado', ['confirmada', 'pendiente'])
+      .eq('recordatorio_24h_enviado', false),
+    db.from('citas')
+      .select('id, fecha_inicio, clientes_agenda(nombre,telefono), profesionales(nombre), servicios(nombre), tenants(nombre)')
+      .gte('fecha_inicio', en55min.toISOString())
+      .lte('fecha_inicio', en75min.toISOString())
+      .in('estado', ['confirmada', 'pendiente'])
+      .eq('recordatorio_1h_enviado', false),
+  ])
+
+  let enviados24h = 0
+  let enviados1h  = 0
+
+  for (const c of (res24h.data || [])) {
     const cli  = (c as any).clientes_agenda
     const prof = (c as any).profesionales
     const serv = (c as any).servicios
@@ -58,14 +74,40 @@ Deno.serve(async (req) => {
       `Salón: ${ten?.nombre || '—'}\n` +
       `Profesional: ${prof?.nombre || '—'}\n` +
       `Servicio: ${serv?.nombre || '—'}\n` +
+      `Día: ${fmtFecha(c.fecha_inicio)}\n` +
       `Hora: ${fmtHora(c.fecha_inicio)}\n\n` +
       `Si necesitas cancelar, responde este mensaje. ¡Te esperamos! ✂️`
 
-    await enviarWA(cli.telefono, msg)
-    enviados++
+    const ok = await enviarWA(cli.telefono, msg)
+    if (ok) {
+      await db.from('citas').update({ recordatorio_24h_enviado: true }).eq('id', c.id)
+      enviados24h++
+    }
   }
 
-  return new Response(JSON.stringify({ ok: true, enviados, fecha: manana }), {
+  for (const c of (res1h.data || [])) {
+    const cli  = (c as any).clientes_agenda
+    const prof = (c as any).profesionales
+    const serv = (c as any).servicios
+    const ten  = (c as any).tenants
+    if (!cli?.telefono) continue
+
+    const msg =
+      `⏰ *Tu cita es en 1 hora*\n\n` +
+      `Salón: ${ten?.nombre || '—'}\n` +
+      `Profesional: ${prof?.nombre || '—'}\n` +
+      `Servicio: ${serv?.nombre || '—'}\n` +
+      `Hora: ${fmtHora(c.fecha_inicio)}\n\n` +
+      `¡Te esperamos! ✂️`
+
+    const ok = await enviarWA(cli.telefono, msg)
+    if (ok) {
+      await db.from('citas').update({ recordatorio_1h_enviado: true }).eq('id', c.id)
+      enviados1h++
+    }
+  }
+
+  return new Response(JSON.stringify({ ok: true, enviados24h, enviados1h, ts: ahora.toISOString() }), {
     headers: { ...cors, 'Content-Type': 'application/json' },
   })
 })

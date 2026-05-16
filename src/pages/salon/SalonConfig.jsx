@@ -609,20 +609,41 @@ export default function SalonConfig() {
       {/* ── Tu plan ────────────────────────────────────── */}
       <Seccion titulo="Tu plan">
         {(() => {
-          const plan = tenant?.plan || 'starter'
-          const PLAN_COLOR = { starter:'#60a5fa', pro:'#a855f7', ultra:'#f59e0b' }
-          const PLAN_PRECIO = { starter:'$49.000', pro:'$89.000', ultra:'$149.000' }
-          const planColor = PLAN_COLOR[plan] || '#60a5fa'
+          const plan = tenant?.plan || 'basico'
+          const PLAN_COLOR_MAP = {
+            basico: '#f43f5e', pro: '#a855f7', premium: '#f59e0b',
+            starter: '#f43f5e', ultra: '#f59e0b',
+          }
+          const PLAN_LABEL_MAP = {
+            basico: 'Básico', pro: 'Pro', premium: 'Premium',
+            starter: 'Básico', ultra: 'Premium',
+          }
+          const PLAN_PRECIO_MAP = {
+            basico: '$80.000', pro: '$160.000', premium: '$200.000',
+            starter: '$80.000', ultra: '$200.000',
+          }
+          const PLAN_DETALLE_MAP = {
+            basico:   '2 usuarios · Sin mensajería',
+            pro:      '10 usuarios · Sin mensajería',
+            premium:  'Usuarios ilimitados · Mensajería incluida',
+            starter:  '2 usuarios',
+            ultra:    'Usuarios ilimitados · Mensajería incluida',
+          }
+          const planColor   = PLAN_COLOR_MAP[plan]   || '#60a5fa'
+          const planLabel   = PLAN_LABEL_MAP[plan]   || plan
+          const planPrecio  = PLAN_PRECIO_MAP[plan]  || '$80.000'
+          const planDetalle = PLAN_DETALLE_MAP[plan] || ''
           const vence = tenant?.fecha_vencimiento
           const venceDate = vence ? new Date(vence) : null
           const diasRestantes = venceDate
             ? Math.ceil((venceDate - new Date()) / (1000 * 60 * 60 * 24))
             : null
+          const vencido = diasRestantes !== null && diasRestantes <= 0
           return (
             <div style={{
               padding:'16px', borderRadius:14,
               background:`${planColor}08`,
-              border:`1px solid ${planColor}30`,
+              border:`1px solid ${vencido ? '#ef444440' : planColor + '30'}`,
             }}>
               <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
                 <div style={{
@@ -634,28 +655,28 @@ export default function SalonConfig() {
                   <Ico d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" size={20} />
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <span style={{
-                      fontFamily:'Outfit', fontWeight:900, fontSize:18,
-                      color: planColor, textTransform:'capitalize',
-                    }}>Plan {plan}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                    <span style={{ fontFamily:'Outfit', fontWeight:900, fontSize:18, color:planColor }}>
+                      Plan {planLabel}
+                    </span>
                     <span style={{
                       padding:'2px 8px', borderRadius:20,
                       background:`${planColor}18`, border:`1px solid ${planColor}40`,
-                      fontSize:11, fontWeight:700, color: planColor,
-                    }}>
-                      {PLAN_PRECIO[plan] || '$49.000'}/mes
-                    </span>
+                      fontSize:11, fontWeight:700, color:planColor,
+                    }}>{planPrecio}/mes</span>
                   </div>
+                  {planDetalle && (
+                    <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>{planDetalle}</div>
+                  )}
                   {venceDate && (
-                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
+                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:4 }}>
                       Vigente hasta{' '}
                       <span style={{ fontWeight:700, color: diasRestantes && diasRestantes < 10 ? '#f87171' : 'var(--text-2)' }}>
                         {venceDate.toLocaleDateString('es-CO', { day:'numeric', month:'long', year:'numeric' })}
                       </span>
                       {diasRestantes !== null && (
                         <span style={{ marginLeft:6, color: diasRestantes < 10 ? '#f87171' : 'var(--text-3)' }}>
-                          ({diasRestantes > 0 ? `${diasRestantes} días` : 'Vencido'})
+                          ({diasRestantes > 0 ? `${diasRestantes} días restantes` : 'VENCIDO'})
                         </span>
                       )}
                     </div>
@@ -667,7 +688,7 @@ export default function SalonConfig() {
                 padding:'10px 12px', borderRadius:10,
                 background:'var(--bg)', border:'1px solid var(--border)',
               }}>
-                Para cambiar de plan o renovar, contacta a tu administrador de Salón Pro.
+                Para cambiar de plan o renovar, contacta al administrador de Salón Pro.
               </div>
             </div>
           )
