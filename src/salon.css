@@ -1363,8 +1363,8 @@
   scroll-snap-align: start;
 }
 .sp-tab-btn.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: var(--tab-col, var(--accent));
+  border-bottom-color: var(--tab-col, var(--accent));
 }
 
 /* Filtros/chips scrollables */
