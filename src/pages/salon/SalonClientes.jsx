@@ -63,7 +63,7 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
-const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'' }
+const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'', tipo_precio:'normal' }
 
 export default function SalonClientes() {
   const { tenant } = useTenant()
@@ -182,7 +182,7 @@ export default function SalonClientes() {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
     const q = supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento')
+      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags')
       .eq('tenant_id', tenant.id)
       .order('nombre')
     if (busq.trim()) q.ilike('nombre', `%${busq}%`)
@@ -231,6 +231,7 @@ export default function SalonClientes() {
       num_visitas:          0,
       total_gastado:        0,
       puntos_fidelizacion:  0,
+      tipo_precio:          nuevoForm.tipo_precio || 'normal',
     })
     setGuardando(false)
     if (error) { showToast('Error al crear cliente', false); return }
@@ -514,6 +515,24 @@ export default function SalonClientes() {
                   rows={3} style={{ resize:'vertical', minHeight:80 }} />
               </div>
 
+              {/* Tipo de precio */}
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:8 }}>
+                  TIPO DE PRECIO
+                </label>
+                <div style={{ display:'flex', gap:8 }}>
+                  {[{ k:'normal', label:'Normal', color:'var(--text-2)' }, { k:'mayorista', label:'Mayorista', color:'#f59e0b' }].map(opt => (
+                    <button key={opt.k} type="button" onClick={() => setNuevoForm(p => ({...p, tipo_precio: opt.k}))} style={{
+                      flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
+                      border:`1.5px solid ${nuevoForm.tipo_precio === opt.k ? opt.color : 'var(--border)'}`,
+                      background: nuevoForm.tipo_precio === opt.k ? `${opt.color}14` : 'var(--card)',
+                      color: nuevoForm.tipo_precio === opt.k ? opt.color : 'var(--text-3)',
+                      fontWeight:700, fontSize:13, transition:'all 0.12s',
+                    }}>{opt.label}</button>
+                  ))}
+                </div>
+              </div>
+
               {/* Fidelización — info */}
               <div style={{
                 padding:'12px 14px', borderRadius:12,
@@ -654,6 +673,12 @@ export default function SalonClientes() {
                   </div>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
+                  {c.tipo_precio === 'mayorista' && (
+                    <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
+                      background:'rgba(245,158,11,0.15)', color:'#f59e0b' }}>
+                      MAYOR
+                    </span>
+                  )}
                   <SegBadge segmento={c.segmento} />
                   {c.puntos_fidelizacion > 0 && (
                     <span style={{
@@ -697,13 +722,31 @@ export default function SalonClientes() {
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>{sel.nombre}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, flexWrap:'wrap' }}>
                   <SegBadge segmento={sel.segmento} />
+                  {sel.tipo_precio === 'mayorista' && (
+                    <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
+                      background:'rgba(245,158,11,0.15)', color:'#f59e0b' }}>MAYORISTA</span>
+                  )}
                   <span style={{ fontSize:12, color:'var(--text-3)' }}>
                     desde {fmtFecha(sel.created_at)}
                   </span>
                 </div>
               </div>
+              <button onClick={async () => {
+                const nuevo = sel.tipo_precio === 'mayorista' ? 'normal' : 'mayorista'
+                await supabase.from('clientes_agenda').update({ tipo_precio: nuevo }).eq('id', sel.id).eq('tenant_id', tenant.id)
+                setSel(s => ({...s, tipo_precio: nuevo}))
+                showToast(nuevo === 'mayorista' ? 'Cambiado a Mayorista' : 'Cambiado a Normal')
+                cargar()
+              }} style={{
+                padding:'6px 12px', borderRadius:10, border:`1px solid ${sel.tipo_precio === 'mayorista' ? '#f59e0b' : 'var(--border)'}`,
+                background: sel.tipo_precio === 'mayorista' ? 'rgba(245,158,11,0.12)' : 'transparent',
+                color: sel.tipo_precio === 'mayorista' ? '#f59e0b' : 'var(--text-3)',
+                fontSize:11, fontWeight:700, cursor:'pointer', flexShrink:0,
+              }}>
+                {sel.tipo_precio === 'mayorista' ? 'Mayor.' : 'Normal'}
+              </button>
             </div>
 
             {sel.num_visitas >= 0 && (
