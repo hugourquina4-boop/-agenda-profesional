@@ -107,6 +107,18 @@ export default function SalonAnalytics() {
   const [staff,     setStaff]     = useState(isDemo ? DEMO_STAFF     : [])
   const [retention, setRetention] = useState(isDemo ? DEMO_RETENTION : null)
   const [loading,   setLoading]   = useState(!isDemo)
+  const [tabA,      setTabA]      = useState('resumen')
+
+  // Informe citas
+  const hoy = new Date().toISOString().slice(0,10)
+  const primeroDeMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+  const [infDesde,    setInfDesde]    = useState(primeroDeMes)
+  const [infHasta,    setInfHasta]    = useState(hoy)
+  const [infProf,     setInfProf]     = useState('')
+  const [infEstado,   setInfEstado]   = useState('')
+  const [infCitas,    setInfCitas]    = useState([])
+  const [infLoading,  setInfLoading]  = useState(false)
+  const [profesionales, setProfesionales] = useState([])
 
   const cargar = useCallback(async () => {
     if (!tenant) return
@@ -132,6 +144,55 @@ export default function SalonAnalytics() {
   }, [tenant])
 
   useEffect(() => { cargar() }, [cargar])
+
+  useEffect(() => {
+    if (!tenant) return
+    supabase.from('profesionales').select('id,nombre').eq('tenant_id', tenant.id).eq('activo', true).order('nombre')
+      .then(({ data }) => setProfesionales(data || []))
+  }, [tenant])
+
+  async function cargarInforme() {
+    if (!tenant) return
+    setInfLoading(true)
+    let q = supabase.from('citas')
+      .select('id, fecha_inicio, estado, clientes_agenda(nombre), servicios(nombre, precio), profesionales(nombre, id)')
+      .eq('tenant_id', tenant.id)
+      .gte('fecha_inicio', infDesde + 'T00:00:00')
+      .lte('fecha_inicio', infHasta + 'T23:59:59')
+      .order('fecha_inicio')
+    if (infProf)   q = q.eq('profesional_id', infProf)
+    if (infEstado) q = q.eq('estado', infEstado)
+    const { data } = await q.limit(500)
+    setInfCitas(data || [])
+    setInfLoading(false)
+  }
+
+  function exportarInfCSV() {
+    const cols = ['fecha','hora','cliente','servicio','profesional','estado','precio']
+    const header = cols.join(',')
+    const rows = infCitas.map(c => {
+      const d = new Date(c.fecha_inicio)
+      return [
+        d.toLocaleDateString('es-CO'),
+        d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' }),
+        c.clientes_agenda?.nombre || '—',
+        c.servicios?.nombre || '—',
+        c.profesionales?.nombre || '—',
+        c.estado,
+        c.servicios?.precio || 0,
+      ].map(v => String(v).includes(',') ? `"${v}"` : v).join(',')
+    })
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `citas-${infDesde}-${infHasta}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const ESTADO_COLOR2 = { completada:'#22c55e', confirmada:'#3b82f6', pendiente:'#f59e0b', cancelada:'#6b7280', no_asistio:'#f43f5e' }
 
   async function descargarPDF() {
     const { default: jsPDF } = await import('jspdf')
@@ -229,6 +290,136 @@ export default function SalonAnalytics() {
           Modo demo — datos de ejemplo
         </div>
       )}
+
+      {/* ── Tabs ── */}
+      <div style={{ padding:'16px 16px 0', display:'flex', gap:8 }}>
+        {[['resumen','Resumen'],['citas','Informe citas']].map(([t,label]) => (
+          <button key={t} onClick={() => setTabA(t)} style={{
+            flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
+            fontWeight:700, fontSize:13, fontFamily:'Outfit',
+            background: tabA === t ? col : 'var(--card)',
+            color: tabA === t ? '#fff' : 'var(--text-3)',
+            border:`1px solid ${tabA === t ? col : 'var(--border)'}`,
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── Tab: Informe Citas ─────────────────────────────── */}
+      {tabA === 'citas' && (
+        <div style={{ padding:'16px' }}>
+          {/* Filtros */}
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div>
+                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, display:'block', marginBottom:5, textTransform:'uppercase' }}>Desde</label>
+                <input className="sp-input" type="date" value={infDesde} onChange={e => setInfDesde(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, display:'block', marginBottom:5, textTransform:'uppercase' }}>Hasta</label>
+                <input className="sp-input" type="date" value={infHasta} onChange={e => setInfHasta(e.target.value)} />
+              </div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <select className="sp-input" value={infProf} onChange={e => setInfProf(e.target.value)}>
+                <option value="">Todos los profesionales</option>
+                {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+              <select className="sp-input" value={infEstado} onChange={e => setInfEstado(e.target.value)}>
+                <option value="">Todos los estados</option>
+                {['pendiente','confirmada','completada','cancelada','no_asistio'].map(e => (
+                  <option key={e} value={e}>{e.replace('_',' ')}</option>
+                ))}
+              </select>
+            </div>
+            <button onClick={cargarInforme} disabled={infLoading} style={{
+              width:'100%', padding:'12px', borderRadius:13, border:'none', cursor:'pointer',
+              background:col, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'Outfit',
+              opacity: infLoading ? 0.7 : 1,
+            }}>
+              {infLoading ? 'Cargando…' : 'Generar informe'}
+            </button>
+          </div>
+
+          {/* Resumen */}
+          {infCitas.length > 0 && (() => {
+            const completadas = infCitas.filter(c => c.estado === 'completada')
+            const totalIngresos = completadas.reduce((s,c) => s+(c.servicios?.precio||0), 0)
+            return (
+              <>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+                  {[
+                    { label:'Total citas', value:infCitas.length, color:'var(--text)' },
+                    { label:'Completadas', value:completadas.length, color:'#22c55e' },
+                    { label:'Ingresos est.', value:`$${(totalIngresos/1000).toFixed(0)}K`, color:col },
+                  ].map(s => (
+                    <div key={s.label} style={{ background:'var(--card)', border:'1px solid var(--border)',
+                      borderRadius:12, padding:'10px', textAlign:'center' }}>
+                      <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:s.color }}>{s.value}</div>
+                      <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3, marginTop:2 }}>{s.label.toUpperCase()}</div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={exportarInfCSV} style={{
+                  width:'100%', padding:'10px', borderRadius:12, marginBottom:14,
+                  background:'var(--card)', border:`1px solid ${col}44`,
+                  color:col, fontWeight:700, fontSize:13, cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                }}>
+                  <Ico d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" size={14} />
+                  Exportar CSV ({infCitas.length} citas)
+                </button>
+              </>
+            )
+          })()}
+
+          {/* Lista */}
+          {infCitas.length === 0 && !infLoading ? (
+            <div className="sp-empty">
+              <span className="sp-empty-icon">📋</span>
+              <p className="sp-empty-title">Sin datos</p>
+              <p className="sp-empty-sub">Selecciona rango de fechas y genera el informe</p>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {infCitas.map(c => {
+                const d = new Date(c.fecha_inicio)
+                const clr = ESTADO_COLOR2[c.estado] || 'var(--text-3)'
+                return (
+                  <div key={c.id} style={{
+                    padding:'10px 14px', borderRadius:12,
+                    background:'var(--card)', border:'1px solid var(--border)',
+                    display:'flex', alignItems:'center', gap:10,
+                    position:'relative', overflow:'hidden',
+                  }}>
+                    <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:clr }} />
+                    <div style={{ flex:1, paddingLeft:8 }}>
+                      <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>
+                        {c.clientes_agenda?.nombre || '—'}
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                        {d.toLocaleDateString('es-CO',{day:'numeric',month:'short'})} {d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})} · {c.servicios?.nombre || '—'} · {c.profesionales?.nombre?.split(' ')[0] || '—'}
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:3, flexShrink:0 }}>
+                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6,
+                        background:`${clr}18`, color:clr, textTransform:'capitalize' }}>
+                        {c.estado?.replace('_',' ')}
+                      </span>
+                      {c.servicios?.precio > 0 && (
+                        <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:12, color:col }}>
+                          ${Number(c.servicios.precio).toLocaleString('es-CO')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tabA === 'resumen' && (<>
 
       {/* ── KPIs del mes ──────────────────────────────────── */}
       <div className="sp-section" style={{ marginTop:20 }}>
@@ -376,6 +567,7 @@ export default function SalonAnalytics() {
         </div>
       )}
       <div style={{ height:24 }} />
+      </>)}
     </>
   )
 }
