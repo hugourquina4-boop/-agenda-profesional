@@ -4,7 +4,7 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-16
+> Actualizado: 2026-05-16 (sesión 2)
 > **Versión actual en producción: v1.3-dev** (sin tag aún)
 
 ---
@@ -106,7 +106,24 @@ v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + d
 
 ---
 
-## Pendientes v1.2 (no bloquean uso, pero mejoran la plataforma)
+## Correcciones aplicadas v1.3-dev (sesión 2 — 2026-05-16)
+
+### Bug fixes deployados
+
+| Bug | Causa raíz | Fix |
+| --- | --- | --- |
+| Sheets ocultos detrás del nav en mobile | `.sp-root > *` ponía z-index:1 en `.sp-main`, creando stacking context que atrapaba sheets (z-index 300/301) por debajo del nav (z-index 200) | Añadido `.sp-root > .sp-main { z-index: auto }` en salon.css |
+| Selector de fecha usa picker nativo del teléfono | `<input type="date">` en SalonNuevaCita llama al date picker del SO | Reemplazado con componente `CalendarioPicker` inline (grid mensual, días pasados deshabilitados) |
+| Foto upload propietario rompe silenciosamente | ImageUploader usaba props `currentUrl`/`onUploaded` en lugar de `value`/`onChange` — crash sin feedback | Corregidas las props en SalonEquipo.jsx |
+| Agregar/editar profesional sin feedback | `guardar()` sin try/catch; si `tenant` era null lanzaba TypeError sin mostrar error | Añadido null-check + try/catch |
+| Color del profesional no persiste | `color` no incluido en payload INSERT/UPDATE — dependía del default de BD | Incluido explícitamente + color picker visual en el form |
+
+### Pendientes confirmados (no deployados)
+
+1. **Módulo Mensajería** (Sprint 4) — ver tabla de roadmap abajo
+2. **Módulo Proveedores + Gastos** (Sprint 3) — SQL v49 + UI pendiente
+3. **Control de acceso por rol en UI** — tabla `permisos_tenant` existe en BD, falta conectar en SalonLayout sidebar
+4. **Roles granulares por módulo** — Sprint 3 pendiente
 
 ### 1. Deploy Edge Functions WA pendientes
 ```bash
@@ -116,6 +133,10 @@ npx supabase functions deploy cumpleanos-clientes resumen-diario
 
 ### 2. Activar Supabase Schedules (4 crons)
 Configurar en Supabase Dashboard → Database → Extensions → pg_cron, o en SalonConfig.
+
+### 3. Verificar bucket `imagenes` en Supabase Storage
+
+Si el upload de fotos de profesionales falla, aplicar el SQL de `sql/v13_storage_imagenes.sql` en el SQL Editor de Supabase.
 
 ---
 
