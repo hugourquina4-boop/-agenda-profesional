@@ -70,12 +70,13 @@ export default function SalonCaja() {
   const [totalCobrado, setTotalCobrado] = useState(0)
   const [loading,      setLoading]      = useState(true)
 
-  const [modalCita,  setModalCita]  = useState(null)
-  const [monto,      setMonto]      = useState('')
-  const [metodo,     setMetodo]     = useState('efectivo')
-  const [referencia, setReferencia] = useState('')
-  const [saving,     setSaving]     = useState(false)
-  const [toast,      setToast]      = useState(null)
+  const [modalCita,    setModalCita]    = useState(null)
+  const [monto,        setMonto]        = useState('')
+  const [metodo,       setMetodo]       = useState('efectivo')
+  const [referencia,   setReferencia]   = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [toast,        setToast]        = useState(null)
+  const [confirmAnular, setConfirmAnular] = useState(null) // pago obj
 
   function showToast(msg, ok = true) {
     setToast({ msg, ok })
@@ -191,6 +192,13 @@ export default function SalonCaja() {
     setReferencia('')
   }
 
+  async function anularPago(pago) {
+    await supabase.from('pagos').update({ estado: 'anulado' }).eq('id', pago.id)
+    setConfirmAnular(null)
+    showToast('Pago anulado')
+    cargar()
+  }
+
   async function handleCobrar(e) {
     e.preventDefault()
     if (!modalCita || !monto) return
@@ -297,6 +305,30 @@ export default function SalonCaja() {
             </div>
           </div>
 
+          {/* Breakdown por método */}
+          {historial.length > 0 && (() => {
+            const porM = {}
+            historial.forEach(c => { porM[c.pago.metodo] = (porM[c.pago.metodo]||0) + Number(c.pago.monto) })
+            return (
+              <div style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:16, paddingBottom:2 }}>
+                {Object.entries(porM).map(([m, total]) => (
+                  <div key={m} style={{
+                    flexShrink:0, padding:'10px 14px', borderRadius:14,
+                    background:'var(--card)', border:`1.5px solid ${METODO_COLORS[m]||col}44`,
+                    minWidth:100,
+                  }}>
+                    <div style={{ fontSize:10, fontWeight:700, color: METODO_COLORS[m]||col, textTransform:'uppercase', letterSpacing:0.5, marginBottom:4 }}>
+                      {m}
+                    </div>
+                    <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:'var(--text)' }}>
+                      {fmtCOP(total)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* Tabs */}
           <div style={{ display:'flex', gap:4, marginBottom:16,
             background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:4 }}>
@@ -331,12 +363,14 @@ export default function SalonCaja() {
                     background:'var(--card)', border:'1px solid var(--border)',
                   }}>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontWeight:600, fontSize:14, color:'var(--text)',
+                      <div style={{ fontWeight:700, fontSize:14, color:'var(--text)',
                         whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                         {c.clientes_agenda?.nombre || '—'}
                       </div>
                       <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
-                        {c.servicios?.nombre || '—'} · {fmtFecha(c.fecha_inicio)} {fmtHora(c.fecha_inicio)}
+                        {c.servicios?.nombre || '—'}
+                        {c.profesionales?.nombre ? ` · ${c.profesionales.nombre.split(' ')[0]}` : ''}
+                        {' · '}{fmtFecha(c.fecha_inicio)} {fmtHora(c.fecha_inicio)}
                       </div>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
@@ -367,34 +401,69 @@ export default function SalonCaja() {
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {historial.map(c => (
+                {historial.map((c, idx) => (
                   <div key={c.id} style={{
-                    display:'flex', alignItems:'center', justifyContent:'space-between',
-                    padding:'14px 16px', borderRadius:14,
+                    padding:'12px 16px', borderRadius:14,
                     background:'var(--card)', border:'1px solid var(--border)',
                   }}>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
-                        <span style={{ fontWeight:600, fontSize:14, color:'var(--text)',
-                          whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:120 }}>
-                          {c.clientes_agenda?.nombre || '—'}
-                        </span>
-                        <span style={{
-                          fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20, flexShrink:0,
-                          background:`${METODO_COLORS[c.pago.metodo] || col}22`,
-                          color: METODO_COLORS[c.pago.metodo] || col,
-                        }}>
-                          {c.pago.metodo}
-                        </span>
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                      {/* # número */}
+                      <div style={{
+                        width:28, height:28, borderRadius:8, background:`${col}14`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:10, fontWeight:800, color:col, flexShrink:0, marginTop:2,
+                      }}>
+                        {historial.length - idx}
                       </div>
-                      <div style={{ fontSize:12, color:'var(--text-3)' }}>
-                        {c.servicios?.nombre || '—'} · {fmtFecha(c.pago.created_at)}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:3 }}>
+                          <span style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>
+                            {c.clientes_agenda?.nombre || '—'}
+                          </span>
+                          <span style={{
+                            fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, flexShrink:0,
+                            background:`${METODO_COLORS[c.pago.metodo] || col}22`,
+                            color: METODO_COLORS[c.pago.metodo] || col,
+                          }}>
+                            {c.pago.metodo}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'var(--text-3)', marginBottom: c.pago.referencia ? 2 : 0 }}>
+                          {c.servicios?.nombre || '—'}
+                          {c.profesionales?.nombre ? ` · ${c.profesionales.nombre.split(' ')[0]}` : ''}
+                          {' · '}{fmtFecha(c.pago.created_at)} {fmtHora(c.pago.created_at)}
+                        </div>
+                        {c.pago.referencia && (
+                          <div style={{ fontSize:11, color:'var(--text-3)', fontStyle:'italic' }}>
+                            Ref: {c.pago.referencia}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0 }}>
+                        <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:'#22c55e' }}>
+                          ${Number(c.pago.monto).toLocaleString('es-CO')}
+                        </span>
+                        {confirmAnular?.id === c.pago.id ? (
+                          <div style={{ display:'flex', gap:5 }}>
+                            <button onClick={() => anularPago(c.pago)} style={{
+                              padding:'4px 10px', borderRadius:8, border:'none', cursor:'pointer',
+                              background:'#ef4444', color:'#fff', fontWeight:700, fontSize:11,
+                            }}>Sí</button>
+                            <button onClick={() => setConfirmAnular(null)} style={{
+                              padding:'4px 10px', borderRadius:8, border:'1px solid var(--border)',
+                              background:'transparent', color:'var(--text-3)', fontWeight:700, fontSize:11, cursor:'pointer',
+                            }}>No</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmAnular(c.pago)} style={{
+                            background:'none', border:'none', cursor:'pointer', color:'var(--text-3)',
+                            fontSize:11, fontWeight:600, padding:'2px 6px', borderRadius:6,
+                          }}>
+                            Anular
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:15,
-                      color:'#22c55e', flexShrink:0, marginLeft:8 }}>
-                      ${Number(c.pago.monto).toLocaleString('es-CO')}
-                    </span>
                   </div>
                 ))}
               </div>

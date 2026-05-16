@@ -53,6 +53,14 @@ export default function SalonOrdenes() {
   const [creando,     setCreando]     = useState(false)
   const [servicioQ,   setServicioQ]   = useState('')
 
+  // Modal editar
+  const [editOrden,   setEditOrden]   = useState(null)
+  const [editItems,   setEditItems]   = useState([])
+  const [editProf,    setEditProf]    = useState('')
+  const [editNotas,   setEditNotas]   = useState('')
+  const [editServQ,   setEditServQ]   = useState('')
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
+
   // Modal pagar
   const [pagarOrden,  setPagarOrden]  = useState(null)
   const [pagoMonto,   setPagoMonto]   = useState('')
@@ -141,6 +149,53 @@ export default function SalonOrdenes() {
     resetNueva()
     cargar()
   }
+
+  // ── Editar orden ─────────────────────────────────────────────
+  function abrirEditar(ord) {
+    setEditOrden(ord)
+    setEditItems(Array.isArray(ord.items) ? [...ord.items] : [])
+    setEditProf(ord.profesional_id || '')
+    setEditNotas(ord.notas || '')
+    setEditServQ('')
+  }
+
+  function editAgregarServicio(serv) {
+    setEditItems(prev => {
+      const existe = prev.find(i => i.servicio_id === serv.id)
+      if (existe) return prev.map(i => i.servicio_id === serv.id ? { ...i, cantidad: i.cantidad + 1 } : i)
+      return [...prev, { servicio_id: serv.id, nombre: serv.nombre, precio: serv.precio, cantidad: 1 }]
+    })
+    setEditServQ('')
+  }
+
+  function editCambiarCantidad(servId, delta) {
+    setEditItems(prev => prev.map(i => {
+      if (i.servicio_id !== servId) return i
+      return { ...i, cantidad: Math.max(1, i.cantidad + delta) }
+    }))
+  }
+
+  const totalEdit = editItems.reduce((s, i) => s + (i.precio||0) * (i.cantidad||1), 0)
+
+  async function guardarEdicion() {
+    if (!editOrden || editItems.length === 0) return
+    setGuardandoEdit(true)
+    const { error } = await supabase.from('ordenes_espera').update({
+      profesional_id: editProf || null,
+      items:          editItems,
+      total:          totalEdit,
+      notas:          editNotas.trim() || null,
+    }).eq('id', editOrden.id)
+    setGuardandoEdit(false)
+    if (error) { showToast('Error al guardar', false); return }
+    showToast('Orden actualizada ✓')
+    setEditOrden(null)
+    cargar()
+  }
+
+  const editServsFiltrados = editServQ.trim()
+    ? servicios.filter(s => s.nombre.toLowerCase().includes(editServQ.toLowerCase()))
+    : servicios.slice(0, 8)
 
   // ── Pagar orden ──────────────────────────────────────────────
   function abrirPagar(orden) {
@@ -283,6 +338,11 @@ export default function SalonOrdenes() {
                         {fmtFechaHora(ord.created_at)}
                       </div>
                     </div>
+                    <button onClick={() => abrirEditar(ord)}
+                      style={{ background:'none', border:'none', cursor:'pointer',
+                        color:'var(--text-3)', padding:4, borderRadius:6 }}>
+                      <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
+                    </button>
                     <button onClick={() => cancelarOrden(ord.id)}
                       style={{ background:'none', border:'none', cursor:'pointer',
                         color:'var(--text-3)', padding:4, borderRadius:6 }}>
@@ -355,6 +415,118 @@ export default function SalonOrdenes() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── Modal editar orden ───────────────────────────────────── */}
+      {editOrden && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'flex-end',
+          background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)',
+        }} onClick={e => { if (e.target === e.currentTarget) setEditOrden(null) }}>
+          <div style={{
+            width:'100%', maxWidth:520, margin:'0 auto',
+            background:'var(--bg)', borderRadius:'24px 24px 0 0',
+            padding:'20px 20px 32px', maxHeight:'92dvh', overflowY:'auto',
+          }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:'var(--border)', margin:'0 auto 20px' }} />
+            <h3 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:'var(--text)', marginBottom:20 }}>
+              Editar orden
+            </h3>
+
+            {/* Profesional */}
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>PROFESIONAL</label>
+              <select className="sp-input" value={editProf} onChange={e => setEditProf(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+
+            {/* Agregar servicio */}
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>SERVICIOS / PRODUCTOS</label>
+              <input className="sp-input" placeholder="Buscar servicio…"
+                value={editServQ} onChange={e => setEditServQ(e.target.value)} />
+              {editServsFiltrados.length > 0 && editServQ.trim() && (
+                <div style={{
+                  marginTop:4, background:'var(--card)', border:'1px solid var(--border)',
+                  borderRadius:12, overflow:'hidden', maxHeight:200, overflowY:'auto',
+                }}>
+                  {editServsFiltrados.map(s => (
+                    <button key={s.id} onClick={() => editAgregarServicio(s)} style={{
+                      display:'flex', justifyContent:'space-between', alignItems:'center',
+                      width:'100%', padding:'11px 14px', textAlign:'left',
+                      background:'transparent', border:'none', borderBottom:'1px solid var(--border)',
+                      color:'var(--text)', fontSize:13, cursor:'pointer',
+                    }}>
+                      <span>{s.nombre}</span>
+                      <span style={{ color:'var(--text-3)', fontSize:12 }}>${Number(s.precio).toLocaleString('es-CO')}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Items */}
+            {editItems.length > 0 && (
+              <div style={{
+                background:'var(--card)', border:'1px solid var(--border)',
+                borderRadius:14, overflow:'hidden', marginBottom:14,
+              }}>
+                {editItems.map((it, i) => (
+                  <div key={it.servicio_id} style={{
+                    display:'flex', alignItems:'center', gap:10, padding:'10px 14px',
+                    borderBottom: i < editItems.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <span style={{ flex:1, fontSize:13, color:'var(--text)', fontWeight:600 }}>{it.nombre}</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <button onClick={() => editCambiarCantidad(it.servicio_id, -1)} style={{
+                        width:24, height:24, borderRadius:6, border:'1px solid var(--border)',
+                        background:'var(--bg)', color:'var(--text)', cursor:'pointer', fontWeight:700,
+                      }}>−</button>
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--text)', minWidth:16, textAlign:'center' }}>
+                        {it.cantidad}
+                      </span>
+                      <button onClick={() => editCambiarCantidad(it.servicio_id, 1)} style={{
+                        width:24, height:24, borderRadius:6, border:'1px solid var(--border)',
+                        background:'var(--bg)', color:'var(--text)', cursor:'pointer', fontWeight:700,
+                      }}>+</button>
+                    </div>
+                    <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:13, color:col, minWidth:56, textAlign:'right' }}>
+                      ${((it.precio||0) * it.cantidad).toLocaleString('es-CO')}
+                    </span>
+                    <button onClick={() => setEditItems(prev => prev.filter(x => x.servicio_id !== it.servicio_id))}
+                      style={{ background:'none', border:'none', cursor:'pointer', color:'#f87171', padding:2 }}>
+                      <Ico d="M6 18L18 6M6 6l12 12" size={14} />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ padding:'10px 14px', background:`${col}08`, display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:'var(--text-2)' }}>Total</span>
+                  <span style={{ fontFamily:'Outfit', fontWeight:900, fontSize:18, color:col }}>
+                    ${totalEdit.toLocaleString('es-CO')}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Notas */}
+            <div style={{ marginBottom:20 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>NOTAS</label>
+              <input className="sp-input" placeholder="Instrucciones especiales…"
+                value={editNotas} onChange={e => setEditNotas(e.target.value)} />
+            </div>
+
+            <button onClick={guardarEdicion} disabled={guardandoEdit || editItems.length === 0} style={{
+              width:'100%', padding:'15px', borderRadius:14, border:'none', cursor:'pointer',
+              background: (guardandoEdit || editItems.length === 0) ? 'var(--border)' : col,
+              color: (guardandoEdit || editItems.length === 0) ? 'var(--text-3)' : '#fff',
+              fontFamily:'Outfit', fontWeight:800, fontSize:15, transition:'all 0.2s',
+            }}>
+              {guardandoEdit ? 'Guardando…' : `Guardar cambios · ${fmtCOP(totalEdit)}`}
+            </button>
+          </div>
         </div>
       )}
 
