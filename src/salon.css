@@ -763,6 +763,8 @@
    ═══════════════════════════════════ */
 .sp-page {
   animation: sp-fadein 0.32s cubic-bezier(0.16,1,0.3,1) forwards;
+  /* nav bar mobile = 72px; extra buffer so last items are reachable */
+  padding-bottom: 88px;
 }
 @keyframes sp-fadein {
   from { opacity: 0; transform: translateY(12px); }
