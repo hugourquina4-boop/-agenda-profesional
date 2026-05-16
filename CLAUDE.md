@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-10
-> **Versión actual en producción: v1.2** (tag git: v1.2)
+> Actualizado: 2026-05-16
+> **Versión actual en producción: v1.3-dev** (sin tag aún)
 
 ---
 
@@ -52,13 +52,13 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Agenda Mes / Semana / Día | SalonAgenda.jsx | Toggle 3 vistas, grid por profesional, bloques proporcionales, pago inline |
 | Nueva cita (5 pasos) | SalonNuevaCita.jsx | Horarios, slots, anti-solapamiento, WA confirmación al crear |
 | Portal público | SalonPortal.jsx | Reservas online, precios dinámicos, lista de espera, WA confirmación |
-| Servicios CRUD | SalonServicios.jsx | Precio, duración, categoría — independiente por tenant |
+| Servicios CRUD | SalonServicios.jsx | 4 tabs: Detalles, Precio (base+oferta+duración), Equipo (profesionales asignados), Recordatorio (template WA con preview) |
 | Equipo CRUD + horarios táctiles + calendario excepciones | SalonEquipo.jsx | HorarioGrid drag-to-select, MiniCalendar visual para excepciones por fecha (verde=especial, rojo=ausente) |
 | HorarioGrid (componente reutilizable) | components/HorarioGrid.jsx | Drag-to-select táctil, pointer capture, exports: rangeToSlots, slotsToRange, slotsToFranjas |
-| Clientes CRUD + historial + fotos | SalonClientes.jsx | Cumpleaños, segmento, historial, galería, CSV export + import |
-| Caja — Registro de cobros | SalonCaja.jsx | Tabla pagos, tabs Por cobrar/Cobrado, métodos pago, PDF export |
-| Comisiones — Reglas + liquidación | SalonComisiones.jsx | % por profesional, meta mensual, liquidación PDF individual |
-| Órdenes en espera | SalonOrdenes.jsx | Grid tarjetas, nueva orden, cobrar → pagos → comisión |
+| Clientes CRUD + historial + fotos | SalonClientes.jsx | Cumpleaños, segmento, historial, galería, CSV export + import, tipo_precio (Normal/Mayorista), badge MAYOR en lista, toggle rápido en detalle |
+| Caja — Registro de cobros | SalonCaja.jsx | Tabla pagos, tabs Por cobrar/Cobrado, métodos pago, PDF export, breakdown por método, anulación, # movimiento, especialista en historial |
+| Comisiones — Reglas + liquidación | SalonComisiones.jsx | % por profesional, meta mensual, liquidación PDF individual, tab Planilla con anticipos/deducciones/neto |
+| Órdenes en espera | SalonOrdenes.jsx | Grid tarjetas 2 col, nueva orden, editar orden (modal), cobrar → pagos → comisión |
 | Inventario de productos | SalonInventario.jsx | CRUD + CSV import (preview → upsert por SKU), subcategoria/marca/codigo/contenido/proveedor |
 | Analytics — KPIs y métricas | SalonAnalytics.jsx | v_kpis_mes, v_revenue_staff, v_retention, gráficos, PDF export |
 | Configuración del negocio | SalonConfig.jsx | Logo, color, WhatsApp, tipología, horario, slots, QR, plan |
@@ -99,6 +99,9 @@ v43_rls_tenants_superadmin.sql    ✅ policies SELECT en tenants: superadmin_ve_
 v43_salon_admin_crear_usuario.sql ✅ RPC salon_admin_crear_usuario: crea usuario en auth.users directamente
 v44_accesos_tenant.sql            ✅ RPCs crear_acceso_tenant + resetear_clave_tenant
 v45_superadmin_enhanced.sql       ✅ deleted_at en tenants + citas_hoy en get_tenants + salon_admin_eliminar_tenant
+v46_servicios_enhanced.sql        ✅ columnas precio_oferta, recordatorio_texto, profesionales_ids en servicios
+v47_clientes_tipo_precio.sql      ✅ columnas tipo_precio, tags[] en clientes_agenda
+v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + deducciones de profesionales)
 ```
 
 ---
@@ -260,10 +263,10 @@ Estado: [lo que está pendiente según este CLAUDE.md]
 - Al crear cualquier tabla nueva: RLS habilitado + política tenant_id + GRANT específico
 - Las RPCs SECURITY DEFINER (`salon_admin_*`, `crear_acceso_tenant`, `resetear_clave_tenant`) se llaman vía `fetch()` con anon key — nunca con el cliente Supabase autenticado
 
-### SQL próximo (v1.3)
+### SQL próximo (v1.4)
 ```
-v46_proveedores_gastos.sql    → tablas: proveedores, gastos + RLS + índices
-v47_billing.sql               → tabla suscripciones + pagos Wompi + webhooks
+v49_proveedores_gastos.sql    → tablas: proveedores, gastos + RLS + índices
+v50_billing.sql               → tabla suscripciones + pagos Wompi + webhooks
 ```
 
 ---
