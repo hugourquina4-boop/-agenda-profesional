@@ -60,6 +60,15 @@ export default function SalonComisiones() {
   const [loadingDes, setLoadingDes] = useState(false)
   const [generandoPDF, setGenerandoPDF] = useState(null)
 
+  // Planilla de anticipos
+  const [anticipos,     setAnticipos]     = useState([])
+  const [loadingAnt,    setLoadingAnt]    = useState(false)
+  const [anticipoForm,  setAnticipoForm]  = useState(null) // profesional_id abierto
+  const [antMonto,      setAntMonto]      = useState('')
+  const [antConcepto,   setAntConcepto]   = useState('')
+  const [antTipo,       setAntTipo]       = useState('anticipo')
+  const [guardandoAnt,  setGuardandoAnt]  = useState(false)
+
   const showToast = (msg, color = '#22c55e') => {
     setToast({ msg, color })
     setTimeout(() => setToast(null), 2800)
@@ -105,6 +114,44 @@ export default function SalonComisiones() {
   }, [tenant, mesStr])
 
   useEffect(() => { if (tab === 'desempeno') cargarDesempeno() }, [cargarDesempeno, tab])
+
+  const cargarAnticipos = useCallback(async () => {
+    if (!tenant) return
+    setLoadingAnt(true)
+    const { data } = await supabase.from('anticipos_profesional')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .eq('liquidado', false)
+      .order('created_at', { ascending: false })
+    setAnticipos(data || [])
+    setLoadingAnt(false)
+  }, [tenant])
+
+  useEffect(() => { if (tab === 'planilla') cargarAnticipos() }, [cargarAnticipos, tab])
+
+  async function registrarAnticipo(profId) {
+    const m = parseFloat(antMonto)
+    if (!m || m <= 0) { showToast('Monto inválido', '#f87171'); return }
+    setGuardandoAnt(true)
+    await supabase.from('anticipos_profesional').insert({
+      tenant_id: tenant.id,
+      profesional_id: profId,
+      monto: m,
+      concepto: antConcepto.trim() || null,
+      tipo: antTipo,
+    })
+    setGuardandoAnt(false)
+    setAnticipoForm(null)
+    setAntMonto(''); setAntConcepto(''); setAntTipo('anticipo')
+    showToast('Registrado ✓')
+    cargarAnticipos()
+  }
+
+  async function eliminarAnticipo(id) {
+    await supabase.from('anticipos_profesional').delete().eq('id', id).eq('tenant_id', tenant.id)
+    showToast('Eliminado')
+    cargarAnticipos()
+  }
 
   async function descargarPDFProf(d, i) {
     setGenerandoPDF(d.profesional_id)
@@ -358,10 +405,10 @@ export default function SalonComisiones() {
       )}
 
       {/* ── Tabs ─────────────────────────────────────────── */}
-      <div style={{ padding:'16px 16px 0', display:'flex', gap:8 }}>
-        {[['comisiones','Comisiones'],['desempeno','Desempeño']].map(([t, label]) => (
+      <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', paddingBottom:0 }}>
+        {[['comisiones','Comisiones'],['planilla','Planilla'],['desempeno','Desempeño']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
-            padding:'8px 18px', borderRadius:20, cursor:'pointer',
+            flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
             fontWeight:700, fontSize:13, fontFamily:'Outfit',
             background: tab === t ? col : 'var(--card)',
             color: tab === t ? '#fff' : 'var(--text-3)',
@@ -371,6 +418,152 @@ export default function SalonComisiones() {
           </button>
         ))}
       </div>
+
+      {tab === 'planilla' && (
+        <div style={{ padding:'16px' }}>
+          {loadingAnt ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
+              <div className="sp-spinner" style={{ borderTopColor:col }} />
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+              {profesionales.map((prof, pi) => {
+                const profCom = comisiones.filter(c => c.profesional_id === prof.id)
+                const profAnt = anticipos.filter(a => a.profesional_id === prof.id)
+                const totalCom = profCom.reduce((s,c) => s+(c.monto_comision||0), 0)
+                const totalAnt = profAnt.filter(a => a.tipo === 'anticipo').reduce((s,a) => s+a.monto, 0)
+                const totalDed = profAnt.filter(a => a.tipo === 'deduccion').reduce((s,a) => s+a.monto, 0)
+                const neto    = Math.max(0, totalCom - totalAnt - totalDed)
+                const profColor = PROF_COLORS[pi % PROF_COLORS.length]
+                const isOpen = anticipoForm === prof.id
+
+                return (
+                  <div key={prof.id} style={{
+                    background:'var(--card)', border:'1px solid var(--border)',
+                    borderRadius:18, overflow:'hidden',
+                  }}>
+                    {/* Header prof */}
+                    <div style={{ padding:'14px 16px', background:`${profColor}08`, display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{
+                        width:38, height:38, borderRadius:12, background:`${profColor}22`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontFamily:'Outfit', fontWeight:800, fontSize:16, color:profColor, flexShrink:0,
+                      }}>
+                        {prof.nombre[0]}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{prof.nombre}</div>
+                        <div style={{ fontSize:11, color:'var(--text-3)' }}>{profCom.length} comisiones pendientes</div>
+                      </div>
+                      <button onClick={() => {
+                        setAnticipoForm(isOpen ? null : prof.id)
+                        setAntMonto(''); setAntConcepto(''); setAntTipo('anticipo')
+                      }} style={{
+                        padding:'6px 12px', borderRadius:9, border:`1px solid ${profColor}44`,
+                        background: isOpen ? `${profColor}22` : 'transparent',
+                        color:profColor, fontWeight:700, fontSize:12, cursor:'pointer',
+                      }}>
+                        + Mov.
+                      </button>
+                    </div>
+
+                    {/* Líneas de anticipo */}
+                    {profAnt.length > 0 && (
+                      <div style={{ padding:'0 16px' }}>
+                        {profAnt.map(a => (
+                          <div key={a.id} style={{
+                            display:'flex', alignItems:'center', gap:8, padding:'8px 0',
+                            borderBottom:'1px solid var(--border)',
+                          }}>
+                            <span style={{
+                              fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6,
+                              background: a.tipo === 'anticipo' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.12)',
+                              color: a.tipo === 'anticipo' ? '#f59e0b' : '#ef4444',
+                              textTransform:'uppercase', flexShrink:0,
+                            }}>
+                              {a.tipo === 'anticipo' ? 'Anticipo' : 'Deducción'}
+                            </span>
+                            <span style={{ flex:1, fontSize:12, color:'var(--text-3)' }}>{a.concepto || '—'}</span>
+                            <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:13,
+                              color: a.tipo === 'anticipo' ? '#f59e0b' : '#ef4444' }}>
+                              −${a.monto.toLocaleString('es-CO')}
+                            </span>
+                            <button onClick={() => eliminarAnticipo(a.id)} style={{
+                              background:'none', border:'none', cursor:'pointer', color:'var(--text-3)', fontSize:14, padding:'0 4px',
+                            }}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Formulario agregar */}
+                    {isOpen && (
+                      <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)', background:'var(--bg)' }}>
+                        <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                          {[{ k:'anticipo', label:'Anticipo' }, { k:'deduccion', label:'Deducción' }].map(opt => (
+                            <button key={opt.k} type="button" onClick={() => setAntTipo(opt.k)} style={{
+                              flex:1, padding:'7px', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:12,
+                              border:`1.5px solid ${antTipo === opt.k ? profColor : 'var(--border)'}`,
+                              background: antTipo === opt.k ? `${profColor}14` : 'transparent',
+                              color: antTipo === opt.k ? profColor : 'var(--text-3)',
+                            }}>{opt.label}</button>
+                          ))}
+                        </div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ position:'relative', flex:'0 0 110px' }}>
+                            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+                              color:'var(--text-3)', fontSize:13, fontWeight:700, pointerEvents:'none' }}>$</span>
+                            <input className="sp-input" type="number" min="0" step="1000"
+                              placeholder="0" value={antMonto} onChange={e => setAntMonto(e.target.value)}
+                              style={{ paddingLeft:22, fontSize:14 }} />
+                          </div>
+                          <input className="sp-input" placeholder="Concepto (opcional)"
+                            value={antConcepto} onChange={e => setAntConcepto(e.target.value)}
+                            style={{ flex:1 }} />
+                          <button onClick={() => registrarAnticipo(prof.id)} disabled={guardandoAnt} style={{
+                            padding:'0 14px', borderRadius:12, border:'none', cursor:'pointer',
+                            background:profColor, color:'#fff', fontWeight:700, fontSize:13, flexShrink:0,
+                          }}>
+                            {guardandoAnt ? '…' : 'OK'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer totales */}
+                    <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                        <div style={{ textAlign:'center' }}>
+                          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3, marginBottom:3 }}>COMISIÓN</div>
+                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:'var(--text)' }}>{fmtCOP(totalCom)}</div>
+                        </div>
+                        <div style={{ textAlign:'center' }}>
+                          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3, marginBottom:3 }}>ANTICIPOS</div>
+                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:'#f59e0b' }}>−{fmtCOP(totalAnt + totalDed)}</div>
+                        </div>
+                        <div style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>
+                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:0.3, marginBottom:3,
+                            color: neto > 0 ? '#22c55e' : 'var(--text-3)' }}>NETO A PAGAR</div>
+                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18,
+                            color: neto > 0 ? '#22c55e' : 'var(--text-3)' }}>{fmtCOP(neto)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {profesionales.length === 0 && (
+                <div className="sp-empty">
+                  <span className="sp-empty-icon">📋</span>
+                  <p className="sp-empty-title">Sin profesionales</p>
+                  <p className="sp-empty-sub">Agrega profesionales en el módulo Equipo</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === 'desempeno' && (
         <>
