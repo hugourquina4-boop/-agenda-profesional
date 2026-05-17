@@ -27,6 +27,13 @@ const TIER = {
   bronce: { label:'Bronce', color:'#cd7f32', emoji:'🥉' },
 }
 
+const TAGS_OPCIONES = [
+  { key:'star',     label:'STAR',    icon:'⭐', color:'#f59e0b' },
+  { key:'vip',      label:'VIP',     icon:'💎', color:'#a855f7' },
+  { key:'referido', label:'Refiere', icon:'🤝', color:'#22c55e' },
+  { key:'dificil',  label:'Difícil', icon:'⚠️', color:'#ef4444' },
+]
+
 const FILTROS = [
   { key:'todos',      label:'Todos'      },
   { key:'vip',        label:'VIP'        },
@@ -82,6 +89,7 @@ export default function SalonClientes() {
   const [showNuevo,   setShowNuevo]   = useState(false)
   const [nuevoForm,   setNuevoForm]   = useState(FORM_VACIO)
   const [guardando,   setGuardando]   = useState(false)
+  const [nuevoTab,    setNuevoTab]    = useState('contacto')
   const [editNotas,   setEditNotas]   = useState(false)
   const [notasEdit,   setNotasEdit]   = useState('')
   const [guardandoN,  setGuardandoN]  = useState(false)
@@ -455,82 +463,93 @@ export default function SalonClientes() {
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Nuevo cliente</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:20 }}>
-              {/* Nombre, teléfono, email */}
-              {[
-                { key:'nombre',   label:'NOMBRE *', type:'text',  placeholder:'' },
-                { key:'telefono', label:'TELÉFONO',  type:'tel',   placeholder:'Ej: 3001234567' },
-                { key:'email',    label:'EMAIL',     type:'email', placeholder:'' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
-                    {f.label}
-                  </label>
-                  <input className="sp-input" type={f.type} placeholder={f.placeholder}
-                    value={nuevoForm[f.key]}
-                    onChange={e => setNuevoForm(p => ({ ...p, [f.key]: e.target.value }))} />
-                </div>
+
+            {/* Tabs */}
+            <div style={{ display:'flex', gap:4, marginBottom:18,
+              background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+              {[['contacto','Contacto'],['perfil','Perfil'],['notas','Notas']].map(([t, label]) => (
+                <button key={t} onClick={() => setNuevoTab(t)} style={{
+                  flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
+                  background: nuevoTab === t ? col : 'transparent',
+                  color: nuevoTab === t ? '#fff' : 'var(--text-3)',
+                  fontWeight:700, fontSize:13, transition:'all 0.15s',
+                }}>{label}</button>
               ))}
+            </div>
 
-              {/* Fecha de nacimiento */}
-              <div>
-                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
-                  FECHA DE NACIMIENTO
-                </label>
-                <input className="sp-input" type="date"
-                  value={nuevoForm.fecha_nacimiento}
-                  onChange={e => setNuevoForm(p => ({ ...p, fecha_nacimiento: e.target.value }))}
-                  max={new Date().toISOString().split('T')[0]}
-                />
-              </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:20 }}>
+              {nuevoTab === 'contacto' && <>
+                {[
+                  { key:'nombre',   label:'NOMBRE *', type:'text',  placeholder:'' },
+                  { key:'telefono', label:'TELÉFONO',  type:'tel',   placeholder:'Ej: 3001234567' },
+                  { key:'email',    label:'EMAIL',     type:'email', placeholder:'' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                      {f.label}
+                    </label>
+                    <input className="sp-input" type={f.type} placeholder={f.placeholder}
+                      value={nuevoForm[f.key]}
+                      onChange={e => setNuevoForm(p => ({ ...p, [f.key]: e.target.value }))} />
+                  </div>
+                ))}
+              </>}
 
-              {/* Servicios de interés */}
-              <div>
-                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
-                  SERVICIOS DE INTERÉS
-                </label>
-                <input className="sp-input" type="text"
-                  placeholder="Ej: Tinte, Corte, Manicura…"
-                  value={nuevoForm.servicios_interes}
-                  onChange={e => setNuevoForm(p => ({ ...p, servicios_interes: e.target.value }))} />
-              </div>
-
-              {/* Notas */}
-              <div>
-                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
-                  NOTAS / ALERGIAS
-                </label>
-                <textarea className="sp-input"
-                  placeholder="Alergias, preferencias, referencias…"
-                  value={nuevoForm.notas}
-                  onChange={e => setNuevoForm(p => ({ ...p, notas: e.target.value }))}
-                  rows={3} style={{ resize:'vertical', minHeight:80 }} />
-              </div>
-
-              {/* Tipo de precio */}
-              <div>
-                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:8 }}>
-                  TIPO DE PRECIO
-                </label>
-                <div style={{ display:'flex', gap:8 }}>
-                  {[{ k:'normal', label:'Normal', color:'var(--text-2)' }, { k:'mayorista', label:'Mayorista', color:'#f59e0b' }].map(opt => (
-                    <button key={opt.k} type="button" onClick={() => setNuevoForm(p => ({...p, tipo_precio: opt.k}))} style={{
-                      flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
-                      border:`1.5px solid ${nuevoForm.tipo_precio === opt.k ? opt.color : 'var(--border)'}`,
-                      background: nuevoForm.tipo_precio === opt.k ? `${opt.color}14` : 'var(--card)',
-                      color: nuevoForm.tipo_precio === opt.k ? opt.color : 'var(--text-3)',
-                      fontWeight:700, fontSize:13, transition:'all 0.12s',
-                    }}>{opt.label}</button>
-                  ))}
+              {nuevoTab === 'perfil' && <>
+                <div>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                    FECHA DE NACIMIENTO
+                  </label>
+                  <input className="sp-input" type="date"
+                    value={nuevoForm.fecha_nacimiento}
+                    onChange={e => setNuevoForm(p => ({ ...p, fecha_nacimiento: e.target.value }))}
+                    max={new Date().toISOString().split('T')[0]}
+                  />
                 </div>
-              </div>
+                <div>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                    SERVICIOS DE INTERÉS
+                  </label>
+                  <input className="sp-input" type="text"
+                    placeholder="Ej: Tinte, Corte, Manicura…"
+                    value={nuevoForm.servicios_interes}
+                    onChange={e => setNuevoForm(p => ({ ...p, servicios_interes: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:8 }}>
+                    TIPO DE PRECIO
+                  </label>
+                  <div style={{ display:'flex', gap:8 }}>
+                    {[{ k:'normal', label:'Normal', color:'var(--text-2)' }, { k:'mayorista', label:'Mayorista', color:'#f59e0b' }].map(opt => (
+                      <button key={opt.k} type="button" onClick={() => setNuevoForm(p => ({...p, tipo_precio: opt.k}))} style={{
+                        flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
+                        border:`1.5px solid ${nuevoForm.tipo_precio === opt.k ? opt.color : 'var(--border)'}`,
+                        background: nuevoForm.tipo_precio === opt.k ? `${opt.color}14` : 'var(--card)',
+                        color: nuevoForm.tipo_precio === opt.k ? opt.color : 'var(--text-3)',
+                        fontWeight:700, fontSize:13, transition:'all 0.12s',
+                      }}>{opt.label}</button>
+                    ))}
+                  </div>
+                </div>
+              </>}
 
-              {/* Fidelización — info */}
-              <div className="sp-alert info" style={{ marginLeft:0, marginRight:0, alignItems:'center' }}>
-                <span style={{ fontSize:12, color:'#93c5fd', lineHeight:1.6 }}>
-                  <b style={{ color:'#60a5fa' }}>⭐ Fidelización</b> — puntos, tier y estadísticas se calculan automáticamente al registrar citas.
-                </span>
-              </div>
+              {nuevoTab === 'notas' && <>
+                <div>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                    NOTAS / ALERGIAS
+                  </label>
+                  <textarea className="sp-input"
+                    placeholder="Alergias, preferencias, referencias…"
+                    value={nuevoForm.notas}
+                    onChange={e => setNuevoForm(p => ({ ...p, notas: e.target.value }))}
+                    rows={5} style={{ resize:'vertical', minHeight:120 }} autoFocus />
+                </div>
+                <div className="sp-alert info" style={{ marginLeft:0, marginRight:0, alignItems:'center' }}>
+                  <span style={{ fontSize:12, color:'#93c5fd', lineHeight:1.6 }}>
+                    <b style={{ color:'#60a5fa' }}>⭐ Fidelización</b> — puntos, tier y estadísticas se calculan automáticamente al registrar citas.
+                  </span>
+                </div>
+              </>}
             </div>
             <button onClick={guardarCliente} disabled={guardando} style={{
               width:'100%', padding:'15px', borderRadius:14, cursor:'pointer',
@@ -570,7 +589,7 @@ export default function SalonClientes() {
             )}
             <input ref={csvInputRef} type="file" accept=".csv,text/csv"
               onChange={handleCSVFile} style={{ display:'none' }} />
-            <button onClick={() => setShowNuevo(true)} style={{
+            <button onClick={() => { setShowNuevo(true); setNuevoTab('contacto') }} style={{
               display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
               background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13,
               cursor:'pointer', fontFamily:'Plus Jakarta Sans',
@@ -649,6 +668,20 @@ export default function SalonClientes() {
                     {c.nombre}
                     {cumple && <span title="Cumpleaños próximo">🎂</span>}
                   </div>
+                  {c.tags?.length > 0 && (
+                    <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:3 }}>
+                      {c.tags.map(tag => {
+                        const t = TAGS_OPCIONES.find(o => o.key === tag)
+                        if (!t) return null
+                        return (
+                          <span key={tag} style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5,
+                            background:`${t.color}20`, color:t.color }}>
+                            {t.icon} {t.label}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                   <div style={{ fontSize:12, color:'var(--text-3)', display:'flex', flexDirection:'column', gap:2 }}>
                     {c.telefono && <span>📞 {c.telefono}</span>}
                     {c.ultima_visita
@@ -734,28 +767,50 @@ export default function SalonClientes() {
               </button>
             </div>
 
+            {/* Tags */}
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+              {TAGS_OPCIONES.map(tag => {
+                const activo = sel.tags?.includes(tag.key)
+                return (
+                  <button key={tag.key} onClick={async () => {
+                    const tags = sel.tags || []
+                    const nuevos = activo ? tags.filter(t => t !== tag.key) : [...tags, tag.key]
+                    await supabase.from('clientes_agenda').update({ tags: nuevos }).eq('id', sel.id).eq('tenant_id', tenant.id)
+                    setSel(s => ({ ...s, tags: nuevos }))
+                    cargar()
+                  }} style={{
+                    padding:'5px 11px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:700,
+                    border:`1px solid ${activo ? tag.color : 'var(--border)'}`,
+                    background: activo ? `${tag.color}20` : 'transparent',
+                    color: activo ? tag.color : 'var(--text-3)',
+                    transition:'all 0.15s',
+                  }}>
+                    {tag.icon} {tag.label}
+                  </button>
+                )
+              })}
+            </div>
+
             {sel.num_visitas >= 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
                 {[
-                  { label:'Visitas',   value: sel.num_visitas || 0        },
-                  { label:'Gastado',   value: fmtCOP(sel.total_gastado)   },
-                  { label:'Ticket',    value: fmtCOP(sel.ticket_promedio) },
+                  { label:'Visitas', value: sel.num_visitas || 0,        bg:`linear-gradient(135deg,${col}28,${col}08)`, c:col },
+                  { label:'Gastado', value: fmtCOP(sel.total_gastado),   bg:'linear-gradient(135deg,rgba(34,197,94,0.15),transparent)', c:'#22c55e' },
+                  { label:'Ticket',  value: fmtCOP(sel.ticket_promedio), bg:'linear-gradient(135deg,rgba(245,158,11,0.15),transparent)', c:'#f59e0b' },
                 ].map(s => (
-                  <div key={s.label} style={{
-                    background:'var(--card)', border:'1px solid var(--border)',
-                    borderRadius:12, padding:'10px 12px', textAlign:'center',
-                  }}>
-                    <div style={{ fontSize:15, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>{s.value}</div>
-                    <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:600, letterSpacing:0.3, marginTop:2 }}>{s.label.toUpperCase()}</div>
+                  <div key={s.label} className="sp-kpi-card" style={{ background:s.bg, textAlign:'center', padding:'10px 8px', gap:2 }}>
+                    <div style={{ fontSize:15, fontWeight:800, color:s.c, fontFamily:'Outfit' }}>{s.value}</div>
+                    <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:600, letterSpacing:0.3 }}>{s.label.toUpperCase()}</div>
                   </div>
                 ))}
               </div>
             )}
 
             <div style={{
-              background:'var(--card)', border:'1px solid var(--border)',
+              background:`linear-gradient(135deg,${col}0d,transparent)`,
               borderRadius:16, padding:'14px 16px', marginBottom:14,
               display:'flex', flexDirection:'column', gap:10,
+              boxShadow:'inset 0 1px 0 rgba(255,255,255,0.04)',
             }}>
               {sel.telefono && (
                 <a href={`tel:${sel.telefono}`} style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'var(--text-2)', textDecoration:'none' }}>
@@ -891,20 +946,23 @@ export default function SalonClientes() {
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {historial.map(c => (
-                    <div key={c.id} style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)', border:'1px solid var(--border)' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>
-                          {c.servicios?.nombre || '—'}
-                        </span>
-                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                          <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: ESTADO_COLOR[c.estado] || '#6b7280', display:'inline-block' }} />
-                          <span style={{ fontSize:11, color:'var(--text-3)' }}>{fmtFechaCorta(c.fecha_inicio)}</span>
+                    <div key={c.id} className="sp-tbl-row" style={{ padding:'11px 14px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+                        <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: ESTADO_COLOR[c.estado] || '#6b7280' }} />
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontWeight:600, fontSize:13, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                            {c.servicios?.nombre || '—'}
+                          </div>
+                          <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
+                            {c.profesionales?.nombre?.split(' ')[0] || '—'} · {fmtFechaCorta(c.fecha_inicio)}
+                          </div>
                         </div>
                       </div>
-                      <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
-                        {c.profesionales?.nombre?.split(' ')[0] || '—'}
-                        {c.precio_cobrado > 0 ? ` · $${Number(c.precio_cobrado).toLocaleString('es-CO')}` : ''}
-                      </div>
+                      {c.precio_cobrado > 0 && (
+                        <span style={{ fontSize:13, fontWeight:700, color:'var(--text-2)', flexShrink:0 }}>
+                          ${Number(c.precio_cobrado).toLocaleString('es-CO')}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
