@@ -139,6 +139,8 @@ export default function SalonDashboard({ onNavigate }) {
   ]} : null)
   const [toast,          setToast]          = useState(null)
 
+  const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
+
   const showToast = (msg, color='#22c55e') => {
     setToast({msg,color})
     setTimeout(() => setToast(null), 2800)
@@ -222,6 +224,27 @@ export default function SalonDashboard({ onNavigate }) {
     await supabase.from('citas').update({estado:'completada'}).eq('id', citaId)
     showToast('Cita completada ✓')
     cargar()
+  }
+
+  async function registrarCobro(cita, metodo) {
+    if (isDemo) { showToast('Demo — conecta Supabase para guardar', '#f59e0b'); setCobrando(null); return }
+    const monto = cita.servicios?.precio
+    if (!monto) { showToast('Servicio sin precio', '#f59e0b'); return }
+    try {
+      const { data: pago, error: e1 } = await supabase.from('pagos')
+        .insert({ tenant_id: tenant.id, cita_id: cita.id, monto, metodo, estado: 'pendiente' })
+        .select('id').single()
+      if (e1) throw e1
+      const { error: e2 } = await supabase.from('pagos').update({ estado:'pagado' }).eq('id', pago.id)
+      if (e2) throw e2
+      await supabase.from('citas').update({ estado:'completada' }).eq('id', cita.id)
+      setCobrando(null)
+      showToast(`Cobro registrado — ${new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(monto)}`)
+      cargar()
+    } catch (err) {
+      showToast('Error al registrar cobro', '#ef4444')
+      console.error('[cobro]', err)
+    }
   }
 
   function enviarWA(cita) {
@@ -610,15 +633,41 @@ export default function SalonDashboard({ onNavigate }) {
                     <div className="sp-tl-actions">
                       <button className="sp-tl-action wa" onClick={()=>enviarWA(cita)}>
                         <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={13} />
-                        WhatsApp
+                        WA
                       </button>
                       {canDone && (
-                        <button className="sp-tl-action ok" onClick={()=>marcarCompletada(cita.id)}>
-                          <Ico d="M5 13l4 4L19 7" size={13} />
-                          Completar
+                        <button className="sp-tl-action ok"
+                          onClick={() => setCobrando(cobrando?.citaId===cita.id ? null : { citaId:cita.id, metodo:'efectivo' })}>
+                          <Ico d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={13} />
+                          {fmtCOP(cita.servicios?.precio||0)}
                         </button>
                       )}
                     </div>
+                    {cobrando?.citaId === cita.id && (
+                      <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10,
+                        background:'var(--surface)', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:8 }}>
+                        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                          {['efectivo','nequi','daviplata','tarjeta'].map(m => (
+                            <button key={m} onClick={() => setCobrando(c => ({...c, metodo:m}))} style={{
+                              padding:'5px 10px', borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer',
+                              border:`1px solid ${cobrando.metodo===m ? col : 'var(--border)'}`,
+                              background: cobrando.metodo===m ? `${col}18` : 'var(--card)',
+                              color: cobrando.metodo===m ? col : 'var(--text-3)',
+                            }}>{m.charAt(0).toUpperCase()+m.slice(1)}</button>
+                          ))}
+                        </div>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={() => setCobrando(null)} style={{
+                            flex:1, padding:'7px', borderRadius:8, cursor:'pointer',
+                            background:'transparent', border:'1px solid var(--border)', color:'var(--text-3)', fontSize:12,
+                          }}>Cancelar</button>
+                          <button onClick={() => registrarCobro(cita, cobrando.metodo)} style={{
+                            flex:2, padding:'7px', borderRadius:8, cursor:'pointer',
+                            background:col, border:'none', color:'#fff', fontWeight:700, fontSize:12,
+                          }}>✓ Confirmar cobro</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
