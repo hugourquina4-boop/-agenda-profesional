@@ -502,7 +502,8 @@ export default function SalonEquipo() {
               <div key={p.id} style={{
                 display:'flex', alignItems:'center', gap:12,
                 padding:'14px 16px', borderRadius:16,
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:`linear-gradient(135deg,${color}10,${color}05)`,
+                boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
               }}>
                 {/* Avatar */}
                 <div style={{
@@ -542,16 +543,16 @@ export default function SalonEquipo() {
                   </button>
 
                   <button onClick={() => abrirHorarios(p)} title="Horarios" style={{
-                    width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
-                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
+                    width:32, height:32, borderRadius:9, border:'none',
+                    background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
                     display:'flex', alignItems:'center', justifyContent:'center',
                   }}>
                     <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={14} />
                   </button>
 
                   <button onClick={() => abrir(p)} title="Editar" style={{
-                    width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
-                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
+                    width:32, height:32, borderRadius:9, border:'none',
+                    background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
                     display:'flex', alignItems:'center', justifyContent:'center',
                   }}>
                     <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
@@ -626,7 +627,8 @@ export default function SalonEquipo() {
 
               {/* Toggle activo */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                padding:'14px 16px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+                padding:'14px 16px', borderRadius:14, background:`linear-gradient(135deg,${col}08,transparent)`,
+                boxShadow:'0 1px 8px rgba(0,0,0,0.08)' }}>
                 <span style={{ fontSize:14, fontWeight:600, color:'var(--text)' }}>Activo</span>
                 <button onClick={() => setForm(f => ({ ...f, activo: !f.activo }))} style={{
                   width:48, height:26, borderRadius:13, border:'none', cursor:'pointer',
@@ -684,8 +686,9 @@ export default function SalonEquipo() {
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => setElimTarget(null)} style={{
                 flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
-                background:'var(--surface)', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none',
                 color:'var(--text-2)', fontWeight:600, fontSize:14,
+                boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               }}>Cancelar</button>
               <button onClick={eliminar} disabled={saving} style={{
                 flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
@@ -732,7 +735,8 @@ export default function SalonEquipo() {
                 const h = horarios.find(x => x.dia === d.key) || { activo:false, hora_inicio:'09:00', hora_fin:'19:00' }
                 return (
                   <div key={d.key} style={{
-                    borderRadius:14, background:'var(--card)', border:'1px solid var(--border)',
+                    borderRadius:14, background:'var(--card)',
+                    boxShadow: h.activo ? `0 2px 12px ${col}18` : '0 1px 6px rgba(0,0,0,0.08)',
                     overflow:'hidden',
                   }}>
                     {/* Fila día + toggle */}
@@ -801,9 +805,9 @@ export default function SalonEquipo() {
               onClick={() => { const p = profH; setProfH(null); abrirExcepciones(p) }}
               style={{
                 width:'100%', padding:'12px', borderRadius:14, cursor:'pointer',
-                marginBottom:10, background:'var(--surface)',
-                border:'1px solid var(--border)', color:'var(--text-2)',
-                fontFamily:'Plus Jakarta Sans', fontWeight:600, fontSize:14,
+                marginBottom:10, background:`${col}12`,
+                border:'none', color:col,
+                fontFamily:'Plus Jakarta Sans', fontWeight:700, fontSize:14,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
               }}
             >
@@ -849,8 +853,8 @@ export default function SalonEquipo() {
                 {/* Navegador de mes */}
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
                   <button onClick={() => cambiarMes(-1)} style={{
-                    width:36, height:36, borderRadius:10, border:'1px solid var(--border)',
-                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
+                    width:36, height:36, borderRadius:10, border:'none',
+                    background:`${col}12`, color:col, cursor:'pointer',
                     display:'flex', alignItems:'center', justifyContent:'center',
                   }}>
                     <Ico d="M15 18l-6-6 6-6" size={16} />
@@ -859,8 +863,8 @@ export default function SalonEquipo() {
                     {MESES[excMes.month - 1]} {excMes.year}
                   </span>
                   <button onClick={() => cambiarMes(1)} style={{
-                    width:36, height:36, borderRadius:10, border:'1px solid var(--border)',
-                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
+                    width:36, height:36, borderRadius:10, border:'none',
+                    background:`${col}12`, color:col, cursor:'pointer',
                     display:'flex', alignItems:'center', justifyContent:'center',
                   }}>
                     <Ico d="M9 18l6-6-6-6" size={16} />
@@ -884,10 +888,10 @@ export default function SalonEquipo() {
                     </p>
                     <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
                       {excepciones.map(exc => (
-                        <div key={exc.id} style={{
+                        <div key={exc.id} className="sp-tbl-row" style={{
                           display:'flex', alignItems:'center', gap:10,
                           padding:'9px 12px', borderRadius:10,
-                          background:'var(--card)', border:'1px solid var(--border)',
+                          background:'var(--card)',
                         }}>
                           <div style={{
                             width:6, height:6, borderRadius:'50%', flexShrink:0,
@@ -934,7 +938,9 @@ export default function SalonEquipo() {
 
                   {/* Toggle trabaja ese día */}
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                    padding:'14px 16px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+                    padding:'14px 16px', borderRadius:14,
+                    background:`linear-gradient(135deg,${col}08,transparent)`,
+                    boxShadow:'0 1px 8px rgba(0,0,0,0.08)' }}>
                     <div>
                       <div style={{ fontSize:14, fontWeight:600, color:'var(--text)' }}>Trabaja ese día</div>
                       <div style={{ fontSize:12, color:'var(--text-3)' }}>Desactivar = ausencia completa</div>
@@ -985,8 +991,9 @@ export default function SalonEquipo() {
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={() => setExcForm(null)} style={{
                     flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
-                    background:'var(--surface)', border:'1px solid var(--border)',
+                    background:'var(--card)', border:'none',
                     color:'var(--text-2)', fontWeight:600, fontSize:14,
+                    boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                   }}>Cancelar</button>
                   <button onClick={guardarExcepcion} disabled={savingExc} style={{
                     flex:2, padding:'14px', borderRadius:14, cursor:'pointer',
@@ -1048,8 +1055,9 @@ export default function SalonEquipo() {
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => setEditOwner(false)} style={{
                 flex:1, padding:'13px', borderRadius:14, cursor:'pointer',
-                background:'transparent', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none',
                 color:'var(--text-2)', fontWeight:600, fontSize:14,
+                boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               }}>Cancelar</button>
               <button onClick={guardarOwner} disabled={savingOwner} style={{
                 flex:2, padding:'13px', borderRadius:14, cursor:'pointer',
