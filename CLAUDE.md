@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-16 (sesión 3)
-> **Versión actual en producción: v1.3-dev** (commit 46cc3b6)
+> Actualizado: 2026-05-16 (sesión 4)
+> **Versión actual en producción: v1.3-dev** (commit e60da0c)
 
 ---
 
