@@ -132,6 +132,11 @@ export default function SalonDashboard({ onNavigate }) {
   const [serviciosCount, setServiciosCount] = useState(null)
   const [gastosMes,      setGastosMes]      = useState(isDemo ? 890000 : 0)
   const [ingresosMes,    setIngresosMes]    = useState(isDemo ? 7252000 : 0)
+  const [manana,         setManana]         = useState(isDemo ? { count:3, citas:[
+    { nombre:'Laura González', servicio:'Mechas', hora:'09:00' },
+    { nombre:'Sofía Pérez',    servicio:'Corte',  hora:'10:30' },
+    { nombre:'Andrea Ruiz',    servicio:'Tinte',  hora:'14:00' },
+  ]} : null)
   const [toast,          setToast]          = useState(null)
 
   const showToast = (msg, color='#22c55e') => {
@@ -148,7 +153,11 @@ export default function SalonDashboard({ onNavigate }) {
       const mesFin    = new Date(new Date(mesInicio).getFullYear(), new Date(mesInicio).getMonth() + 1, 0)
         .toISOString().slice(0, 10)
 
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes] = await Promise.all([
+      const mananaFecha = (() => {
+        const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10)
+      })()
+
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -170,6 +179,11 @@ export default function SalonDashboard({ onNavigate }) {
           .select('monto')
           .eq('tenant_id', tenant.id)
           .gte('created_at', `${mesInicio}T00:00:00`).lte('created_at', `${mesFin}T23:59:59`),
+        supabase.from('citas')
+          .select('id,fecha_inicio,clientes_agenda(nombre),servicios(nombre)')
+          .eq('tenant_id', tenant.id)
+          .gte('fecha_inicio', `${mananaFecha}T00:00:00`).lte('fecha_inicio', `${mananaFecha}T23:59:59`)
+          .neq('estado', 'cancelada').order('fecha_inicio').limit(5),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -185,6 +199,15 @@ export default function SalonDashboard({ onNavigate }) {
       setServiciosCount(servRes.count ?? 0)
       setGastosMes(totalGastos)
       setIngresosMes(totalIngresos)
+      const citasM = citasMananaRes.data || []
+      setManana({
+        count: citasM.length,
+        citas: citasM.map(c => ({
+          nombre:  c.clientes_agenda?.nombre || 'Cliente',
+          servicio: c.servicios?.nombre || '',
+          hora:    fmtHora(c.fecha_inicio),
+        })),
+      })
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -603,6 +626,60 @@ export default function SalonDashboard({ onNavigate }) {
           })}
         </div>
       )}
+      {/* ── Vista previa mañana ─────────────────────────── */}
+      {manana && manana.count > 0 && (
+        <div style={{ margin:'8px 16px 0' }}>
+          <div style={{
+            borderRadius:16, overflow:'hidden',
+            border:'1px solid var(--border)', background:'var(--card)',
+          }}>
+            <div style={{
+              padding:'12px 16px', borderBottom:'1px solid var(--border)',
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{
+                  width:32, height:32, borderRadius:9, flexShrink:0,
+                  background:`${col}18`, display:'flex', alignItems:'center', justifyContent:'center',
+                }}>
+                  <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={15} style={{ color: col }} />
+                </div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>Mañana</div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
+                    {manana.count} cita{manana.count !== 1 ? 's' : ''} agendada{manana.count !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => onNavigate?.('agenda')} style={{
+                fontSize:12, fontWeight:700, color:col, padding:'5px 10px',
+                borderRadius:8, border:`1px solid ${col}35`,
+                background:`${col}12`, cursor:'pointer', whiteSpace:'nowrap',
+              }}>
+                Ver agenda →
+              </button>
+            </div>
+            {manana.citas.map((c, i) => (
+              <div key={i} style={{
+                padding:'10px 16px', display:'flex', alignItems:'center', gap:10,
+                borderBottom: i < manana.citas.length - 1 ? '1px solid var(--border)' : 'none',
+              }}>
+                <span style={{
+                  fontSize:12, fontWeight:700, color:'var(--text-3)',
+                  minWidth:48, fontFamily:'monospace',
+                }}>{c.hora}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                    {c.nombre}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{c.servicio}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ height:20 }} />
     </>
   )
