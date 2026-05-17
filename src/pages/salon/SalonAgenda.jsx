@@ -74,11 +74,13 @@ export default function SalonAgenda() {
   const [pagoMetodo,   setPagoMetodo]   = useState('efectivo')
   const [pagoRef,      setPagoRef]      = useState('')
   const [guardandoPago,setGuardandoPago]= useState(false)
+  const [filtroProf,   setFiltroProf]   = useState(null)
+  const [nowOffset,    setNowOffset]    = useState(null)
 
   useEffect(() => {
     if (!tenant) return
     supabase.from('profesionales')
-      .select('id,nombre,color')
+      .select('id,nombre,color,foto_url')
       .eq('tenant_id', tenant.id)
       .eq('activo', true)
       .order('nombre')
@@ -129,6 +131,17 @@ export default function SalonAgenda() {
       .eq('fecha_preferida', selDay)
       .then(({ count }) => setEsperaDia(count || 0))
   }, [tenant, selDay])
+
+  useEffect(() => {
+    function calcOffset() {
+      const now = new Date()
+      if (selDay !== now.toISOString().slice(0,10)) { setNowOffset(null); return }
+      setNowOffset(((now.getHours() - 7) * 60 + now.getMinutes()) / 30 * 44)
+    }
+    calcOffset()
+    const iv = setInterval(calcOffset, 60000)
+    return () => clearInterval(iv)
+  }, [selDay])
 
   async function cambiarEstado(nuevoEstado) {
     if (!selCita) return
@@ -290,8 +303,9 @@ export default function SalonAgenda() {
     const H_END   = 21
     const SLOT_H  = 44  // px per 30min
     const COL_W   = 110
-    const PROFS   = profesionales.length > 0 ? profesionales
+    const PROFS_BASE = profesionales.length > 0 ? profesionales
       : [...new Map(citasDia.map(c => [c.profesionales?.nombre, { id: c.profesionales?.nombre, nombre: c.profesionales?.nombre, color: col }])).values()]
+    const PROFS = filtroProf ? PROFS_BASE.filter(p => p.id === filtroProf) : PROFS_BASE
 
     function minOffset(iso) {
       const [h, m] = iso.substring(11, 16).split(':').map(Number)
@@ -319,12 +333,18 @@ export default function SalonAgenda() {
             <div />
             {PROFS.map(p => (
               <div key={p.id} style={{ padding:'10px 8px', textAlign:'center' }}>
-                <div style={{ width:32, height:32, borderRadius:10, margin:'0 auto 4px',
-                  background:`${p.color || col}25`, display:'flex', alignItems:'center',
-                  justifyContent:'center', fontWeight:800, fontSize:13, color:p.color || col,
-                  fontFamily:'Outfit' }}>
-                  {p.nombre?.[0]}
-                </div>
+                {p.foto_url ? (
+                  <img src={p.foto_url} alt={p.nombre?.[0]}
+                    style={{ width:36, height:36, borderRadius:10, objectFit:'cover',
+                    margin:'0 auto 4px', display:'block', border:`2px solid ${p.color || col}40` }} />
+                ) : (
+                  <div style={{ width:36, height:36, borderRadius:10, margin:'0 auto 4px',
+                    background:`${p.color || col}25`, display:'flex', alignItems:'center',
+                    justifyContent:'center', fontWeight:800, fontSize:14, color:p.color || col,
+                    fontFamily:'Outfit' }}>
+                    {p.nombre?.[0]}
+                  </div>
+                )}
                 <div style={{ fontSize:11, fontWeight:700, color:'var(--text)',
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {p.nombre?.split(' ')[0]}
@@ -352,6 +372,14 @@ export default function SalonAgenda() {
                 height:1, background:'var(--border)', opacity:0.35,
               }} />
             ))}
+
+            {/* Línea hora actual */}
+            {nowOffset !== null && nowOffset >= 0 && nowOffset <= TOTAL_H && (
+              <div style={{ position:'absolute', left:56, right:0, top:nowOffset, zIndex:6, pointerEvents:'none', display:'flex', alignItems:'center' }}>
+                <div style={{ width:9, height:9, borderRadius:'50%', background:'#ef4444', flexShrink:0, marginLeft:-1 }} />
+                <div style={{ flex:1, height:2, background:'linear-gradient(90deg, #ef4444 70%, transparent)' }} />
+              </div>
+            )}
 
             {/* Bloques de citas */}
             {PROFS.map((prof, pi) => {
@@ -454,7 +482,7 @@ export default function SalonAgenda() {
       <div style={{ display:'flex', gap:4, margin:'0 16px 12px',
         background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
         {[['mes','Mes'],['semana','Sem'],['dia','Día']].map(([v,label]) => (
-          <button key={v} onClick={() => setVistaAgenda(v)} style={{
+          <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia') setFiltroProf(null) }} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
             background: vistaAgenda === v ? col : 'transparent',
             color: vistaAgenda === v ? '#fff' : 'var(--text-3)',
@@ -464,7 +492,27 @@ export default function SalonAgenda() {
       </div>
 
       {vistaAgenda === 'semana' && <VistaSemana />}
-      {vistaAgenda === 'dia'    && <VistaDia />}
+      {vistaAgenda === 'dia' && (<>
+        {profesionales.length > 1 && (
+          <div style={{ display:'flex', gap:6, padding:'0 16px 10px', overflowX:'auto' }}>
+            <button onClick={() => setFiltroProf(null)} style={{
+              padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+              background: filtroProf === null ? col : 'rgba(255,255,255,0.06)',
+              color: filtroProf === null ? '#fff' : 'var(--text-3)',
+              fontSize:12, fontWeight:700, transition:'all 0.15s',
+            }}>Todos</button>
+            {profesionales.map(p => (
+              <button key={p.id} onClick={() => setFiltroProf(filtroProf === p.id ? null : p.id)} style={{
+                padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                background: filtroProf === p.id ? (p.color || col) : 'rgba(255,255,255,0.06)',
+                color: filtroProf === p.id ? '#fff' : 'var(--text-3)',
+                fontSize:12, fontWeight:700, transition:'all 0.15s',
+              }}>{p.nombre?.split(' ')[0]}</button>
+            ))}
+          </div>
+        )}
+        <VistaDia />
+      </>)}
 
       {vistaAgenda === 'mes' && (<>
       {/* Cabecera días semana */}
