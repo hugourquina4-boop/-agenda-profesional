@@ -935,7 +935,8 @@ export default function SalonSuperadmin({ onGestionar }) {
               style={{
                 padding: '8px 12px', borderRadius: 10,
                 border: '1px solid var(--border)', background: 'var(--bg)',
-                color: 'var(--text)', fontSize: 13, outline: 'none', width: 200,
+                color: 'var(--text)', fontSize: 13, outline: 'none',
+                width: 180, minWidth: 0, flexShrink: 1,
               }}
             />
             <button onClick={actualizarClaveMaestra} disabled={masterSaving} style={{
@@ -951,7 +952,7 @@ export default function SalonSuperadmin({ onGestionar }) {
 
         {/* ── KPI strip ────────────────────────────────────────── */}
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8,
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8,
           margin: '14px 16px 0',
         }}>
           {[
@@ -1105,8 +1106,8 @@ export default function SalonSuperadmin({ onGestionar }) {
               <div style={{ margin: '10px 16px 0', overflowX: 'auto', overflowY: 'clip' }}>
                 {/* Header */}
                 <div style={{
-                  display: 'grid', gridTemplateColumns: '1.4fr 80px 90px 80px 90px 180px',
-                  padding: '6px 12px', marginBottom: 2,
+                  display: 'grid', gridTemplateColumns: 'minmax(140px,1.4fr) 80px 90px 80px 90px 180px',
+                  padding: '6px 12px', marginBottom: 2, minWidth: 640,
                   fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.7,
                 }}>
                   <span>Negocio</span>
@@ -1121,8 +1122,8 @@ export default function SalonSuperadmin({ onGestionar }) {
                   const col = n.color_primario || '#f43f5e'
                   return (
                     <div key={n.id} className="sp-tbl-row" style={{
-                      display: 'grid', gridTemplateColumns: '1.4fr 80px 90px 80px 90px 180px',
-                      alignItems: 'center', opacity: n.activo ? 1 : 0.55,
+                      display: 'grid', gridTemplateColumns: 'minmax(140px,1.4fr) 80px 90px 80px 90px 180px',
+                      alignItems: 'center', opacity: n.activo ? 1 : 0.55, minWidth: 640,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                         <div style={{

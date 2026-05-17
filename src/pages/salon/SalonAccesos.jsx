@@ -53,6 +53,7 @@ export default function SalonAccesos() {
 
   const [activeTab,    setActiveTab]    = useState('equipo')  // 'equipo' | 'permisos'
   const [localPermisos,setLocalPermisos]= useState(null)
+  const [expandedUser, setExpandedUser] = useState(null)     // user_id expandido
 
   const [usuarios,    setUsuarios]    = useState([])
   const [sinCuenta,   setSinCuenta]   = useState([])
@@ -352,93 +353,119 @@ export default function SalonAccesos() {
               </p>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {usuarios.map(u => {
-                  const r   = ROL[u.rol] || ROL.profesional
-                  const nom = u.profesional?.nombre || u.email || `...${u.user_id.slice(-6)}`
+                  const r        = ROL[u.rol] || ROL.profesional
+                  const nom      = u.profesional?.nombre || u.email || `...${u.user_id.slice(-6)}`
+                  const abierto  = expandedUser === u.user_id
+                  const modAcceso = MODULOS.filter(m => localPermisos?.[u.rol]?.[m.key] !== false)
+
                   return (
                     <div key={u.user_id} style={{
-                      display:'flex', alignItems:'center', gap:12,
-                      padding:'14px 16px', borderRadius:14,
+                      borderRadius:16, overflow:'hidden',
                       background:`linear-gradient(135deg,${r.color}10,var(--card))`,
                       boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
-                      opacity: u.activo ? 1 : 0.5,
+                      opacity: u.activo ? 1 : 0.55,
+                      transition:'opacity 0.2s',
                     }}>
-                      <div style={{
-                        width:40, height:40, borderRadius:12, background:`${r.color}20`,
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        fontFamily:'Outfit', fontWeight:800, fontSize:17, color:r.color, flexShrink:0,
-                        overflow:'hidden',
-                      }}>
-                        {u.profesional?.foto_url
-                          ? <img src={u.profesional.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                          : (nom[0] || '?').toUpperCase()
-                        }
-                      </div>
-
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontWeight:700, fontSize:14, color:'var(--text)',
-                          overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                          {nom}
+                      {/* ── Fila principal ── */}
+                      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer' }}
+                        onClick={() => setExpandedUser(abierto ? null : u.user_id)}>
+                        <div style={{
+                          width:40, height:40, borderRadius:12, background:`${r.color}20`,
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          fontFamily:'Outfit', fontWeight:800, fontSize:17, color:r.color, flexShrink:0, overflow:'hidden',
+                        }}>
+                          {u.profesional?.foto_url
+                            ? <img src={u.profesional.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                            : (nom[0] || '?').toUpperCase()
+                          }
                         </div>
-                        <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2,
-                          overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                          {u.email || 'Sin email'}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontWeight:700, fontSize:14, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                            {nom}
+                          </div>
+                          <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                            {u.email || 'Sin email'}
+                          </div>
                         </div>
+                        <span style={{ padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:700, background:`${r.color}18`, color:r.color, flexShrink:0 }}>
+                          {r.label}
+                        </span>
+                        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth={2}
+                          strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0, transition:'transform 0.2s', transform: abierto ? 'rotate(180deg)' : 'none' }}>
+                          <path d="M6 9l6 6 6-6" />
+                        </svg>
                       </div>
 
-                      <span style={{
-                        padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:700,
-                        background:`${r.color}18`, color:r.color, flexShrink:0,
-                      }}>
-                        {r.label}
-                      </span>
+                      {/* ── Panel expandido ── */}
+                      {abierto && (
+                        <div style={{ padding:'0 16px 16px', borderTop:`1px solid ${r.color}20` }}>
 
-                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-                        {/* Reset contraseña */}
-                        <button
-                          onClick={() => { setResetSheet({ user_id:u.user_id, email:u.email, nuevaClave: genPassword() }); setResetSent(false) }}
-                          title="Resetear contraseña"
-                          style={{
-                            width:32, height:32, borderRadius:9, border:'none',
-                            background:'rgba(255,255,255,0.08)', color:'var(--text-3)', cursor:'pointer',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                          }}>
-                          <Ico d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" size={14} />
-                        </button>
+                          {/* Selector de rol */}
+                          {u.rol !== 'superadmin' && (
+                            <div style={{ marginBottom:14 }}>
+                              <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', margin:'12px 0 8px' }}>
+                                Rol del integrante
+                              </p>
+                              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                                {['admin','contable','recepcion','profesional'].map(key => {
+                                  const rk = ROL[key]
+                                  const selec = u.rol === key
+                                  return (
+                                    <button key={key} onClick={() => cambiarRol(u.user_id, key)} style={{
+                                      padding:'6px 12px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', border:'none',
+                                      background: selec ? rk.color : `${rk.color}15`,
+                                      color:      selec ? '#fff'    : rk.color,
+                                      transition:'all 0.15s',
+                                    }}>
+                                      {rk.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              <p style={{ fontSize:11, color:'var(--text-3)', marginTop:5 }}>{r.desc}</p>
+                            </div>
+                          )}
 
-                        {/* Cambiar rol */}
-                        {u.rol !== 'superadmin' && (
-                          <button
-                            onClick={() => setRolSheet({ user_id:u.user_id, rol:u.rol })}
-                            title="Cambiar rol"
-                            style={{
-                              width:32, height:32, borderRadius:9, border:'none',
-                              background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
-                              display:'flex', alignItems:'center', justifyContent:'center',
+                          {/* Módulos accesibles */}
+                          <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:8 }}>
+                            Módulos con acceso
+                          </p>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:14 }}>
+                            {MODULOS.map(m => {
+                              const tiene = localPermisos ? (localPermisos?.[u.rol]?.[m.key] !== false) : true
+                              return (
+                                <span key={m.key} style={{
+                                  padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:600,
+                                  background: tiene ? `${r.color}15` : 'rgba(239,68,68,0.08)',
+                                  color:      tiene ? r.color        : '#f87171',
+                                }}>
+                                  {tiene ? '✓' : '✗'} {m.label}
+                                </span>
+                              )
+                            })}
+                          </div>
+
+                          {/* Acciones */}
+                          <div style={{ display:'flex', gap:8 }}>
+                            <button onClick={() => { setResetSheet({ user_id:u.user_id, email:u.email, nuevaClave: genPassword() }); setResetSent(false) }} style={{
+                              flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                              background:'rgba(255,255,255,0.08)', color:'var(--text-2)', fontWeight:600, fontSize:12,
                             }}>
-                            <Ico d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" size={14} />
-                          </button>
-                        )}
-
-                        {/* Suspender/Reactivar */}
-                        {u.rol !== 'superadmin' && (
-                          <button
-                            onClick={() => toggleActivo(u.user_id, u.activo)}
-                            title={u.activo ? 'Suspender' : 'Reactivar'}
-                            style={{
-                              width:32, height:32, borderRadius:9,
-                              border:`1px solid ${u.activo ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
-                              background:'transparent',
-                              color: u.activo ? '#f87171' : '#4ade80',
-                              cursor:'pointer',
-                              display:'flex', alignItems:'center', justifyContent:'center',
-                            }}>
-                            <Ico d={u.activo
-                              ? 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636'
-                              : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                            } size={14} />
-                          </button>
-                        )}
-                      </div>
+                              🔑 Cambiar clave
+                            </button>
+                            {u.rol !== 'superadmin' && (
+                              <button onClick={() => toggleActivo(u.user_id, u.activo)} style={{
+                                flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                                fontWeight:600, fontSize:12,
+                                background: u.activo ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                                color:      u.activo ? '#f87171'              : '#4ade80',
+                              }}>
+                                {u.activo ? '⊘ Suspender' : '✓ Reactivar'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
