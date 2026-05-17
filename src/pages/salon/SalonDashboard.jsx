@@ -137,6 +137,9 @@ export default function SalonDashboard({ onNavigate }) {
     { nombre:'Sofía Pérez',    servicio:'Corte',  hora:'10:30' },
     { nombre:'Andrea Ruiz',    servicio:'Tinte',  hora:'14:00' },
   ]} : null)
+  const [cumpleaneros,   setCumpleaneros]   = useState(isDemo ? [
+    { nombre:'Valentina Cruz', telefono:'3001234567' }
+  ] : [])
   const [toast,          setToast]          = useState(null)
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
@@ -159,7 +162,7 @@ export default function SalonDashboard({ onNavigate }) {
         const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10)
       })()
 
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -186,6 +189,10 @@ export default function SalonDashboard({ onNavigate }) {
           .eq('tenant_id', tenant.id)
           .gte('fecha_inicio', `${mananaFecha}T00:00:00`).lte('fecha_inicio', `${mananaFecha}T23:59:59`)
           .neq('estado', 'cancelada').order('fecha_inicio').limit(5),
+        supabase.from('clientes_agenda')
+          .select('id,nombre,telefono')
+          .eq('tenant_id', tenant.id).eq('activo', true)
+          .like('fecha_nacimiento', `%-${fecha.slice(5)}`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -210,6 +217,7 @@ export default function SalonDashboard({ onNavigate }) {
           hora:    fmtHora(c.fecha_inicio),
         })),
       })
+      setCumpleaneros(cumplRes?.data || [])
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -297,6 +305,42 @@ export default function SalonDashboard({ onNavigate }) {
         }}>
           <Ico d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={15} />
           Modo demo — datos de ejemplo. Conecta Supabase para ver tu negocio real.
+        </div>
+      )}
+
+      {/* ── Alerta cumpleaños ────────────────────────────── */}
+      {cumpleaneros.length > 0 && (
+        <div style={{
+          margin:'16px 16px 0', padding:'12px 16px', borderRadius:14,
+          background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.28)',
+          display:'flex', alignItems:'flex-start', gap:12,
+        }}>
+          <span style={{ fontSize:22, flexShrink:0, lineHeight:1 }}>🎂</span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
+              {cumpleaneros.length === 1
+                ? `¡Hoy es el cumpleaños de ${cumpleaneros[0].nombre}!`
+                : `¡${cumpleaneros.length} clientes cumplen años hoy!`}
+            </div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {cumpleaneros.map(c => {
+                const tel = c.telefono?.replace(/\D/g,'')
+                const msg = encodeURIComponent(`¡Feliz cumpleaños ${c.nombre.split(' ')[0]}! 🎉 En ${tenant?.nombre || 'el salón'} te deseamos un día increíble. ¡Queremos celebrarlo contigo — tienes un descuento especial hoy! 💅`)
+                return tel ? (
+                  <a key={c.id} href={`https://wa.me/57${tel}?text=${msg}`} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:7,
+                      background:'rgba(236,72,153,0.12)', border:'1px solid rgba(236,72,153,0.35)',
+                      color:'#ec4899', textDecoration:'none', whiteSpace:'nowrap',
+                    }}>
+                    🎁 WA {cumpleaneros.length > 1 ? c.nombre.split(' ')[0] : 'Saludar'}
+                  </a>
+                ) : (
+                  <span key={c.id} style={{ fontSize:11, color:'var(--text-3)' }}>{c.nombre}</span>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 
