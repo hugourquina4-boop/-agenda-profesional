@@ -395,12 +395,8 @@ export default function SalonClientes() {
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Importar clientes — CSV</p>
 
-            <div style={{
-              padding:'12px 14px', borderRadius:12, marginBottom:16,
-              background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)',
-              fontSize:13, color:'#4ade80', fontWeight:600,
-            }}>
-              {importData.length} cliente{importData.length !== 1 ? 's' : ''} listos para importar
+            <div className="sp-alert success" style={{ marginBottom:16, marginLeft:0, marginRight:0, fontSize:13, color:'#4ade80', fontWeight:600 }}>
+              <span>✓ {importData.length} cliente{importData.length !== 1 ? 's' : ''} listos para importar</span>
             </div>
 
             <div style={{ fontSize:11, color:'var(--text-3)', fontWeight:700,
@@ -427,12 +423,8 @@ export default function SalonClientes() {
               )}
             </div>
 
-            <div style={{
-              padding:'10px 14px', borderRadius:10, marginBottom:20,
-              background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.2)',
-              fontSize:11, color:'#93c5fd', lineHeight:1.6,
-            }}>
-              Columnas reconocidas: <b>nombre</b>, telefono, email, fecha_nacimiento (YYYY-MM-DD), servicios_interes, notas
+            <div className="sp-alert info" style={{ marginLeft:0, marginRight:0, marginBottom:20, fontSize:11, color:'#93c5fd', lineHeight:1.6, alignItems:'center' }}>
+              <span>Columnas reconocidas: <b>nombre</b>, telefono, email, fecha_nacimiento (YYYY-MM-DD), servicios_interes, notas</span>
             </div>
 
             <div style={{ display:'flex', gap:10 }}>
@@ -534,13 +526,10 @@ export default function SalonClientes() {
               </div>
 
               {/* Fidelización — info */}
-              <div style={{
-                padding:'12px 14px', borderRadius:12,
-                background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.18)',
-              }}>
-                <p style={{ fontSize:12, color:'var(--text-3)', margin:0, lineHeight:1.6 }}>
-                  <span style={{ fontWeight:700, color:'#3b82f6' }}>⭐ Fidelización</span> — el saldo de puntos, tier y estadísticas se calculan automáticamente a medida que registres citas.
-                </p>
+              <div className="sp-alert info" style={{ marginLeft:0, marginRight:0, alignItems:'center' }}>
+                <span style={{ fontSize:12, color:'#93c5fd', lineHeight:1.6 }}>
+                  <b style={{ color:'#60a5fa' }}>⭐ Fidelización</b> — puntos, tier y estadísticas se calculan automáticamente al registrar citas.
+                </span>
               </div>
             </div>
             <button onClick={guardarCliente} disabled={guardando} style={{
@@ -640,18 +629,14 @@ export default function SalonClientes() {
           </p>
         </div>
       ) : (
-        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:6 }}>
           {clientesFiltrados.map((c, i) => {
             const color = COLORS[i % COLORS.length]
             const cumple = cumpleProximo(c.fecha_nacimiento)
             return (
               <div key={c.id} onClick={() => abrirCliente(c)}
-                style={{
-                  width:'100%', display:'flex', alignItems:'center', gap:14,
-                  padding:'14px 16px', borderRadius:16, cursor:'pointer',
-                  background:'var(--card)', border:`1px solid ${cumple ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
-                  transition:'all 0.15s',
-                }}>
+                className="sp-client-row"
+                style={{ background: cumple ? 'rgba(251,191,36,0.07)' : undefined }}>
                 <div style={{
                   width:46, height:46, borderRadius:14, background:`${color}25`,
                   display:'flex', alignItems:'center', justifyContent:'center',

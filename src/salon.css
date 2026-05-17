@@ -1531,3 +1531,141 @@ textarea.sp-input { min-height: 80px; resize: vertical; }
   color: var(--text-3);
   margin-right: 4px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ALERT PANELS — gradient fill + left stripe, sin borde coloreado
+   ═══════════════════════════════════════════════════════════════════ */
+.sp-alert {
+  margin: 0 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.sp-alert::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+}
+.sp-alert.warn {
+  background: linear-gradient(120deg, rgba(245,158,11,0.13) 0%, rgba(245,158,11,0.03) 100%);
+  box-shadow: 0 2px 28px rgba(245,158,11,0.08);
+}
+.sp-alert.warn::before   { background: linear-gradient(to bottom, #fbbf24, #d97706); }
+.sp-alert.success {
+  background: linear-gradient(120deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.03) 100%);
+  box-shadow: 0 2px 28px rgba(34,197,94,0.07);
+}
+.sp-alert.success::before { background: linear-gradient(to bottom, #4ade80, #16a34a); }
+.sp-alert.rose {
+  background: linear-gradient(120deg, rgba(236,72,153,0.12) 0%, rgba(236,72,153,0.03) 100%);
+  box-shadow: 0 2px 28px rgba(236,72,153,0.08);
+}
+.sp-alert.rose::before    { background: linear-gradient(to bottom, #f472b6, #be185d); }
+.sp-alert.info {
+  background: linear-gradient(120deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.03) 100%);
+  box-shadow: 0 2px 28px rgba(59,130,246,0.07);
+}
+.sp-alert.info::before    { background: linear-gradient(to bottom, #60a5fa, #1d4ed8); }
+.sp-alert.danger {
+  background: linear-gradient(120deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.03) 100%);
+  box-shadow: 0 2px 28px rgba(239,68,68,0.07);
+}
+.sp-alert.danger::before  { background: linear-gradient(to bottom, #f87171, #b91c1c); }
+
+@media (min-width: 768px) { .sp-alert { margin: 0 28px; } }
+
+.sp-root.sp-light .sp-alert.warn    { background: linear-gradient(120deg, rgba(245,158,11,0.09), transparent); box-shadow: none; }
+.sp-root.sp-light .sp-alert.success { background: linear-gradient(120deg, rgba(34,197,94,0.08),  transparent); box-shadow: none; }
+.sp-root.sp-light .sp-alert.rose    { background: linear-gradient(120deg, rgba(236,72,153,0.08), transparent); box-shadow: none; }
+.sp-root.sp-light .sp-alert.info    { background: linear-gradient(120deg, rgba(59,130,246,0.08), transparent); box-shadow: none; }
+.sp-root.sp-light .sp-alert.danger  { background: linear-gradient(120deg, rgba(239,68,68,0.07),  transparent); box-shadow: none; }
+
+/* ── KPI cards (gradient fill, sin borde) ── */
+.sp-kpi-card {
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.sp-kpi-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.1);
+  pointer-events: none;
+}
+.sp-kpi-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.sp-kpi-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.sp-kpi-sub {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.6;
+  margin-top: 1px;
+}
+
+/* ── Clean list rows — sin borde, con hover sutil ── */
+.sp-tbl-row {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.025);
+  transition: background 0.14s;
+  margin-bottom: 3px;
+}
+.sp-tbl-row:hover { background: rgba(255,255,255,0.055); }
+.sp-root.sp-light .sp-tbl-row { background: rgba(0,0,0,0.022); }
+.sp-root.sp-light .sp-tbl-row:hover { background: rgba(0,0,0,0.045); }
+
+/* ── Client card row ── */
+.sp-client-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.15s;
+  background: rgba(255,255,255,0.03);
+  position: relative;
+}
+.sp-client-row:hover {
+  background: rgba(255,255,255,0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+}
+.sp-client-row:active { transform: scale(0.99); box-shadow: none; }
+.sp-root.sp-light .sp-client-row { background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+.sp-root.sp-light .sp-client-row:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.10); }
+
+/* ── Stat row (pagos historial, analytics) ── */
+.sp-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.025);
+  margin-bottom: 3px;
+}
+.sp-root.sp-light .sp-stat-row { background: rgba(0,0,0,0.02); }

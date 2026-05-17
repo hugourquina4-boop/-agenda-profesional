@@ -81,7 +81,8 @@ function LinkReservas({ slug, col, showToast }) {
   return (
     <div style={{
       margin:'12px 16px 0', padding:'14px 16px', borderRadius:16,
-      background:`${col}0e`, border:`1px solid ${col}30`,
+      background:`linear-gradient(135deg, ${col}14, ${col}06)`,
+      boxShadow:`0 4px 24px ${col}10`,
       display:'flex', alignItems:'center', gap:12,
     }}>
       <div style={{
@@ -297,24 +298,15 @@ export default function SalonDashboard({ onNavigate }) {
       {toast && <div className="sp-toast show" style={{ background:toast.color }}>{toast.msg}</div>}
 
       {isDemo && (
-        <div style={{
-          margin:'16px 16px 0', padding:'10px 16px', borderRadius:12,
-          background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.25)',
-          fontSize:12, color:'#fbbf24', fontWeight:600,
-          display:'flex', alignItems:'center', gap:8,
-        }}>
-          <Ico d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={15} />
-          Modo demo — datos de ejemplo. Conecta Supabase para ver tu negocio real.
+        <div className="sp-alert warn" style={{ marginTop:16, fontSize:12, color:'#fbbf24', fontWeight:600 }}>
+          <Ico d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={15} style={{ flexShrink:0 }} />
+          <span>Modo demo — datos de ejemplo. Conecta Supabase para ver tu negocio real.</span>
         </div>
       )}
 
       {/* ── Alerta cumpleaños ────────────────────────────── */}
       {cumpleaneros.length > 0 && (
-        <div style={{
-          margin:'16px 16px 0', padding:'12px 16px', borderRadius:14,
-          background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.28)',
-          display:'flex', alignItems:'flex-start', gap:12,
-        }}>
+        <div className="sp-alert rose" style={{ marginTop:16 }}>
           <span style={{ fontSize:22, flexShrink:0, lineHeight:1 }}>🎂</span>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
@@ -496,29 +488,21 @@ export default function SalonDashboard({ onNavigate }) {
       {/* ── Resumen del mes ─────────────────────────────── */}
       {(ingresosMes > 0 || gastosMes > 0) && (
         <div style={{ margin:'0 16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-          <div style={{
-            padding:'14px 16px', borderRadius:16,
-            background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)',
+          <div className="sp-kpi-card" style={{
+            background:'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.04) 100%)',
+            boxShadow:'0 4px 24px rgba(34,197,94,0.09)',
           }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'#4ade80', letterSpacing:0.5, marginBottom:6 }}>
-              INGRESOS MES
-            </div>
-            <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'#4ade80' }}>
-              {fmtCOP(ingresosMes)}
-            </div>
+            <div className="sp-kpi-lbl" style={{ color:'#4ade80' }}>Ingresos mes</div>
+            <div className="sp-kpi-val" style={{ color:'#4ade80', fontSize:22 }}>{fmtCOP(ingresosMes)}</div>
           </div>
-          <div style={{
-            padding:'14px 16px', borderRadius:16,
-            background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)',
+          <div className="sp-kpi-card" style={{
+            background:'linear-gradient(135deg, rgba(239,68,68,0.13) 0%, rgba(239,68,68,0.04) 100%)',
+            boxShadow:'0 4px 24px rgba(239,68,68,0.08)',
           }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'#f87171', letterSpacing:0.5, marginBottom:6 }}>
-              GASTOS MES
-            </div>
-            <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'#f87171' }}>
-              {fmtCOP(gastosMes)}
-            </div>
+            <div className="sp-kpi-lbl" style={{ color:'#f87171' }}>Gastos mes</div>
+            <div className="sp-kpi-val" style={{ color:'#f87171', fontSize:22 }}>{fmtCOP(gastosMes)}</div>
             {gastosMes > 0 && ingresosMes > 0 && (
-              <div style={{ fontSize:10, color:'rgba(248,113,113,0.7)', marginTop:2 }}>
+              <div className="sp-kpi-sub" style={{ color:'rgba(248,113,113,0.65)' }}>
                 {Math.round(gastosMes / ingresosMes * 100)}% de ingresos
               </div>
             )}
@@ -528,11 +512,7 @@ export default function SalonDashboard({ onNavigate }) {
 
       {/* ── Alerta stock bajo ───────────────────────────── */}
       {stockAlertas > 0 && (
-        <div style={{
-          margin:'0 16px 4px', padding:'12px 16px', borderRadius:14,
-          background:'rgba(251,146,60,0.1)', border:'1px solid rgba(251,146,60,0.28)',
-          display:'flex', alignItems:'center', gap:12,
-        }}>
+        <div className="sp-alert warn" style={{ marginBottom:4 }}>
           <Ico d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={18} />
           <div style={{ flex:1 }}>
             <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
@@ -545,35 +525,6 @@ export default function SalonDashboard({ onNavigate }) {
         </div>
       )}
 
-      {/* ── Link portal público ─────────────────────────── */}
-      {tenant?.slug && (
-        <div style={{ margin:'0 16px 4px' }}>
-          <div style={{
-            display:'flex', alignItems:'center', gap:14, padding:'14px 16px', borderRadius:16,
-            background:`${col}10`, border:`1px solid ${col}30`,
-          }}>
-            <div style={{ width:38, height:38, borderRadius:12, background:`${col}20`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-              <Ico d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" size={18} />
-            </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>Portal de reservas</div>
-              <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                /reservar/{tenant.slug}
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                const url = `${window.location.origin}/reservar/${tenant.slug}`
-                navigator.clipboard?.writeText(url)
-                  .then(() => setToast({ msg:'Link copiado', color:'#22c55e' }))
-                setTimeout(() => setToast(null), 2000)
-              }}
-              style={{ padding:'8px 14px', borderRadius:10, border:`1px solid ${col}40`, background:`${col}18`, color:col, fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
-              Copiar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Equipo strip ─────────────────────────────────── */}
       {equipo.length>0 && (
@@ -688,30 +639,45 @@ export default function SalonDashboard({ onNavigate }) {
                       )}
                     </div>
                     {cobrando?.citaId === cita.id && (
-                      <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10,
-                        background:'var(--surface)', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:8 }}>
-                        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                      <div style={{
+                        marginTop:10, padding:'12px 14px', borderRadius:14,
+                        background:`linear-gradient(135deg, ${col}10, ${col}05)`,
+                        boxShadow:`0 4px 20px ${col}12`,
+                        display:'flex', flexDirection:'column', gap:10,
+                      }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:2 }}>
+                          Método de cobro
+                        </div>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                           {['efectivo','nequi','daviplata','tarjeta'].map(m => (
                             <button key={m} onClick={() => setCobrando(c => ({...c, metodo:m}))} style={{
-                              padding:'5px 10px', borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer',
-                              border:`1px solid ${cobrando.metodo===m ? col : 'var(--border)'}`,
-                              background: cobrando.metodo===m ? `${col}18` : 'var(--card)',
-                              color: cobrando.metodo===m ? col : 'var(--text-3)',
+                              padding:'7px 13px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer',
+                              border:'none',
+                              background: cobrando.metodo===m
+                                ? `linear-gradient(135deg, ${col}cc, ${col}88)`
+                                : 'rgba(255,255,255,0.07)',
+                              color: cobrando.metodo===m ? '#fff' : 'var(--text-2)',
+                              boxShadow: cobrando.metodo===m ? `0 2px 12px ${col}40` : 'none',
+                              transition:'all 0.15s',
                             }}>{m.charAt(0).toUpperCase()+m.slice(1)}</button>
                           ))}
                         </div>
                         <div style={{ display:'flex', gap:6 }}>
                           <button onClick={() => setCobrando(null)} style={{
-                            padding:'7px 10px', borderRadius:8, cursor:'pointer',
-                            background:'transparent', border:'1px solid var(--border)', color:'var(--text-3)', fontSize:12,
+                            padding:'8px 12px', borderRadius:9, cursor:'pointer',
+                            background:'rgba(255,255,255,0.06)', border:'none',
+                            color:'var(--text-3)', fontSize:12, fontWeight:600,
                           }}>✕</button>
                           <button onClick={() => { marcarCompletada(cita.id); setCobrando(null) }} style={{
-                            flex:1, padding:'7px', borderRadius:8, cursor:'pointer',
-                            background:'transparent', border:'1px solid var(--border)', color:'var(--text-2)', fontSize:11,
+                            flex:1, padding:'8px', borderRadius:9, cursor:'pointer',
+                            background:'rgba(255,255,255,0.06)', border:'none',
+                            color:'var(--text-2)', fontSize:12, fontWeight:600,
                           }}>Sin cobro</button>
                           <button onClick={() => registrarCobro(cita, cobrando.metodo)} style={{
-                            flex:2, padding:'7px', borderRadius:8, cursor:'pointer',
-                            background:col, border:'none', color:'#fff', fontWeight:700, fontSize:12,
+                            flex:2, padding:'8px', borderRadius:9, cursor:'pointer',
+                            background:`linear-gradient(135deg, ${col}, ${col}cc)`,
+                            border:'none', color:'#fff', fontWeight:700, fontSize:13,
+                            boxShadow:`0 4px 16px ${col}40`,
                           }}>✓ Cobrar</button>
                         </div>
                       </div>
@@ -725,54 +691,56 @@ export default function SalonDashboard({ onNavigate }) {
       )}
       {/* ── Vista previa mañana ─────────────────────────── */}
       {manana && manana.count > 0 && (
-        <div style={{ margin:'8px 16px 0' }}>
-          <div style={{
-            borderRadius:16, overflow:'hidden',
-            border:'1px solid var(--border)', background:'var(--card)',
-          }}>
+        <div style={{ margin:'16px 16px 0' }}>
+          <div style={{ borderRadius:18, overflow:'hidden', boxShadow:'0 4px 24px rgba(0,0,0,0.18)' }}>
             <div style={{
-              padding:'12px 16px', borderBottom:'1px solid var(--border)',
+              padding:'14px 18px',
+              background:`linear-gradient(135deg, ${col}22, ${col}0a)`,
               display:'flex', alignItems:'center', justifyContent:'space-between',
             }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:11 }}>
                 <div style={{
-                  width:32, height:32, borderRadius:9, flexShrink:0,
-                  background:`${col}18`, display:'flex', alignItems:'center', justifyContent:'center',
+                  width:34, height:34, borderRadius:10, flexShrink:0,
+                  background:`${col}30`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
                 }}>
-                  <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={15} style={{ color: col }} />
+                  <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={16} style={{ color:col }} />
                 </div>
                 <div>
-                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>Mañana</div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'var(--text)', letterSpacing:-0.2 }}>Mañana</div>
                   <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
                     {manana.count} cita{manana.count !== 1 ? 's' : ''} agendada{manana.count !== 1 ? 's' : ''}
                   </div>
                 </div>
               </div>
               <button onClick={() => onNavigate?.('agenda')} style={{
-                fontSize:12, fontWeight:700, color:col, padding:'5px 10px',
-                borderRadius:8, border:`1px solid ${col}35`,
-                background:`${col}12`, cursor:'pointer', whiteSpace:'nowrap',
+                fontSize:12, fontWeight:700, color:col, padding:'6px 12px',
+                borderRadius:9, border:'none',
+                background:`${col}22`, cursor:'pointer', whiteSpace:'nowrap',
               }}>
-                Ver agenda →
+                Ver →
               </button>
             </div>
-            {manana.citas.map((c, i) => (
-              <div key={i} style={{
-                padding:'10px 16px', display:'flex', alignItems:'center', gap:10,
-                borderBottom: i < manana.citas.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <span style={{
-                  fontSize:12, fontWeight:700, color:'var(--text-3)',
-                  minWidth:48, fontFamily:'monospace',
-                }}>{c.hora}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                    {c.nombre}
+            <div style={{ background:'rgba(255,255,255,0.025)' }}>
+              {manana.citas.map((c, i) => (
+                <div key={i} style={{
+                  padding:'11px 18px', display:'flex', alignItems:'center', gap:12,
+                  borderTop:'1px solid rgba(255,255,255,0.05)',
+                }}>
+                  <span style={{
+                    fontSize:12, fontWeight:700, color:col,
+                    minWidth:46, fontFamily:'Outfit, monospace',
+                    letterSpacing:-0.3,
+                  }}>{c.hora}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                      {c.nombre}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{c.servicio}</div>
                   </div>
-                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{c.servicio}</div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}

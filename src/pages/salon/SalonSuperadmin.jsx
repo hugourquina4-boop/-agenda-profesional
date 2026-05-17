@@ -951,41 +951,47 @@ export default function SalonSuperadmin({ onGestionar }) {
 
         {/* ── KPI strip ────────────────────────────────────────── */}
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 1,
-          background: 'var(--border)', margin: '12px 16px 0', borderRadius: 14, overflow: 'hidden',
+          display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8,
+          margin: '14px 16px 0',
         }}>
           {[
-            ['TOTAL NEGOCIOS',  negocios.length,    '#60a5fa', 'registrados'],
-            ['ACTIVOS',         activos.length,      '#4ade80', 'con acceso vigente'],
-            ['SUSPENDIDOS',     suspendidos.length,  '#f87171', 'sin acceso'],
-            ['CITAS HOY',       citasHoy,            '#c084fc', 'en todos los negocios'],
-            ['MRR ESTIMADO',    fmtCOP(mrr),         '#22c55e', 'suscripciones activas'],
-          ].map(([lbl, val, c, sub]) => (
-            <div key={lbl} style={{ padding: '14px 10px', background: 'var(--card)', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: c, fontFamily: 'Outfit', lineHeight: 1.1 }}>{val}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>{lbl}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-3)', marginTop: 2, fontWeight: 400 }}>{sub}</div>
+            ['Total',      negocios.length,    '#60a5fa', 'rgba(59,130,246,0.15)',   'negocios'],
+            ['Activos',    activos.length,      '#4ade80', 'rgba(34,197,94,0.14)',    'vigentes'],
+            ['Suspendidos',suspendidos.length,  '#f87171', 'rgba(239,68,68,0.13)',    'sin acceso'],
+            ['Citas hoy',  citasHoy,            '#c084fc', 'rgba(168,85,247,0.14)',   'total'],
+            ['MRR',        fmtCOP(mrr),         '#4ade80', 'rgba(34,197,94,0.10)',    'estimado'],
+          ].map(([lbl, val, c, bg, sub]) => (
+            <div key={lbl} className="sp-kpi-card" style={{
+              background: `linear-gradient(135deg, ${bg} 0%, transparent 100%)`,
+              boxShadow: `0 4px 20px ${bg}`,
+              textAlign: 'center',
+              padding: '14px 8px',
+            }}>
+              <div className="sp-kpi-val" style={{ color: c, fontSize: 22, textAlign: 'center' }}>{val}</div>
+              <div className="sp-kpi-lbl" style={{ color: c, opacity: 0.85, marginTop: 5 }}>{lbl}</div>
+              <div className="sp-kpi-sub" style={{ marginTop: 2 }}>{sub}</div>
             </div>
           ))}
         </div>
 
         {/* ── Distribución por plan ─────────────────────────────── */}
         {distribPlan.length > 0 && (
-          <div style={{ margin: '12px 16px 0' }}>
+          <div style={{ margin: '10px 16px 0' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
-              Distribución por plan — negocios activos
+              Distribución por plan — activos
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {distribPlan.map(({ plan, count }) => {
                 const c = PLAN_COLOR[plan] || '#9ca3af'
                 return (
-                  <div key={plan} style={{
-                    flex: 1, ...cardStyle, textAlign: 'center', padding: '12px 10px',
-                    borderTop: `3px solid ${c}`,
+                  <div key={plan} className="sp-kpi-card" style={{
+                    flex: 1, textAlign: 'center', padding: '12px 8px',
+                    background: `linear-gradient(135deg, ${c}18 0%, ${c}06 100%)`,
+                    boxShadow: `0 4px 16px ${c}10`,
                   }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: c, textTransform: 'uppercase', letterSpacing: 0.5 }}>{plan}</div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', fontFamily: 'Outfit', lineHeight: 1.2, margin: '4px 0' }}>{count}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: c, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{PLAN_DETALLE[plan]?.label || plan}</div>
+                    <div className="sp-kpi-val" style={{ color: 'var(--text)', fontSize: 24, textAlign: 'center' }}>{count}</div>
+                    <div className="sp-kpi-sub" style={{ marginTop: 4 }}>
                       {PLAN_PRECIO[plan] ? fmtCOP(PLAN_PRECIO[plan]) + '/mes' : 'Gratis'}
                     </div>
                   </div>
@@ -1071,17 +1077,16 @@ export default function SalonSuperadmin({ onGestionar }) {
 
             {/* Error */}
             {loadError && (
-              <div style={{
-                margin: '10px 16px 0', padding: '12px 16px', borderRadius: 12,
-                background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-              }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 4 }}>Error al cargar negocios</p>
-                <p style={{ fontSize: 11, color: 'rgba(248,113,113,0.8)', fontFamily: 'monospace', marginBottom: 8 }}>{loadError}</p>
-                <button onClick={cargar} style={{
-                  padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
-                  border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)',
-                  color: '#f87171', fontSize: 12, fontWeight: 700,
-                }}>Reintentar</button>
+              <div className="sp-alert danger" style={{ marginTop: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 4 }}>Error al cargar negocios</p>
+                  <p style={{ fontSize: 11, color: 'rgba(248,113,113,0.75)', fontFamily: 'monospace', marginBottom: 8 }}>{loadError}</p>
+                  <button onClick={cargar} style={{
+                    padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+                    background: 'rgba(239,68,68,0.15)', border: 'none',
+                    color: '#f87171', fontSize: 12, fontWeight: 700,
+                  }}>Reintentar</button>
+                </div>
               </div>
             )}
 
@@ -1115,19 +1120,22 @@ export default function SalonSuperadmin({ onGestionar }) {
                 {filtrados.map(n => {
                   const col = n.color_primario || '#f43f5e'
                   return (
-                    <div key={n.id} style={{
+                    <div key={n.id} className="sp-tbl-row" style={{
                       display: 'grid', gridTemplateColumns: '1.4fr 80px 90px 80px 90px 180px',
-                      alignItems: 'center', marginBottom: 6, padding: '11px 12px',
-                      borderRadius: 12, background: 'var(--card)', border: '1px solid var(--border)',
-                      borderLeft: `3px solid ${col}`, opacity: n.activo ? 1 : 0.6,
+                      alignItems: 'center', opacity: n.activo ? 1 : 0.55,
                     }}>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                         <div style={{
-                          fontSize: 13, fontWeight: 700, color: 'var(--text)',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                          textTransform: 'uppercase', letterSpacing: 0.3,
-                        }}>{n.nombre}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>/{n.slug}</div>
+                          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                          background: col, boxShadow: `0 0 6px ${col}80`,
+                        }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{
+                            fontSize: 13, fontWeight: 700, color: 'var(--text)',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          }}>{n.nombre}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>/{n.slug}</div>
+                        </div>
                       </div>
                       <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-2)' }}>
                         {n.ciudad || '—'}
@@ -1212,15 +1220,18 @@ export default function SalonSuperadmin({ onGestionar }) {
         {tab === 'pagos' && (
           <div style={{ margin: '12px 16px 0' }}>
             {/* Resumen rápido */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
               {[
-                { lbl: 'MRR',          val: fmtCOP(mrr),                                     col: '#4ade80' },
-                { lbl: 'Vence ≤ 7d',   val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; return v && Math.ceil((v - new Date()) / 86400000) <= 7 }).length, col: '#f87171' },
-                { lbl: 'Vence ≤ 30d',  val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; const d = v ? Math.ceil((v - new Date()) / 86400000) : null; return d !== null && d > 7 && d <= 30 }).length, col: '#f59e0b' },
-              ].map(({ lbl, val, col }) => (
-                <div key={lbl} style={{ ...cardStyle, textAlign: 'center', padding: '12px 8px', borderTop: `3px solid ${col}` }}>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: col, fontFamily: 'Outfit' }}>{val}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>{lbl}</div>
+                { lbl: 'MRR',         val: fmtCOP(mrr),  col: '#4ade80', bg: 'rgba(34,197,94,0.14)'  },
+                { lbl: 'Vence ≤ 7d',  val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; return v && Math.ceil((v - new Date()) / 86400000) <= 7 }).length,  col: '#f87171', bg: 'rgba(239,68,68,0.13)'  },
+                { lbl: 'Vence ≤ 30d', val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; const d = v ? Math.ceil((v - new Date()) / 86400000) : null; return d !== null && d > 7 && d <= 30 }).length, col: '#f59e0b', bg: 'rgba(245,158,11,0.13)' },
+              ].map(({ lbl, val, col, bg }) => (
+                <div key={lbl} className="sp-kpi-card" style={{
+                  background: `linear-gradient(135deg, ${bg} 0%, transparent 100%)`,
+                  textAlign: 'center', padding: '14px 8px',
+                }}>
+                  <div className="sp-kpi-val" style={{ color: col, fontSize: 22, textAlign: 'center' }}>{val}</div>
+                  <div className="sp-kpi-lbl" style={{ color: col, opacity: 0.8, marginTop: 5 }}>{lbl}</div>
                 </div>
               ))}
             </div>
@@ -1233,10 +1244,10 @@ export default function SalonSuperadmin({ onGestionar }) {
                 const diasColor = !dias ? '#9ca3af' : dias < 0 ? '#ef4444' : dias < 7 ? '#f97316' : dias < 30 ? '#f59e0b' : '#22c55e'
                 const urgente = dias !== null && dias <= 7
                 return (
-                  <div key={n.id} style={{
-                    ...cardStyle, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-                    borderLeft: `3px solid ${urgente ? '#f87171' : (n.color_primario || 'var(--border)')}`,
+                  <div key={n.id} className="sp-tbl-row" style={{
+                    display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     opacity: n.activo ? 1 : 0.55,
+                    background: urgente ? 'rgba(239,68,68,0.07)' : undefined,
                   }}>
                     <div style={{ flex: 1, minWidth: 140 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.nombre}</div>
@@ -1288,11 +1299,9 @@ export default function SalonSuperadmin({ onGestionar }) {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
                   Historial reciente
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {historialPagos.slice(0, 20).map(p => (
-                    <div key={p.id} style={{
-                      ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                    }}>
+                    <div key={p.id} className="sp-stat-row" style={{ gap: 10, padding: '11px 14px' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                           {p.tenant_nombre}
