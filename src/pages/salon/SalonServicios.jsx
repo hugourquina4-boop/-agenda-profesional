@@ -28,6 +28,7 @@ export default function SalonServicios() {
 
   const [servicios,    setServicios]    = useState([])
   const [profesionales,setProfesionales]= useState([])
+  const [productos,    setProductos]    = useState([])
   const [loading,      setLoading]      = useState(true)
   const [sel,          setSel]          = useState(null)
   const [tab,          setTab]          = useState('detalles')
@@ -46,12 +47,14 @@ export default function SalonServicios() {
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
-    const [{ data: servs }, { data: profs }] = await Promise.all([
+    const [{ data: servs }, { data: profs }, { data: prods }] = await Promise.all([
       supabase.from('servicios').select('*').eq('tenant_id', tenant.id).order('categoria').order('nombre'),
       supabase.from('profesionales').select('id,nombre,color').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+      supabase.from('productos_salon').select('id,nombre,categoria').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
     ])
     setServicios(servs || [])
     setProfesionales(profs || [])
+    setProductos(prods || [])
     setLoading(false)
   }, [tenant])
 
@@ -79,6 +82,7 @@ export default function SalonServicios() {
       activo:             serv.activo,
       recordatorio_texto: serv.recordatorio_texto || RECORD_DEFAULT,
       profesionales_ids:  serv.profesionales_ids || [],
+      productos_ids:      serv.productos_ids || [],
     })
     setNuevo(false)
     setElimConfirm(false)
@@ -91,7 +95,7 @@ export default function SalonServicios() {
       nombre:'', categoria:'', precio:'', precio_oferta:'',
       duracion_min:30, descripcion:'', activo:true,
       recordatorio_texto: RECORD_DEFAULT,
-      profesionales_ids: [],
+      profesionales_ids: [], productos_ids: [],
     })
     setNuevo(true)
     setElimConfirm(false)
@@ -101,6 +105,13 @@ export default function SalonServicios() {
     setForm(f => {
       const ids = f.profesionales_ids || []
       return { ...f, profesionales_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
+    })
+  }
+
+  function toggleProducto(id) {
+    setForm(f => {
+      const ids = f.productos_ids || []
+      return { ...f, productos_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
     })
   }
 
@@ -119,6 +130,7 @@ export default function SalonServicios() {
       activo:             form.activo,
       recordatorio_texto: form.recordatorio_texto || null,
       profesionales_ids:  form.profesionales_ids?.length ? form.profesionales_ids : null,
+      productos_ids:      form.productos_ids?.length ? form.productos_ids : null,
     }
     const { error } = nuevo
       ? await supabase.from('servicios').insert({ ...payload, tenant_id: tenant.id })
@@ -150,10 +162,11 @@ export default function SalonServicios() {
     : form.precio ? Number(form.precio) : null
 
   const TABS = [
-    { key:'detalles',    label:'Detalles' },
-    { key:'precio',      label:'Precio' },
-    { key:'especialistas', label:'Equipo' },
-    { key:'recordatorio',label:'Recordatorio' },
+    { key:'detalles',     label:'Detalles' },
+    { key:'precio',       label:'Precio' },
+    { key:'especialistas',label:'Equipo' },
+    { key:'productos',    label:'Productos' },
+    { key:'recordatorio', label:'Recordatorio' },
   ]
 
   return (
@@ -216,53 +229,44 @@ export default function SalonServicios() {
               textTransform:'uppercase', marginBottom:8 }}>{cat}</p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {items.map(s => (
-                <div key={s.id} style={{
+                <div key={s.id} className="sp-tbl-row" style={{
                   display:'flex', alignItems:'center', gap:12,
-                  padding:'13px 14px', borderRadius:14,
-                  background:'var(--card)', border:'1px solid var(--border)',
-                }}>
+                  opacity: s.activo ? 1 : 0.55, cursor:'pointer',
+                }} onClick={() => abrir(s)}>
                   <div style={{
-                    width:38, height:38, borderRadius:11, background:`${col}20`,
+                    width:36, height:36, borderRadius:10, flexShrink:0,
+                    background:`linear-gradient(135deg, ${col}28, ${col}10)`,
                     display:'flex', alignItems:'center', justifyContent:'center',
-                    color:col, flexShrink:0,
+                    color:col, boxShadow:`0 2px 8px ${col}20`,
                   }}>
-                    <Ico d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" size={17} />
+                    <Ico d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" size={16} />
                   </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      <span style={{ fontWeight:700, fontSize:14, color: s.activo ? 'var(--text)' : 'var(--text-3)' }}>
-                        {s.nombre}
-                      </span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                      <span style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{s.nombre}</span>
                       {s.precio_oferta && (
-                        <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:6,
-                          background:'rgba(34,197,94,0.15)', color:'#22c55e' }}>
+                        <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
+                          background:'rgba(34,197,94,0.15)', color:'#22c55e', letterSpacing:0.4 }}>
                           OFERTA
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
+                    <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>
                       {s.duracion_min}min
                       {s.precio_oferta
-                        ? <> · <span style={{ textDecoration:'line-through', opacity:0.5 }}>${Number(s.precio).toLocaleString('es-CO')}</span> ${Number(s.precio_oferta).toLocaleString('es-CO')}</>
+                        ? <> · <span style={{ textDecoration:'line-through', opacity:0.5 }}>${Number(s.precio).toLocaleString('es-CO')}</span> · <span style={{ color:'#22c55e', fontWeight:700 }}>${Number(s.precio_oferta).toLocaleString('es-CO')}</span></>
                         : s.precio ? ` · $${Number(s.precio).toLocaleString('es-CO')}` : ''
                       }
                       {s.profesionales_ids?.length ? ` · ${s.profesionales_ids.length} prof.` : ''}
+                      {s.productos_ids?.length ? ` · ${s.productos_ids.length} prod.` : ''}
                     </div>
                   </div>
-                  {!s.activo && <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:600 }}>Inactivo</span>}
-                  <button onClick={() => abrir(s)} title="Editar" style={{
-                    width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
-                    background:'transparent', color:'var(--text-2)', cursor:'pointer',
-                    display:'flex', alignItems:'center', justifyContent:'center',
+                  <button onClick={e => { e.stopPropagation(); setElimTarget(s) }} title="Eliminar" style={{
+                    width:30, height:30, borderRadius:8, border:'none',
+                    background:'rgba(239,68,68,0.08)', color:'#f87171', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
                   }}>
-                    <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
-                  </button>
-                  <button onClick={() => setElimTarget(s)} title="Eliminar" style={{
-                    width:32, height:32, borderRadius:9, border:'1px solid rgba(239,68,68,0.3)',
-                    background:'transparent', color:'#ef4444', cursor:'pointer',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} />
+                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={13} />
                   </button>
                 </div>
               ))}
@@ -386,15 +390,15 @@ export default function SalonServicios() {
                 </div>
 
                 {form.precio && form.precio_oferta && (
-                  <div style={{ padding:'12px 16px', borderRadius:12,
-                    background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)' }}>
-                    <span style={{ fontSize:12, color:'var(--text-3)' }}>Descuento: </span>
-                    <span style={{ fontWeight:700, color:'#22c55e' }}>
-                      {Math.round((1 - Number(form.precio_oferta)/Number(form.precio)) * 100)}%
-                    </span>
-                    <span style={{ fontSize:12, color:'var(--text-3)', marginLeft:8 }}>
-                      Ahorro: ${(Number(form.precio) - Number(form.precio_oferta)).toLocaleString('es-CO')}
-                    </span>
+                  <div className="sp-alert success" style={{ margin:0 }}>
+                    <div>
+                      <div style={{ fontWeight:700, color:'#22c55e', fontSize:14 }}>
+                        Descuento {Math.round((1 - Number(form.precio_oferta)/Number(form.precio)) * 100)}%
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
+                        El cliente ahorra ${(Number(form.precio) - Number(form.precio_oferta)).toLocaleString('es-CO')}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -427,13 +431,9 @@ export default function SalonServicios() {
                 </div>
 
                 {precioFinal && (
-                  <div style={{ padding:'16px', borderRadius:14, background:`${col}10`, border:`1px solid ${col}30`, textAlign:'center' }}>
-                    <div style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, marginBottom:4 }}>
-                      PRECIO QUE VE EL CLIENTE
-                    </div>
-                    <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:28, color:col }}>
-                      ${precioFinal.toLocaleString('es-CO')}
-                    </div>
+                  <div className="sp-kpi-card" style={{ background:`linear-gradient(135deg, ${col}22 0%, ${col}08 100%)`, textAlign:'center', alignItems:'center' }}>
+                    <div className="sp-kpi-lbl" style={{ color:col, opacity:0.7 }}>Precio que ve el cliente</div>
+                    <div className="sp-kpi-val" style={{ color:col, fontSize:30 }}>${precioFinal.toLocaleString('es-CO')}</div>
                   </div>
                 )}
               </div>
@@ -492,6 +492,57 @@ export default function SalonServicios() {
                   <button onClick={() => setForm(f => ({...f, profesionales_ids:[]}))}
                     style={{ marginTop:12, fontSize:12, color:'var(--text-3)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
                     Limpiar selección (permitir todos)
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ── Tab: Productos ── */}
+            {tab === 'productos' && (
+              <div>
+                <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:14, lineHeight:1.5 }}>
+                  Productos del inventario que se consumen al realizar este servicio (para control de stock).
+                </p>
+                {productos.length === 0 ? (
+                  <div style={{ textAlign:'center', color:'var(--text-3)', padding:'24px 0', fontSize:13 }}>
+                    No hay productos activos en el inventario. Agrégalos desde el módulo Inventario.
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {productos.map(p => {
+                      const activo = (form.productos_ids || []).includes(p.id)
+                      return (
+                        <button key={p.id} onClick={() => toggleProducto(p.id)} style={{
+                          display:'flex', alignItems:'center', gap:12,
+                          padding:'11px 14px', borderRadius:12, width:'100%', textAlign:'left',
+                          background: activo ? `${col}10` : 'rgba(255,255,255,0.025)',
+                          border:'none', cursor:'pointer', transition:'background 0.12s',
+                        }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontWeight:700, fontSize:13, color: activo ? 'var(--text)' : 'var(--text-2)' }}>{p.nombre}</div>
+                            {p.categoria && <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{p.categoria}</div>}
+                          </div>
+                          <div style={{
+                            width:20, height:20, borderRadius:5, flexShrink:0,
+                            background: activo ? col : 'rgba(255,255,255,0.07)',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                          }}>
+                            {activo && (
+                              <svg width={11} height={11} viewBox="0 0 24 24" fill="none"
+                                stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {form.productos_ids?.length > 0 && (
+                  <button onClick={() => setForm(f => ({...f, productos_ids:[]}))}
+                    style={{ marginTop:10, fontSize:12, color:'var(--text-3)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
+                    Limpiar selección
                   </button>
                 )}
               </div>
