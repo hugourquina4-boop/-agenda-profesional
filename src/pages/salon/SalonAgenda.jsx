@@ -398,7 +398,7 @@ export default function SalonAgenda() {
     <div style={{ padding:'0 0 16px' }}>
 
       {/* ── Navegación (mes / semana / día) ── */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', marginBottom:12 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', marginBottom:12, gap:6 }}>
         <button
           onClick={() => {
             if (vistaAgenda === 'mes')    setViewDate(new Date(year, month - 1, 1))
@@ -407,15 +407,36 @@ export default function SalonAgenda() {
           }}
           style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
             background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center' }}>
+            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <Ico d="M15 19l-7-7 7-7" size={18} />
         </button>
-        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:vistaAgenda==='dia'?16:20,
-          color:'var(--text)', textAlign:'center', flex:1, margin:'0 8px' }}>
-          {vistaAgenda === 'mes'    && `${MESES[month]} ${year}`}
-          {vistaAgenda === 'semana' && semanaLabel()}
-          {vistaAgenda === 'dia'    && new Date(selDay+'T12:00:00').toLocaleDateString('es-CO',{ weekday:'long', day:'numeric', month:'long' })}
-        </h2>
+
+        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+          <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:vistaAgenda==='dia'?15:18,
+            color:'var(--text)', textAlign:'center', margin:0, lineHeight:1.2 }}>
+            {vistaAgenda === 'mes'    && `${MESES[month]} ${year}`}
+            {vistaAgenda === 'semana' && semanaLabel()}
+            {vistaAgenda === 'dia'    && new Date(selDay+'T12:00:00').toLocaleDateString('es-CO',{ weekday:'long', day:'numeric', month:'long' })}
+          </h2>
+          {/* Botón Hoy — solo si no estamos ya en hoy */}
+          {selDay !== today.toISOString().slice(0,10) && (
+            <button
+              onClick={() => {
+                const hoyIso = today.toISOString().slice(0,10)
+                setSelDay(hoyIso)
+                setViewDate(new Date(today.getFullYear(), today.getMonth(), 1))
+              }}
+              style={{
+                marginTop:4, padding:'2px 10px', borderRadius:6,
+                background:`${col}18`, border:`1px solid ${col}40`,
+                color:col, fontSize:10, fontWeight:700, cursor:'pointer',
+              }}
+            >
+              Hoy
+            </button>
+          )}
+        </div>
+
         <button
           onClick={() => {
             if (vistaAgenda === 'mes')    setViewDate(new Date(year, month + 1, 1))
@@ -424,7 +445,7 @@ export default function SalonAgenda() {
           }}
           style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
             background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center' }}>
+            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <Ico d="M9 5l7 7-7 7" size={18} />
         </button>
       </div>
@@ -580,16 +601,46 @@ export default function SalonAgenda() {
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
 
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
               <p className="sp-sheet-title" style={{ margin:0 }}>Detalle cita</p>
-              <span style={{
-                fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:8,
-                background:`${ESTADO_COLOR[selCita.estado] || col}20`,
-                color: ESTADO_COLOR[selCita.estado] || col,
-              }}>
-                {ESTADO_LABEL[selCita.estado] || selCita.estado}
-              </span>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{
+                  fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:8,
+                  background:`${ESTADO_COLOR[selCita.estado] || col}20`,
+                  color: ESTADO_COLOR[selCita.estado] || col,
+                }}>
+                  {ESTADO_LABEL[selCita.estado] || selCita.estado}
+                </span>
+                <button onClick={() => setSelCita(null)} style={{
+                  width:30, height:30, borderRadius:8, border:'1px solid var(--border)',
+                  background:'transparent', color:'var(--text-3)', cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:18, lineHeight:1,
+                }}>×</button>
+              </div>
             </div>
+
+            {/* WA rápido */}
+            {selCita.clientes_agenda?.telefono && (
+              <a
+                href={`https://wa.me/57${selCita.clientes_agenda.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(
+                  `Hola ${selCita.clientes_agenda.nombre?.split(' ')[0] || 'cliente'} 👋 Te confirmamos tu cita de ${selCita.servicios?.nombre || 'servicio'} el ${new Date(selCita.fecha_inicio).toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'})} a las ${fmtHora(selCita.fecha_inicio)}. ¡Te esperamos en ${tenant?.nombre || 'el salón'}! 💅`
+                )}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  padding:'11px 16px', borderRadius:13, marginBottom:16,
+                  background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)',
+                  color:'#22c55e', fontWeight:700, fontSize:14, textDecoration:'none',
+                }}
+              >
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="#22c55e">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                  <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.849L.054 23.45a.5.5 0 00.612.612l5.601-1.478A11.96 11.96 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.985 0-3.838-.551-5.418-1.508l-.387-.23-4.007 1.056 1.057-3.923-.252-.4A9.956 9.956 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                </svg>
+                Enviar recordatorio por WhatsApp
+              </a>
+            )}
 
             {/* Info rows */}
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
