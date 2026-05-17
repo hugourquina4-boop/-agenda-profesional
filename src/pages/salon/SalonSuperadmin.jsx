@@ -796,9 +796,19 @@ export default function SalonSuperadmin({ onGestionar }) {
     } catch { setUsuarios([]) }
   }, [])
 
+  const [historialPagos, setHistorialPagos] = useState([])
+
+  const cargarHistorialPagos = useCallback(async () => {
+    try {
+      const data = await rpcAnon('salon_admin_get_pagos', { p_token: ADMIN_HASH })
+      setHistorialPagos(Array.isArray(data) ? data : [])
+    } catch { setHistorialPagos([]) }
+  }, [])
+
   // Siempre cargar al montar — no dependemos de esSuperadmin (sidebar ya filtra)
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { if (tab === 'usuarios') cargarUsuarios() }, [tab, cargarUsuarios])
+  useEffect(() => { if (tab === 'pagos') cargarHistorialPagos() }, [tab, cargarHistorialPagos])
 
   async function actualizarClaveMaestra() {
     if (!masterClave.trim() || masterClave.trim().length < 6) {
@@ -898,7 +908,8 @@ export default function SalonSuperadmin({ onGestionar }) {
         <ModalClave data={claveModal} onClose={() => { setClaveModal(null); setMostrarForm(false); cargar() }} />
       )}
       {pagoModal && (
-        <ModalPago negocio={pagoModal} onClose={() => setPagoModal(null)} onSaved={cargar} showToast={showToast} />
+        <ModalPago negocio={pagoModal} onClose={() => setPagoModal(null)}
+          onSaved={() => { cargar(); cargarHistorialPagos() }} showToast={showToast} />
       )}
 
       <div style={{ padding: '0 0 40px' }}>
@@ -1270,6 +1281,39 @@ export default function SalonSuperadmin({ onGestionar }) {
                 </div>
               )}
             </div>
+
+            {/* ── Historial reciente de pagos ── */}
+            {historialPagos.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+                  Historial reciente
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {historialPagos.slice(0, 20).map(p => (
+                    <div key={p.id} style={{
+                      ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                          {p.tenant_nombre}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                          {new Date(p.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {p.meses > 1 ? ` · ${p.meses} meses` : ''}
+                          {p.referencia ? ` · ${p.referencia}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: '#4ade80' }}>{fmtCOP(p.monto)}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>
+                          {p.metodo} · {p.plan_pagado || '—'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
