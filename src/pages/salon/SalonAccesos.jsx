@@ -20,18 +20,20 @@ const ROL = {
 }
 
 const MODULOS = [
-  { key:'hoy',        label:'Inicio / Dashboard' },
-  { key:'agenda',     label:'Agenda' },
-  { key:'clientes',   label:'Clientes' },
-  { key:'servicios',  label:'Servicios' },
-  { key:'ordenes',    label:'Órdenes en espera' },
-  { key:'caja',       label:'Caja / Ingresos' },
-  { key:'comisiones', label:'Comisiones' },
-  { key:'inventario', label:'Inventario' },
-  { key:'analytics',  label:'Analytics' },
-  { key:'equipo',     label:'Equipo' },
-  { key:'accesos',    label:'Accesos' },
-  { key:'config',     label:'Configuración' },
+  { key:'hoy',         label:'Inicio / Dashboard' },
+  { key:'agenda',      label:'Agenda' },
+  { key:'clientes',    label:'Clientes' },
+  { key:'servicios',   label:'Servicios' },
+  { key:'ordenes',     label:'Órdenes en espera' },
+  { key:'caja',        label:'Caja / Ingresos' },
+  { key:'comisiones',  label:'Comisiones' },
+  { key:'inventario',  label:'Inventario' },
+  { key:'proveedores', label:'Proveedores / Gastos' },
+  { key:'mensajeria',  label:'Mensajería WhatsApp' },
+  { key:'analytics',   label:'Analytics' },
+  { key:'equipo',      label:'Equipo' },
+  { key:'accesos',     label:'Accesos' },
+  { key:'config',      label:'Configuración' },
 ]
 
 const ROLES_CONFIG = [

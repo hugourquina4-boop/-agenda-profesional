@@ -8,9 +8,9 @@ const KEY_TENANT = 'salon_tenant_id'
 
 // Permisos por defecto si la BD aún no retornó datos (evita flash de nav vacía)
 const PERMISOS_DEFAULT = {
-  contable:    { hoy:true,  agenda:false, clientes:false, servicios:false, ordenes:false, caja:true,  comisiones:true,  inventario:true,  analytics:true,  equipo:false, accesos:false, config:false },
-  recepcion:   { hoy:true,  agenda:true,  clientes:true,  servicios:true,  ordenes:true,  caja:false, comisiones:false, inventario:false, analytics:false, equipo:false, accesos:false, config:false },
-  profesional: { hoy:true,  agenda:true,  clientes:true,  servicios:true,  ordenes:true,  caja:false, comisiones:false, inventario:false, analytics:false, equipo:false, accesos:false, config:false },
+  contable:    { hoy:true,  agenda:false, clientes:false, servicios:false, ordenes:false, caja:true,  comisiones:true,  inventario:true,  proveedores:true,  mensajeria:false, analytics:true,  equipo:false, accesos:false, config:false },
+  recepcion:   { hoy:true,  agenda:true,  clientes:true,  servicios:true,  ordenes:true,  caja:false, comisiones:false, inventario:false, proveedores:false, mensajeria:true,  analytics:false, equipo:false, accesos:false, config:false },
+  profesional: { hoy:true,  agenda:true,  clientes:true,  servicios:true,  ordenes:true,  caja:false, comisiones:false, inventario:false, proveedores:false, mensajeria:false, analytics:false, equipo:false, accesos:false, config:false },
 }
 
 export function TenantProvider({ children }) {

@@ -339,6 +339,127 @@ function ModalReset({ negocio, onClose, showToast }) {
   )
 }
 
+// ── Modal registrar pago ─────────────────────────────────────────────────────
+function ModalPago({ negocio, onClose, onSaved, showToast }) {
+  const precio = PLAN_PRECIO[negocio.plan] || 0
+  const [monto,  setMonto]  = useState(String(precio))
+  const [metodo, setMetodo] = useState('transferencia')
+  const [meses,  setMeses]  = useState(1)
+  const [ref_,   setRef]    = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const vence    = negocio.fecha_vencimiento ? new Date(negocio.fecha_vencimiento) : new Date()
+  const base     = vence < new Date() ? new Date() : vence
+  const nuevaDate = new Date(base)
+  nuevaDate.setMonth(nuevaDate.getMonth() + meses)
+  const nuevaLabel = nuevaDate.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+
+  const METODOS = ['transferencia', 'nequi', 'daviplata', 'efectivo', 'tarjeta', 'otro']
+
+  async function guardar() {
+    const n = parseFloat(monto)
+    if (!n || n <= 0) { showToast('Ingresa un monto válido', '#f87171'); return }
+    setSaving(true)
+    try {
+      const res = await rpcAnon('salon_admin_registrar_pago', {
+        p_token: ADMIN_HASH, p_tenant_id: negocio.id,
+        p_monto: n, p_metodo: metodo, p_meses: meses,
+        p_referencia: ref_.trim() || null,
+      })
+      if (!res?.ok) throw new Error(res?.error || 'Error')
+      showToast(`Pago registrado ✓ Vence: ${nuevaLabel}`)
+      onSaved(); onClose()
+    } catch (e) { showToast(e.message, '#f87171') }
+    setSaving(false)
+  }
+
+  const inpStyle = {
+    width: '100%', padding: '10px 12px', borderRadius: 12, boxSizing: 'border-box',
+    border: '1px solid var(--border)', background: 'var(--bg)',
+    color: 'var(--text)', fontSize: 13, outline: 'none',
+  }
+
+  return (
+    <>
+      <div className="sp-sheet-overlay" onClick={onClose} />
+      <div className="sp-sheet">
+        <div className="sp-sheet-handle" />
+        <p className="sp-sheet-title">💳 Registrar pago — {negocio.nombre}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Plan</div>
+              <PlanBadge plan={negocio.plan} />
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Vence actualmente</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmtFecha(negocio.fecha_vencimiento)}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 5 }}>Monto (COP)</label>
+              <input type="number" value={monto} onChange={e => setMonto(e.target.value)} style={inpStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 5 }}>Meses a renovar</label>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {[1, 3, 6, 12].map(m => (
+                  <button key={m} onClick={() => setMeses(m)} style={{
+                    flex: 1, padding: '10px 4px', borderRadius: 9, cursor: 'pointer',
+                    border: `2px solid ${meses === m ? 'var(--accent)' : 'var(--border)'}`,
+                    background: meses === m ? 'var(--accent-dim)' : 'var(--card)',
+                    color: meses === m ? 'var(--accent)' : 'var(--text-3)',
+                    fontWeight: 700, fontSize: 12,
+                  }}>{m}m</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 5 }}>Método de pago</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {METODOS.map(m => (
+                <button key={m} onClick={() => setMetodo(m)} style={{
+                  padding: '7px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                  background: metodo === m ? 'var(--accent)' : 'var(--card)',
+                  color: metodo === m ? '#fff' : 'var(--text-2)',
+                  border: `1px solid ${metodo === m ? 'var(--accent)' : 'var(--border)'}`,
+                }}>{m.charAt(0).toUpperCase() + m.slice(1)}</button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 5 }}>Referencia / comprobante (opcional)</label>
+            <input value={ref_} onChange={e => setRef(e.target.value)} placeholder="TX-12345" style={inpStyle} />
+          </div>
+
+          <div style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>Nueva fecha de vencimiento</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#4ade80' }}>{nuevaLabel}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: '11px', borderRadius: 12, cursor: 'pointer',
+              background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-2)',
+            }}>Cancelar</button>
+            <button onClick={guardar} disabled={saving} style={{
+              flex: 2, padding: '11px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+              color: '#fff', fontWeight: 700, opacity: saving ? 0.7 : 1,
+            }}>{saving ? 'Registrando…' : '💳 Confirmar pago'}</button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Formulario nuevo negocio ──────────────────────────────────────────────────
 const FORM0 = {
   nombre: '', slug: '', ciudad: '', vertical: 'salon', plan: 'starter',
@@ -636,6 +757,7 @@ export default function SalonSuperadmin({ onGestionar }) {
   const [resetModal,  setResetModal]  = useState(null)
   const [elimModal,   setElimModal]   = useState(null)
   const [claveModal,  setClaveModal]  = useState(null)
+  const [pagoModal,   setPagoModal]   = useState(null)
   const [gestionando, setGestionando] = useState(null)
   const [toast,       setToast]       = useState(null)
 
@@ -774,6 +896,9 @@ export default function SalonSuperadmin({ onGestionar }) {
       )}
       {claveModal && (
         <ModalClave data={claveModal} onClose={() => { setClaveModal(null); setMostrarForm(false); cargar() }} />
+      )}
+      {pagoModal && (
+        <ModalPago negocio={pagoModal} onClose={() => setPagoModal(null)} onSaved={cargar} showToast={showToast} />
       )}
 
       <div style={{ padding: '0 0 40px' }}>
@@ -1121,14 +1246,20 @@ export default function SalonSuperadmin({ onGestionar }) {
                         </div>
                       )}
                     </div>
-                    <button onClick={() => setEditModal(n)} style={{
-                      ...btnOutline('#60a5fa'),
-                      background: urgente ? 'rgba(239,68,68,0.1)' : undefined,
-                      borderColor: urgente ? 'rgba(239,68,68,0.4)' : undefined,
-                      color: urgente ? '#f87171' : '#60a5fa',
-                    }}>
-                      {urgente ? '⚠ Renovar' : 'Renovar'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => setPagoModal(n)} style={{
+                        ...btnOutline('#22c55e'),
+                        background: urgente ? 'rgba(239,68,68,0.1)' : undefined,
+                        borderColor: urgente ? 'rgba(239,68,68,0.4)' : undefined,
+                        color: urgente ? '#f87171' : '#22c55e',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {urgente ? '⚠ Pago' : '💳 Pago'}
+                      </button>
+                      <button onClick={() => setEditModal(n)} style={{ ...btnOutline('#60a5fa') }} title="Editar plan/fecha">
+                        ✏️
+                      </button>
+                    </div>
                   </div>
                 )
               })}
