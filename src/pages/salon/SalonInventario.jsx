@@ -314,15 +314,13 @@ export default function SalonInventario() {
 
       {/* ── KPIs ── */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:16, marginBottom:16 }}>
-        <div style={{ padding:'14px 16px', borderRadius:16, background:'var(--card)', border:'1px solid var(--border)' }}>
-          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.8, textTransform:'uppercase', marginBottom:6 }}>Valor inventario</div>
+        <div className="sp-kpi-card" style={{ background:`linear-gradient(135deg,${col}28,${col}08)` }}>
           <div style={{ fontSize:22, fontWeight:800, color:col, fontFamily:'Outfit' }}>{fmtCOP(valorTotal)}</div>
-          <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>{filtrados.length} productos</div>
+          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5 }}>INVENTARIO · {filtrados.length} productos</div>
         </div>
-        <div style={{ padding:'14px 16px', borderRadius:16, background:'var(--card)', border:`1px solid ${bajosStock > 0 ? '#f59e0b44' : 'var(--border)'}` }}>
-          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.8, textTransform:'uppercase', marginBottom:6 }}>Stock bajo</div>
+        <div className="sp-kpi-card" style={{ background: bajosStock > 0 ? 'linear-gradient(135deg,rgba(245,158,11,0.2),transparent)' : 'linear-gradient(135deg,rgba(34,197,94,0.15),transparent)' }}>
           <div style={{ fontSize:22, fontWeight:800, color: bajosStock > 0 ? '#f59e0b' : '#22c55e', fontFamily:'Outfit' }}>{bajosStock}</div>
-          <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>bajo mínimo</div>
+          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5 }}>STOCK BAJO MÍNIMO</div>
         </div>
       </div>
 
@@ -341,8 +339,8 @@ export default function SalonInventario() {
           />
         </div>
         <button onClick={() => fileInputRef.current?.click()} style={{
-          padding:'0 12px', borderRadius:12, border:'1px solid var(--border)',
-          background:'var(--card)', color:'var(--text-2)',
+          padding:'0 12px', borderRadius:12, border:'none',
+          background:`${col}12`, color:col,
           fontWeight:700, fontSize:12, cursor:'pointer', whiteSpace:'nowrap',
           display:'flex', alignItems:'center', gap:5,
         }}>
@@ -399,8 +397,9 @@ export default function SalonInventario() {
             ].filter(Boolean).join(' · ')
             return (
               <div key={p.id} style={{
-                borderRadius:14, background:'var(--card)',
-                border:`1px solid ${bajo ? '#f59e0b44' : 'var(--border)'}`,
+                borderRadius:14,
+                background: bajo ? 'linear-gradient(135deg,rgba(245,158,11,0.1),var(--card))' : `linear-gradient(135deg,${clr}0d,var(--card))`,
+                boxShadow: bajo ? '0 2px 12px rgba(245,158,11,0.15)' : '0 2px 10px rgba(0,0,0,0.08)',
                 overflow:'hidden',
               }}>
                 <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px' }}>
@@ -438,16 +437,16 @@ export default function SalonInventario() {
                     </div>
                     <div style={{ display:'flex', gap:4 }}>
                       <button onClick={() => ajustarStock(p.id, -1)} style={{
-                        width:28, height:28, borderRadius:8, border:'1px solid var(--border)',
-                        background:'var(--card)', color:'var(--text-2)', cursor:'pointer', fontSize:16, lineHeight:1,
+                        width:28, height:28, borderRadius:8, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer', fontSize:16, lineHeight:1,
                       }}>−</button>
                       <button onClick={() => ajustarStock(p.id, +1)} style={{
-                        width:28, height:28, borderRadius:8, border:'1px solid var(--border)',
-                        background:'var(--card)', color:'var(--text-2)', cursor:'pointer', fontSize:16, lineHeight:1,
+                        width:28, height:28, borderRadius:8, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer', fontSize:16, lineHeight:1,
                       }}>+</button>
                       <button onClick={() => abrirEditar(p)} style={{
-                        width:28, height:28, borderRadius:8, border:'1px solid var(--border)',
-                        background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+                        width:28, height:28, borderRadius:8, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
                         display:'flex', alignItems:'center', justifyContent:'center',
                       }}>
                         <Ico d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" size={13} />
@@ -686,7 +685,7 @@ export default function SalonInventario() {
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={() => setCsvModal(null)} disabled={csvImporting} style={{
                 flex:1, padding:'13px', borderRadius:12, cursor:'pointer',
-                background:'var(--card)', border:'1px solid var(--border)', color:'var(--text-2)', fontWeight:700,
+                background:'var(--card)', border:'none', color:'var(--text-2)', fontWeight:700, boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               }}>Cancelar</button>
               {csvModal.rows.length > 0 && (
                 <button onClick={confirmarImportCSV} disabled={csvImporting} style={{
@@ -717,7 +716,7 @@ export default function SalonInventario() {
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={() => setConfirmDel(null)} style={{
                 flex:1, padding:'12px', borderRadius:12, cursor:'pointer',
-                background:'var(--card)', border:'1px solid var(--border)', color:'var(--text-2)', fontWeight:700,
+                background:'var(--card)', border:'none', color:'var(--text-2)', fontWeight:700, boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               }}>Cancelar</button>
               <button onClick={() => eliminar(confirmDel)} style={{
                 flex:1, padding:'12px', borderRadius:12, cursor:'pointer',
