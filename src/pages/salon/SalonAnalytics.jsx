@@ -47,7 +47,9 @@ const DEMO_RETENTION = { clientes_activos:52, clientes_recurrentes:31, retention
 function KpiCard({ label, value, sub, icon, color, trend }) {
   return (
     <div style={{
-      padding:'16px', borderRadius:16, background:'var(--card)', border:'1px solid var(--border)',
+      padding:'16px', borderRadius:16,
+      background:`linear-gradient(135deg,${color}18,${color}06)`,
+      boxShadow:'0 2px 14px rgba(0,0,0,0.1)',
     }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
         <div style={{ width:36, height:36, borderRadius:10, background:`${color}20`,
@@ -391,10 +393,12 @@ export default function SalonAnalytics() {
                     { label:'Completadas', value:completadas.length, color:'#22c55e' },
                     { label:'Ingresos est.', value:`$${(totalIngresos/1000).toFixed(0)}K`, color:col },
                   ].map(s => (
-                    <div key={s.label} style={{ background:'var(--card)', border:'1px solid var(--border)',
-                      borderRadius:12, padding:'10px', textAlign:'center' }}>
+                    <div key={s.label} className="sp-kpi-card" style={{
+                      background:`linear-gradient(135deg,${s.color === 'var(--text)' ? 'rgba(255,255,255,0.06)' : `${s.color}20`},transparent)`,
+                      padding:'10px', textAlign:'center', gap:2,
+                    }}>
                       <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:s.color }}>{s.value}</div>
-                      <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3, marginTop:2 }}>{s.label.toUpperCase()}</div>
+                      <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3 }}>{s.label.toUpperCase()}</div>
                     </div>
                   ))}
                 </div>
@@ -426,7 +430,7 @@ export default function SalonAnalytics() {
                 return (
                   <div key={c.id} style={{
                     padding:'10px 14px', borderRadius:12,
-                    background:'var(--card)', border:'1px solid var(--border)',
+                    background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
                     display:'flex', alignItems:'center', gap:10,
                     position:'relative', overflow:'hidden',
                   }}>
@@ -491,7 +495,8 @@ export default function SalonAnalytics() {
                   ].map(k => (
                     <div key={k.label} style={{
                       padding:'14px 16px', borderRadius:16,
-                      background:'var(--card)', border:'1px solid var(--border)',
+                      background:`linear-gradient(135deg,${k.color}18,${k.color}06)`,
+                      boxShadow:'0 2px 12px rgba(0,0,0,0.09)',
                     }}>
                       <div style={{ width:30, height:30, borderRadius:9, background:`${k.color}20`,
                         display:'flex', alignItems:'center', justifyContent:'center', marginBottom:8, color:k.color }}>
@@ -507,7 +512,7 @@ export default function SalonAnalytics() {
 
                 {/* Gráfico 6 meses ingresos vs gastos */}
                 {(historia.length > 0 || gastosHist.some(h => h.total > 0)) && (
-                  <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, padding:'16px', marginBottom:16 }}>
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', marginBottom:16, boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
                     <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>
                       Ingresos vs Gastos — últimos 6 meses
                     </div>
@@ -553,7 +558,7 @@ export default function SalonAnalytics() {
 
                 {/* Breakdown categorías */}
                 {gastosCat.length > 0 && (
-                  <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, padding:'16px' }}>
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
                     <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>
                       Gastos por categoría — mes actual
                     </div>
@@ -646,7 +651,7 @@ export default function SalonAnalytics() {
             <span className="sp-section-title">Ingresos últimos 6 meses</span>
           </div>
           <div style={{ margin:'0 16px', padding:'16px', borderRadius:16,
-            background:'var(--card)', border:'1px solid var(--border)' }}>
+            background:'var(--card)', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
             <BarChart data={historia} col={col} />
             <div style={{ display:'flex', justifyContent:'space-between', marginTop:12, gap:8,
               flexWrap:'wrap' }}>
@@ -683,7 +688,8 @@ export default function SalonAnalytics() {
             return (
               <div key={i} style={{
                 padding:'16px', borderRadius:16,
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:`linear-gradient(135deg,${color}14,var(--card))`,
+                boxShadow:'0 2px 14px rgba(0,0,0,0.1)',
               }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
                   <div style={{ width:38, height:38, borderRadius:10, background:`${color}22`,
