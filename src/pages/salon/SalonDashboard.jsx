@@ -128,8 +128,10 @@ export default function SalonDashboard({ onNavigate }) {
   const [equipo,      setEquipo]      = useState(isDemo ? DEMO_EQUIPO : [])
   const [ingresosHoy, setIngresosHoy] = useState(isDemo ? 235000 : 0)
   const [loading,     setLoading]     = useState(!isDemo)
-  const [stockAlertas,  setStockAlertas]  = useState(0)
+  const [stockAlertas,   setStockAlertas]   = useState(0)
   const [serviciosCount, setServiciosCount] = useState(null)
+  const [gastosMes,      setGastosMes]      = useState(isDemo ? 890000 : 0)
+  const [ingresosMes,    setIngresosMes]    = useState(isDemo ? 7252000 : 0)
   const [toast,          setToast]          = useState(null)
 
   const showToast = (msg, color='#22c55e') => {
@@ -142,7 +144,11 @@ export default function SalonDashboard({ onNavigate }) {
     setLoading(true)
     try {
       const fecha = hoy()
-      const [citasRes, equipoRes, stockRes, servRes] = await Promise.all([
+      const mesInicio = fecha.slice(0, 7) + '-01'
+      const mesFin    = new Date(new Date(mesInicio).getFullYear(), new Date(mesInicio).getMonth() + 1, 0)
+        .toISOString().slice(0, 10)
+
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -156,17 +162,29 @@ export default function SalonDashboard({ onNavigate }) {
         supabase.from('servicios')
           .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenant.id).eq('activo', true),
+        supabase.from('gastos')
+          .select('monto')
+          .eq('tenant_id', tenant.id)
+          .gte('fecha', mesInicio).lte('fecha', mesFin),
+        supabase.from('pagos')
+          .select('monto')
+          .eq('tenant_id', tenant.id)
+          .gte('created_at', `${mesInicio}T00:00:00`).lte('created_at', `${mesFin}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
       const ingresos = citasList.filter(c=>c.estado==='completada')
         .reduce((s,c) => s+(c.servicios?.precio||0), 0)
       const alertas = (stockRes.data || []).filter(p => p.stock <= p.stock_minimo).length
+      const totalGastos   = (gastosRes.data || []).reduce((s,g) => s + Number(g.monto), 0)
+      const totalIngresos = (ingresosMesRes.data || []).reduce((s,p) => s + Number(p.monto), 0)
       setCitas(citasList)
       setEquipo(equipoList)
       setIngresosHoy(ingresos)
       setStockAlertas(alertas)
       setServiciosCount(servRes.count ?? 0)
+      setGastosMes(totalGastos)
+      setIngresosMes(totalIngresos)
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -384,6 +402,39 @@ export default function SalonDashboard({ onNavigate }) {
         </div>
 
       </div>
+
+      {/* ── Resumen del mes ─────────────────────────────── */}
+      {(ingresosMes > 0 || gastosMes > 0) && (
+        <div style={{ margin:'0 16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          <div style={{
+            padding:'14px 16px', borderRadius:16,
+            background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)',
+          }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#4ade80', letterSpacing:0.5, marginBottom:6 }}>
+              INGRESOS MES
+            </div>
+            <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'#4ade80' }}>
+              {fmtCOP(ingresosMes)}
+            </div>
+          </div>
+          <div style={{
+            padding:'14px 16px', borderRadius:16,
+            background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)',
+          }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#f87171', letterSpacing:0.5, marginBottom:6 }}>
+              GASTOS MES
+            </div>
+            <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'#f87171' }}>
+              {fmtCOP(gastosMes)}
+            </div>
+            {gastosMes > 0 && ingresosMes > 0 && (
+              <div style={{ fontSize:10, color:'rgba(248,113,113,0.7)', marginTop:2 }}>
+                {Math.round(gastosMes / ingresosMes * 100)}% de ingresos
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Alerta stock bajo ───────────────────────────── */}
       {stockAlertas > 0 && (
