@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-16 (sesión 4)
-> **Versión actual en producción: v1.3-dev** (commit e60da0c)
+> Actualizado: 2026-05-16 (sesión 5)
+> **Versión actual en producción: v1.3-dev** (commit 798104d)
 
 ---
 
@@ -119,12 +119,22 @@ v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + d
 | Agregar/editar profesional sin feedback | `guardar()` sin try/catch; si `tenant` era null lanzaba TypeError sin mostrar error | Añadido null-check + try/catch |
 | Color del profesional no persiste | `color` no incluido en payload INSERT/UPDATE — dependía del default de BD | Incluido explícitamente + color picker visual en el form |
 
-### Pendientes confirmados (no deployados)
+### Features deployadas sesión 5 (2026-05-16)
+
+| Feature | Archivos | Notas |
+| ------- | -------- | ----- |
+| Matrix de permisos completa | SalonAccesos.jsx, TenantContext.jsx | proveedores + mensajería añadidos a MODULOS y PERMISOS_DEFAULT |
+| Registro de pagos de suscripción | SalonSuperadmin.jsx, sql/v50 | ModalPago: monto/método/meses + preview nueva fecha + historial en tab Pagos |
+| SQL v50 billing | sql/v50_pagos_plataforma.sql | tablas pagos_plataforma + RPCs salon_admin_registrar_pago/get_pagos (⚠️ PENDIENTE APLICAR en Supabase) |
+| Dashboard preview mañana | SalonDashboard.jsx | Card "Mañana" con citas del día siguiente + botón "Ver agenda →" |
+| Cobro rápido inline en timeline | SalonDashboard.jsx | Botón muestra monto; click expande selector método + "Cobrar"/"Sin cobro" |
+
+### Pendientes operativos
 
 1. ~~**Módulo Mensajería**~~ ✅ DEPLOYADO (sesión 3)
-2. **Módulo Proveedores + Gastos** (Sprint 3) — SQL v49 + UI pendiente
-3. **Control de acceso por rol en UI** — tabla `permisos_tenant` existe en BD, falta conectar en SalonLayout sidebar
-4. **Roles granulares por módulo** — Sprint 3 pendiente
+2. ~~**Módulo Proveedores + Gastos**~~ ✅ DEPLOYADO (sesión 4) — SQL v49 aplicado
+3. ~~**Control de acceso por rol en UI**~~ ✅ COMPLETADO (sesión 5) — permisos wired + MODULOS fix
+4. **SQL v50_pagos_plataforma.sql** — CREAR en Supabase SQL Editor (tabla pagos_plataforma + RPCs)
 
 ### 1. Deploy Edge Functions WA pendientes
 ```bash
@@ -287,8 +297,8 @@ Estado: [lo que está pendiente según este CLAUDE.md]
 
 ### SQL próximo (v1.4)
 ```
-v49_proveedores_gastos.sql    → tablas: proveedores, gastos + RLS + índices
-v50_billing.sql               → tabla suscripciones + pagos Wompi + webhooks
+v49_proveedores_gastos.sql    ✅ APLICADO
+v50_pagos_plataforma.sql      ⚠️ PENDIENTE APLICAR — tabla pagos_plataforma + salon_admin_registrar_pago + salon_admin_get_pagos
 ```
 
 ---

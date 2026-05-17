@@ -658,13 +658,17 @@ export default function SalonDashboard({ onNavigate }) {
                         </div>
                         <div style={{ display:'flex', gap:6 }}>
                           <button onClick={() => setCobrando(null)} style={{
-                            flex:1, padding:'7px', borderRadius:8, cursor:'pointer',
+                            padding:'7px 10px', borderRadius:8, cursor:'pointer',
                             background:'transparent', border:'1px solid var(--border)', color:'var(--text-3)', fontSize:12,
-                          }}>Cancelar</button>
+                          }}>✕</button>
+                          <button onClick={() => { marcarCompletada(cita.id); setCobrando(null) }} style={{
+                            flex:1, padding:'7px', borderRadius:8, cursor:'pointer',
+                            background:'transparent', border:'1px solid var(--border)', color:'var(--text-2)', fontSize:11,
+                          }}>Sin cobro</button>
                           <button onClick={() => registrarCobro(cita, cobrando.metodo)} style={{
                             flex:2, padding:'7px', borderRadius:8, cursor:'pointer',
                             background:col, border:'none', color:'#fff', fontWeight:700, fontSize:12,
-                          }}>✓ Confirmar cobro</button>
+                          }}>✓ Cobrar</button>
                         </div>
                       </div>
                     )}
