@@ -103,6 +103,9 @@ v45_superadmin_enhanced.sql       ✅ deleted_at en tenants + citas_hoy en get_t
 v46_servicios_enhanced.sql        ✅ columnas precio_oferta, recordatorio_texto, profesionales_ids en servicios
 v47_clientes_tipo_precio.sql      ✅ columnas tipo_precio, tags[] en clientes_agenda
 v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + deducciones de profesionales)
+v49_proveedores_gastos.sql        ✅ tabla gastos_salon + proveedores
+v50_pagos_plataforma.sql          ✅ tabla pagos_plataforma + RPCs salon_admin_registrar_pago/get_pagos
+v53_profesional_servicios.sql     ✅ tabla profesional_servicios (muchos-a-muchos prof↔servicio, comisión por servicio)
 ```
 
 ---
@@ -125,7 +128,7 @@ v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + d
 | ------- | -------- | ----- |
 | Matrix de permisos completa | SalonAccesos.jsx, TenantContext.jsx | proveedores + mensajería añadidos a MODULOS y PERMISOS_DEFAULT |
 | Registro de pagos de suscripción | SalonSuperadmin.jsx, sql/v50 | ModalPago: monto/método/meses + preview nueva fecha + historial en tab Pagos |
-| SQL v50 billing | sql/v50_pagos_plataforma.sql | tablas pagos_plataforma + RPCs salon_admin_registrar_pago/get_pagos (⚠️ PENDIENTE APLICAR en Supabase) |
+| SQL v50 billing | sql/v50_pagos_plataforma.sql | tablas pagos_plataforma + RPCs salon_admin_registrar_pago/get_pagos ✅ APLICADO |
 | Dashboard preview mañana | SalonDashboard.jsx | Card "Mañana" con citas del día siguiente + botón "Ver agenda →" |
 | Cobro rápido inline en timeline | SalonDashboard.jsx | Botón muestra monto; click expande selector método + "Cobrar"/"Sin cobro" |
 
@@ -134,7 +137,7 @@ v48_anticipos_planilla.sql        ✅ tabla anticipos_profesional (anticipos + d
 1. ~~**Módulo Mensajería**~~ ✅ DEPLOYADO (sesión 3)
 2. ~~**Módulo Proveedores + Gastos**~~ ✅ DEPLOYADO (sesión 4) — SQL v49 aplicado
 3. ~~**Control de acceso por rol en UI**~~ ✅ COMPLETADO (sesión 5) — permisos wired + MODULOS fix
-4. **SQL v50_pagos_plataforma.sql** — CREAR en Supabase SQL Editor (tabla pagos_plataforma + RPCs)
+4. ~~**SQL v50_pagos_plataforma.sql**~~ ✅ APLICADO (2026-05-16) — tabla pagos_plataforma + salon_admin_registrar_pago + salon_admin_get_pagos
 
 ### 1. Deploy Edge Functions WA pendientes
 ```bash
@@ -297,8 +300,9 @@ Estado: [lo que está pendiente según este CLAUDE.md]
 
 ### SQL próximo (v1.4)
 ```
-v49_proveedores_gastos.sql    ✅ APLICADO
-v50_pagos_plataforma.sql      ⚠️ PENDIENTE APLICAR — tabla pagos_plataforma + salon_admin_registrar_pago + salon_admin_get_pagos
+v49_proveedores_gastos.sql        ✅ APLICADO
+v50_pagos_plataforma.sql          ✅ APLICADO (2026-05-16)
+v53_profesional_servicios.sql     ✅ APLICADO (2026-05-17)
 ```
 
 ---

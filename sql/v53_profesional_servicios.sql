@@ -1,17 +1,18 @@
 -- v53_profesional_servicios.sql
 -- Relación muchos-a-muchos entre profesionales y servicios.
+-- Sin FKs explícitas para evitar problemas con RLS en tablas referenciadas.
 -- Si un profesional no tiene filas aquí → puede hacer TODOS los servicios (compatibilidad).
 
 CREATE TABLE IF NOT EXISTS profesional_servicios (
-  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id        UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  profesional_id   UUID        NOT NULL REFERENCES profesionales(id) ON DELETE CASCADE,
-  servicio_id      UUID        NOT NULL REFERENCES servicios(id)  ON DELETE CASCADE,
-  activo           BOOLEAN     NOT NULL DEFAULT TRUE,
-  tipo_comision    TEXT        NOT NULL DEFAULT 'ninguna'
-                               CHECK (tipo_comision IN ('porcentaje','fijo','ninguna')),
+  id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id        UUID          NOT NULL,
+  profesional_id   UUID          NOT NULL,
+  servicio_id      UUID          NOT NULL,
+  activo           BOOLEAN       NOT NULL DEFAULT TRUE,
+  tipo_comision    TEXT          NOT NULL DEFAULT 'ninguna'
+                                 CHECK (tipo_comision IN ('porcentaje','fijo','ninguna')),
   valor_comision   NUMERIC(10,2) NOT NULL DEFAULT 0,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   UNIQUE (tenant_id, profesional_id, servicio_id)
 );
 
