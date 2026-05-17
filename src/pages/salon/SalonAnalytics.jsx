@@ -333,7 +333,7 @@ export default function SalonAnalytics() {
       )}
 
       {/* ── Tabs ── */}
-      <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none' }}>
+      <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', overflowY:'clip', scrollbarWidth:'none' }}>
         {[['resumen','Resumen'],['citas','Citas'],['finanzas','Finanzas']].map(([t,label]) => (
           <button key={t} onClick={() => setTabA(t)} style={{
             flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',

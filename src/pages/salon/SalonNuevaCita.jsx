@@ -160,15 +160,27 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
       .then(({ data }) => setProfs((data || []).filter(p => p.activo)))
   }, [tenant])
 
-  // Carga servicios al elegir profesional
+  // Carga servicios al elegir profesional — filtra por profesional_servicios si hay filas
   useEffect(() => {
     if (!profId || !tenant) return
     setServIds([])
     setSlot(null)
-    supabase.from('servicios')
-      .select('id, nombre, precio, duracion_min, categoria')
-      .eq('tenant_id', tenant.id).eq('activo', true).order('categoria').order('nombre')
-      .then(({ data }) => setServs(data || []))
+    ;(async () => {
+      const [{ data: todos }, { data: ps }] = await Promise.all([
+        supabase.from('servicios').select('id, nombre, precio, duracion_min, categoria')
+          .eq('tenant_id', tenant.id).eq('activo', true).order('categoria').order('nombre'),
+        supabase.from('profesional_servicios').select('servicio_id')
+          .eq('tenant_id', tenant.id).eq('profesional_id', profId).eq('activo', true),
+      ])
+      const habilitados = ps || []
+      // Si el profesional no tiene filas → puede hacer todos los servicios
+      if (habilitados.length === 0) {
+        setServs(todos || [])
+      } else {
+        const ids = new Set(habilitados.map(r => r.servicio_id))
+        setServs((todos || []).filter(s => ids.has(s.id)))
+      }
+    })()
   }, [profId, tenant])
 
   // Regenera slots cuando cambia duración total, fecha o profesional

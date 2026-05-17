@@ -608,7 +608,7 @@ export default function SalonClientes() {
             style={{ paddingLeft:42 }}
           />
         </div>
-        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:2 }}>
+        <div style={{ display:'flex', gap:6, overflowX:'auto', overflowY:'clip', paddingBottom:2 }}>
           {FILTROS.map(f => {
             const activo = filtroSeg === f.key
             const cnt = f.key === 'todos' ? clientes.length : (conteos[f.key] || 0)

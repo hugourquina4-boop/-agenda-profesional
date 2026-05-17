@@ -120,6 +120,11 @@ export default function SalonEquipo() {
   const [nuevo,       setNuevo]       = useState(false)
   const [elimTarget,  setElimTarget]  = useState(null)
 
+  // Servicios del profesional (profesional_servicios)
+  const [allServs,    setAllServs]    = useState([])   // todos los servicios del tenant
+  const [profServs,   setProfServs]   = useState([])   // filas de profesional_servicios para el prof actual
+  const [savingServs, setSavingServs] = useState(false)
+
   // Sheet horarios
   const [profH,       setProfH]       = useState(null)
   const [horarios,    setHorarios]    = useState([])
@@ -160,6 +165,8 @@ export default function SalonEquipo() {
 
   function cerrarSheet() {
     setSel(null)
+    setAllServs([])
+    setProfServs([])
   }
 
   // ── Horarios ─────────────────────────────────────────────────
@@ -315,16 +322,69 @@ export default function SalonEquipo() {
   }
 
   // ── Profesional edit ─────────────────────────────────────────
-  function abrir(prof) {
+  async function abrir(prof) {
     setSel(prof)
     setForm({ nombre: prof.nombre, especialidad: prof.especialidad || '', telefono: prof.telefono || '', foto_url: prof.foto_url || '', color: prof.color || COLORS[0], activo: prof.activo })
     setNuevo(false)
+    setAllServs([])
+    setProfServs([])
+    const [{ data: servs }, { data: ps }] = await Promise.all([
+      supabase.from('servicios').select('id, nombre, categoria, precio, duracion_min').eq('tenant_id', tenant.id).eq('activo', true).order('categoria').order('nombre'),
+      supabase.from('profesional_servicios').select('*').eq('tenant_id', tenant.id).eq('profesional_id', prof.id),
+    ])
+    setAllServs(servs || [])
+    setProfServs(ps || [])
   }
 
   function abrirNuevo() {
     setSel({ id: null })
     setForm({ nombre:'', especialidad:'', telefono:'', foto_url:'', color: COLORS[profs.length % COLORS.length], activo:true })
     setNuevo(true)
+    setAllServs([])
+    setProfServs([])
+  }
+
+  async function toggleProfServ(servId) {
+    if (!sel?.id || !tenant) return
+    const existing = profServs.find(ps => ps.servicio_id === servId)
+    if (existing) {
+      setProfServs(prev => prev.filter(ps => ps.servicio_id !== servId))
+    } else {
+      const row = { tenant_id: tenant.id, profesional_id: sel.id, servicio_id: servId, activo: true, tipo_comision: 'ninguna', valor_comision: 0 }
+      setProfServs(prev => [...prev, row])
+    }
+  }
+
+  function updateProfServComision(servId, campo, valor) {
+    setProfServs(prev => prev.map(ps =>
+      ps.servicio_id === servId ? { ...ps, [campo]: valor } : ps
+    ))
+  }
+
+  async function guardarServicios() {
+    if (!sel?.id || !tenant) return
+    setSavingServs(true)
+    try {
+      // Borrar todas las filas actuales y re-insertar (upsert por UNIQUE)
+      await supabase.from('profesional_servicios')
+        .delete().eq('profesional_id', sel.id).eq('tenant_id', tenant.id)
+      if (profServs.length > 0) {
+        const rows = profServs.map(ps => ({
+          tenant_id:      tenant.id,
+          profesional_id: sel.id,
+          servicio_id:    ps.servicio_id,
+          activo:         true,
+          tipo_comision:  ps.tipo_comision || 'ninguna',
+          valor_comision: Number(ps.valor_comision) || 0,
+        }))
+        const { error } = await supabase.from('profesional_servicios').insert(rows)
+        if (error) { showToast(error.message, false); setSavingServs(false); return }
+      }
+      showToast('Servicios guardados')
+    } catch (e) {
+      showToast('Error: ' + e.message, false)
+    }
+    setSavingServs(false)
   }
 
   async function toggleActivo(prof) {
@@ -643,6 +703,98 @@ export default function SalonEquipo() {
                 </button>
               </div>
             </div>
+
+            {/* ── Servicios habilitados (solo profesionales existentes) ── */}
+            {!nuevo && allServs.length > 0 && (
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:16 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5 }}>
+                    SERVICIOS HABILITADOS
+                  </label>
+                  <span style={{ fontSize:11, color:'var(--text-3)' }}>
+                    {profServs.length === 0 ? 'Todos' : `${profServs.length} seleccionado${profServs.length !== 1 ? 's' : ''}`}
+                  </span>
+                </div>
+                <p style={{ fontSize:11, color:'var(--text-3)', marginBottom:10, lineHeight:1.5 }}>
+                  Sin selección = puede hacer todos. Selecciona para restringir.
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {allServs.map(s => {
+                    const ps    = profServs.find(r => r.servicio_id === s.id)
+                    const activo = !!ps
+                    return (
+                      <div key={s.id} style={{
+                        borderRadius:12,
+                        background: activo ? `${col}10` : 'var(--card)',
+                        boxShadow: activo ? `0 0 0 1.5px ${col}40` : '0 1px 6px rgba(0,0,0,0.08)',
+                        overflow:'hidden',
+                        transition:'all 0.15s',
+                      }}>
+                        {/* Fila principal */}
+                        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px' }}>
+                          <button onClick={() => toggleProfServ(s.id)} style={{
+                            width:22, height:22, borderRadius:6, border:'none', cursor:'pointer', flexShrink:0,
+                            background: activo ? col : 'var(--border)',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            transition:'background 0.15s',
+                          }}>
+                            {activo && (
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M20 6L9 17l-5-5" />
+                              </svg>
+                            )}
+                          </button>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                              {s.nombre}
+                            </div>
+                            {s.categoria && (
+                              <div style={{ fontSize:11, color:'var(--text-3)' }}>{s.categoria}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Fila comisión (solo si activo) */}
+                        {activo && (
+                          <div style={{ padding:'0 12px 10px', display:'flex', alignItems:'center', gap:8 }}>
+                            <select
+                              value={ps.tipo_comision || 'ninguna'}
+                              onChange={e => updateProfServComision(s.id, 'tipo_comision', e.target.value)}
+                              style={{
+                                fontSize:11, padding:'4px 6px', borderRadius:7, border:'none',
+                                background:'var(--bg)', color:'var(--text-2)', cursor:'pointer',
+                              }}>
+                              <option value="ninguna">Sin comisión</option>
+                              <option value="porcentaje">% Porcentaje</option>
+                              <option value="fijo">$ Valor fijo</option>
+                            </select>
+                            {ps.tipo_comision !== 'ninguna' && (
+                              <input
+                                type="number" min={0} step={ps.tipo_comision === 'porcentaje' ? 1 : 1000}
+                                value={ps.valor_comision || 0}
+                                onChange={e => updateProfServComision(s.id, 'valor_comision', e.target.value)}
+                                style={{
+                                  width:80, fontSize:11, padding:'4px 8px', borderRadius:7, border:'none',
+                                  background:'var(--bg)', color:'var(--text)', textAlign:'right',
+                                }}
+                                placeholder={ps.tipo_comision === 'porcentaje' ? '%' : '$'}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <button onClick={guardarServicios} disabled={savingServs} style={{
+                  marginTop:12, width:'100%', padding:'11px', borderRadius:12,
+                  background:`${col}12`, color:col, border:'none', fontWeight:700, fontSize:13,
+                  cursor:'pointer', opacity: savingServs ? 0.7 : 1,
+                }}>
+                  {savingServs ? 'Guardando…' : 'Guardar servicios'}
+                </button>
+              </div>
+            )}
 
             {/* Eliminar — ANTES de Guardar para que siempre sea visible */}
             {!nuevo && (

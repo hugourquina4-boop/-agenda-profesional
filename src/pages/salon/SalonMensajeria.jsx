@@ -176,7 +176,7 @@ export default function SalonMensajeria() {
       {/* Filtros */}
       <div style={{
         display: 'flex', gap: 8, padding: '0 16px 14px',
-        overflowX: 'auto', scrollbarWidth: 'none',
+        overflowX: 'auto', overflowY: 'clip', scrollbarWidth: 'none',
       }}>
         {FILTROS.map(f => (
           <button

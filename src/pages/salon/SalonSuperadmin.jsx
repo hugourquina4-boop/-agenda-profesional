@@ -1005,7 +1005,7 @@ export default function SalonSuperadmin({ onGestionar }) {
         <div style={{
           display: 'flex', gap: 0, margin: '16px 16px 0',
           borderBottom: '2px solid var(--border)',
-          overflowX: 'auto', scrollbarWidth: 'none',
+          overflowX: 'auto', overflowY: 'clip', scrollbarWidth: 'none',
         }}>
           {[
             ['negocios',  'Negocios'],
@@ -1102,7 +1102,7 @@ export default function SalonSuperadmin({ onGestionar }) {
                 <p className="sp-empty-sub">{buscar ? 'Prueba otra búsqueda' : 'Crea el primer negocio con + Nuevo Negocio'}</p>
               </div>
             ) : (
-              <div style={{ margin: '10px 16px 0', overflowX: 'auto' }}>
+              <div style={{ margin: '10px 16px 0', overflowX: 'auto', overflowY: 'clip' }}>
                 {/* Header */}
                 <div style={{
                   display: 'grid', gridTemplateColumns: '1.4fr 80px 90px 80px 90px 180px',

@@ -230,7 +230,7 @@ export default function SalonAgenda() {
     const hoyIso = today.toISOString().slice(0, 10)
 
     return (
-      <div style={{ overflowX:'auto', paddingBottom:80 }}>
+      <div style={{ overflowX:'auto', overflowY:'clip', paddingBottom:80 }}>
         <div style={{ display:'flex', minWidth: 7 * 78 }}>
           {diasSemana.map(iso => {
             const dc     = citasPorDia[iso] || []
@@ -322,7 +322,7 @@ export default function SalonAgenda() {
     const TOTAL_H = (H_END - H_START) * 2 * SLOT_H
 
     return (
-      <div style={{ overflowX:'auto', paddingBottom:80 }}>
+      <div style={{ overflowX:'auto', overflowY:'clip', paddingBottom:80 }}>
         <div style={{ minWidth: 56 + PROFS.length * COL_W, position:'relative' }}>
           {/* Header profesionales */}
           <div style={{
@@ -494,7 +494,7 @@ export default function SalonAgenda() {
       {vistaAgenda === 'semana' && <VistaSemana />}
       {vistaAgenda === 'dia' && (<>
         {profesionales.length > 1 && (
-          <div style={{ display:'flex', gap:6, padding:'0 16px 10px', overflowX:'auto' }}>
+          <div style={{ display:'flex', gap:6, padding:'0 16px 10px', overflowX:'auto', overflowY:'clip' }}>
             <button onClick={() => setFiltroProf(null)} style={{
               padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
               background: filtroProf === null ? col : 'rgba(255,255,255,0.06)',

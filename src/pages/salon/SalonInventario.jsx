@@ -359,7 +359,7 @@ export default function SalonInventario() {
       </div>
 
       {/* ── Filtro categoría ── */}
-      <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:8, marginBottom:4 }}>
+      <div style={{ display:'flex', gap:6, overflowX:'auto', overflowY:'clip', paddingBottom:8, marginBottom:4 }}>
         {CATEGORIAS.map(c => (
           <button key={c.key} onClick={() => setCatFiltro(c.key)} style={{
             padding:'6px 14px', borderRadius:20, cursor:'pointer', whiteSpace:'nowrap',
@@ -646,7 +646,7 @@ export default function SalonInventario() {
                 </div>
 
                 {/* Preview tabla */}
-                <div style={{ overflowX:'auto', borderRadius:12, boxShadow:'0 1px 8px rgba(0,0,0,0.1)', marginBottom:16 }}>
+                <div style={{ overflowX:'auto', overflowY:'clip', borderRadius:12, boxShadow:'0 1px 8px rgba(0,0,0,0.1)', marginBottom:16 }}>
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
                     <thead>
                       <tr style={{ background:'var(--card)' }}>

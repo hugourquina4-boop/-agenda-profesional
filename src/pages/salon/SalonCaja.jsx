@@ -310,7 +310,7 @@ export default function SalonCaja() {
             const porM = {}
             historial.forEach(c => { porM[c.pago.metodo] = (porM[c.pago.metodo]||0) + Number(c.pago.monto) })
             return (
-              <div style={{ display:'flex', gap:6, overflowX:'auto', marginBottom:14, paddingBottom:2 }}>
+              <div style={{ display:'flex', gap:6, overflowX:'auto', overflowY:'clip', marginBottom:14, paddingBottom:2 }}>
                 {Object.entries(porM).map(([m, total]) => (
                   <div key={m} style={{
                     flexShrink:0, padding:'9px 13px', borderRadius:12,

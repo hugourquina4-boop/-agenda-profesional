@@ -283,7 +283,7 @@ export default function SalonAccesos() {
           {!localPermisos ? (
             <div className="sp-skeleton" style={{ height:200, borderRadius:14 }} />
           ) : (
-            <div style={{ overflowX:'auto' }}>
+            <div style={{ overflowX:'auto', overflowY:'clip' }}>
               <table style={{ width:'100%', borderCollapse:'separate', borderSpacing:0 }}>
                 <thead>
                   <tr>
