@@ -294,8 +294,8 @@ export default function SalonProveedores() {
             padding:'0 16px 14px',
           }}>
             <button onClick={() => cambiarMes(-1)} style={{
-              width:34, height:34, borderRadius:9, border:'1px solid var(--border)',
-              background:'var(--card)', cursor:'pointer', color:'var(--text-2)',
+              width:34, height:34, borderRadius:9, border:'none',
+              background:`${col}12`, cursor:'pointer', color:col,
               display:'flex', alignItems:'center', justifyContent:'center',
             }}>
               <Ico d="M15 19l-7-7 7-7" size={16} />
@@ -304,8 +304,8 @@ export default function SalonProveedores() {
               {MESES[filtroMes.m - 1]} {filtroMes.y}
             </span>
             <button onClick={() => cambiarMes(1)} style={{
-              width:34, height:34, borderRadius:9, border:'1px solid var(--border)',
-              background:'var(--card)', cursor:'pointer', color:'var(--text-2)',
+              width:34, height:34, borderRadius:9, border:'none',
+              background:`${col}12`, cursor:'pointer', color:col,
               display:'flex', alignItems:'center', justifyContent:'center',
             }}>
               <Ico d="M9 5l7 7-7 7" size={16} />
@@ -371,7 +371,8 @@ export default function SalonProveedores() {
                 <div key={g.id} style={{
                   display:'flex', alignItems:'flex-start', gap:12,
                   padding:'13px 14px', borderRadius:14,
-                  background:'var(--card)', border:'1px solid var(--border)',
+                  background:`linear-gradient(135deg,${(CAT_COLORS[g.categoria]||'#6b7280')}10,var(--card))`,
+                  boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
                 }}>
                   {/* Dot categoría */}
                   <div style={{
@@ -427,8 +428,8 @@ export default function SalonProveedores() {
                     </div>
                     <div style={{ display:'flex', gap:4, marginTop:4 }}>
                       <button onClick={() => abrirEditGasto(g)} style={{
-                        width:28, height:28, borderRadius:7, border:'1px solid var(--border)',
-                        background:'transparent', cursor:'pointer', color:'var(--text-3)',
+                        width:28, height:28, borderRadius:7, border:'none',
+                        background:'rgba(255,255,255,0.08)', cursor:'pointer', color:'var(--text-3)',
                         display:'flex', alignItems:'center', justifyContent:'center',
                       }}>
                         <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={13} />
@@ -469,7 +470,8 @@ export default function SalonProveedores() {
                 <div key={p.id} style={{
                   display:'flex', alignItems:'center', gap:12,
                   padding:'13px 14px', borderRadius:14,
-                  background:'var(--card)', border:'1px solid var(--border)',
+                  background:`linear-gradient(135deg,${col}10,var(--card))`,
+                  boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
                 }}>
                   <div style={{
                     width:40, height:40, borderRadius:12, flexShrink:0,
@@ -492,8 +494,8 @@ export default function SalonProveedores() {
                   </div>
                   <div style={{ display:'flex', gap:4, flexShrink:0 }}>
                     <button onClick={() => abrirEditProv(p)} style={{
-                      width:34, height:34, borderRadius:9, border:'1px solid var(--border)',
-                      background:'transparent', cursor:'pointer', color:'var(--text-3)',
+                      width:34, height:34, borderRadius:9, border:'none',
+                      background:'rgba(255,255,255,0.08)', cursor:'pointer', color:'var(--text-3)',
                       display:'flex', alignItems:'center', justifyContent:'center',
                     }}>
                       <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={15} />
@@ -555,7 +557,7 @@ export default function SalonProveedores() {
             </button>
             <button onClick={() => setSheetProv(false)} style={{
               marginTop:8, width:'100%', padding:'12px', borderRadius:12,
-              background:'transparent', border:'1px solid var(--border)',
+              background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               color:'var(--text-3)', fontWeight:600, fontSize:13, cursor:'pointer',
             }}>Cancelar</button>
           </div>
@@ -676,7 +678,7 @@ export default function SalonProveedores() {
             </button>
             <button onClick={() => setSheetGasto(false)} style={{
               marginTop:8, width:'100%', padding:'12px', borderRadius:12,
-              background:'transparent', border:'1px solid var(--border)',
+              background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               color:'var(--text-3)', fontWeight:600, fontSize:13, cursor:'pointer',
             }}>Cancelar</button>
           </div>
