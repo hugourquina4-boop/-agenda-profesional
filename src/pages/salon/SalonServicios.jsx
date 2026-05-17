@@ -189,7 +189,7 @@ export default function SalonServicios() {
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => setElimTarget(null)} style={{
                 flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                 color:'var(--text-2)', fontWeight:600, fontSize:14,
               }}>Cancelar</button>
               <button onClick={() => eliminar(elimTarget.id)} disabled={saving} style={{
@@ -343,7 +343,9 @@ export default function SalonServicios() {
 
                 {nuevo && (
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                    padding:'14px 16px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+                    padding:'14px 16px', borderRadius:14,
+                    background:`linear-gradient(135deg,${col}08,transparent)`,
+                    boxShadow:'0 1px 8px rgba(0,0,0,0.08)' }}>
                     <span style={{ fontSize:14, fontWeight:600, color:'var(--text)' }}>Activo</span>
                     <button onClick={() => setForm(f => ({...f, activo: !f.activo}))} style={{
                       width:48, height:26, borderRadius:13, border:'none', cursor:'pointer',
@@ -617,7 +619,7 @@ export default function SalonServicios() {
                     <div style={{ display:'flex', gap:8 }}>
                       <button onClick={() => setElimConfirm(false)} style={{
                         flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                        background:'var(--card)', border:'1px solid var(--border)',
+                        background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                         color:'var(--text-2)', fontWeight:600, fontSize:14,
                       }}>Cancelar</button>
                       <button onClick={() => eliminar(sel?.id)} disabled={saving} style={{

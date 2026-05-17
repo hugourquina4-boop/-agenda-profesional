@@ -108,10 +108,10 @@ function LinkReservas({ slug, col, showToast }) {
           Copiar
         </button>
         <a href={url} target="_blank" rel="noopener noreferrer" style={{
-          padding:'7px 12px', borderRadius:9, border:'1px solid var(--border)',
-          background:'transparent', color:'var(--text-2)', fontSize:12, fontWeight:700,
+          padding:'7px 12px', borderRadius:9, border:'none',
+          background:'var(--card)', color:'var(--text-2)', fontSize:12, fontWeight:700,
           cursor:'pointer', whiteSpace:'nowrap', textDecoration:'none',
-          display:'flex', alignItems:'center',
+          display:'flex', alignItems:'center', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
         }}>
           Ver
         </a>
