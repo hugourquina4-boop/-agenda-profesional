@@ -210,8 +210,9 @@ export default function SalonConfig() {
         <Campo label="Color de marca">
           <input type="color" value={form.color_primario}
             onChange={e => set('color_primario', e.target.value)}
-            style={{ width:56, height:44, borderRadius:12, border:'1px solid var(--border)',
-              padding:4, background:'var(--card)', cursor:'pointer', display:'block' }} />
+            style={{ width:56, height:44, borderRadius:12, border:'none',
+              padding:4, background:'var(--card)', cursor:'pointer', display:'block',
+              boxShadow:'0 1px 6px rgba(0,0,0,0.15)' }} />
         </Campo>
 
         <ImageUploader
@@ -230,7 +231,7 @@ export default function SalonConfig() {
         <Campo label="WhatsApp del salón (los clientes verán este número)">
           <div style={{ display:'flex', alignItems:'center', gap:0 }}>
             <span style={{ padding:'0 12px', height:46, display:'flex', alignItems:'center',
-              background:'var(--card)', border:'1px solid var(--border)', borderRight:'none',
+              background:'var(--card)', border:'none', boxShadow:'inset 0 1px 4px rgba(0,0,0,0.1)',
               borderRadius:'12px 0 0 12px', fontSize:13, color:'var(--text-3)', flexShrink:0 }}>
               +57
             </span>
@@ -278,7 +279,7 @@ export default function SalonConfig() {
 
         {/* QR de reservas */}
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12,
-          padding:'20px 16px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+          padding:'20px 16px', borderRadius:14, background:'var(--card)', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
           <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
             Código QR de tu portal
           </div>
@@ -456,7 +457,7 @@ export default function SalonConfig() {
             <div style={{ display:'flex', gap:10, marginTop:20 }}>
               <button onClick={() => { setModalRegla(false); setEditRegla(null) }} style={{
                 flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                background:'transparent', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                 color:'var(--text-2)', fontWeight:600, fontSize:14,
               }}>Cancelar</button>
               <button onClick={guardarRegla} disabled={savingRegla} style={{
@@ -578,7 +579,8 @@ export default function SalonConfig() {
         ].map((a, i) => (
           <div key={i} style={{
             padding:'14px 16px', borderRadius:14,
-            background:'var(--card)', border:'1px solid var(--border)',
+            background:`linear-gradient(135deg,${col}0d,var(--card))`,
+            boxShadow:'0 2px 12px rgba(0,0,0,0.09)',
             display:'flex', alignItems:'flex-start', gap:12,
           }}>
             <div style={{ width:36, height:36, borderRadius:10, background:`${col}18`,
@@ -592,8 +594,8 @@ export default function SalonConfig() {
               </div>
               <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:6 }}>{a.desc}</div>
               <div style={{ fontSize:10, fontFamily:'monospace', color:'var(--text-3)',
-                background:'var(--bg)', padding:'4px 8px', borderRadius:6,
-                border:'1px solid var(--border)', wordBreak:'break-all' }}>
+                background:'rgba(0,0,0,0.18)', padding:'4px 8px', borderRadius:6,
+                wordBreak:'break-all' }}>
                 {a.cron}
               </div>
             </div>
@@ -686,7 +688,7 @@ export default function SalonConfig() {
               <div style={{
                 fontSize:11, color:'var(--text-3)', lineHeight:1.6,
                 padding:'10px 12px', borderRadius:10,
-                background:'var(--bg)', border:'1px solid var(--border)',
+                background:'rgba(0,0,0,0.15)',
               }}>
                 Para cambiar de plan o renovar, contacta al administrador de Salón Pro.
               </div>
@@ -741,7 +743,7 @@ function CambiarClave({ accentColor }) {
       style={{
         display:'flex', alignItems:'center', gap:10,
         padding:'12px 16px', borderRadius:14, cursor:'pointer', width:'100%',
-        background:'var(--card)', border:'1px solid var(--border)',
+        background:'var(--card)', border:'none', boxShadow:'0 1px 8px rgba(0,0,0,0.1)',
         color:'var(--text-2)', fontWeight:600, fontSize:13, textAlign:'left',
       }}>
       <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -759,8 +761,9 @@ function CambiarClave({ accentColor }) {
         value={pass} onChange={e => setPass(e.target.value)}
         style={{
           width:'100%', padding:'10px 14px', borderRadius:12,
-          border:'1px solid var(--border)', background:'var(--bg)',
+          border:'none', background:'var(--card)',
           color:'var(--text)', fontSize:14, outline:'none',
+          boxShadow:'inset 0 1px 4px rgba(0,0,0,0.12)',
         }}
       />
       <input
@@ -768,8 +771,9 @@ function CambiarClave({ accentColor }) {
         value={pass2} onChange={e => setPass2(e.target.value)}
         style={{
           width:'100%', padding:'10px 14px', borderRadius:12,
-          border:'1px solid var(--border)', background:'var(--bg)',
+          border:'none', background:'var(--card)',
           color:'var(--text)', fontSize:14, outline:'none',
+          boxShadow:'inset 0 1px 4px rgba(0,0,0,0.12)',
         }}
       />
       {msg && (
@@ -782,7 +786,7 @@ function CambiarClave({ accentColor }) {
         <button type="button" onClick={() => { setAbierto(false); setPass(''); setPass2(''); setMsg(null) }}
           style={{
             flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
-            background:'transparent', border:'1px solid var(--border)',
+            background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
             color:'var(--text-2)', fontWeight:600, fontSize:13,
           }}>
           Cancelar
