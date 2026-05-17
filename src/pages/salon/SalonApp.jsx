@@ -83,7 +83,8 @@ function TenantPicker({ todosTenants, onSelect }) {
               style={{
                 display:'flex', alignItems:'center', gap:14,
                 padding:'16px 18px',
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:`linear-gradient(135deg,${t.color_primario || '#f43f5e'}08,var(--card))`,
+                border:'1px solid transparent', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
                 borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
                 transition:'all 0.15s',
               }}
@@ -92,8 +93,8 @@ function TenantPicker({ todosTenants, onSelect }) {
                 e.currentTarget.style.boxShadow = `0 4px 16px ${t.color_primario || '#f43f5e'}22`
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'var(--border)'
-                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = 'transparent'
+                e.currentTarget.style.boxShadow = '0 1px 8px rgba(0,0,0,0.08)'
               }}
             >
               <div style={{
@@ -123,7 +124,7 @@ function TenantPicker({ todosTenants, onSelect }) {
           onClick={() => supabase.auth.signOut()}
           style={{
             marginTop:24, width:'100%', padding:'12px', borderRadius:14,
-            background:'transparent', border:'1px solid var(--border)',
+            background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
             color:'var(--text-3)', fontWeight:600, fontSize:13, cursor:'pointer',
           }}>
           Cerrar sesión
@@ -191,8 +192,8 @@ function SetNewPassword() {
             <p style={{ fontSize:14, color:'var(--text-3)' }}>Entrando a tu cuenta…</p>
           </div>
         ) : (
-          <div style={{ background:'var(--card)', border:'1px solid var(--border)',
-            borderRadius:24, padding:28, boxShadow:'var(--shadow-sm)' }}>
+          <div style={{ background:'var(--card)',
+            borderRadius:24, padding:28, boxShadow:'0 4px 24px rgba(0,0,0,0.12)' }}>
             <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
               <div>
                 <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600,

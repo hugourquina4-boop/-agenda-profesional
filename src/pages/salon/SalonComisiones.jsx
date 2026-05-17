@@ -406,7 +406,7 @@ export default function SalonComisiones() {
 
       {/* ── Tabs ─────────────────────────────────────────── */}
       <div style={{ display:'flex', gap:4, margin:'16px 16px 0',
-        background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+        background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
         {[['comisiones','Comisiones'],['planilla','Planilla'],['desempeño','Desempeño']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
@@ -566,16 +566,16 @@ export default function SalonComisiones() {
           {/* ── Selector de mes ───────────────────────────── */}
           <div style={{ padding:'16px 16px 8px', display:'flex', alignItems:'center', gap:12 }}>
             <button onClick={prevMes} style={{ width:34, height:34, borderRadius:10,
-              background:'var(--card)', border:'1px solid var(--border)',
-              cursor:'pointer', color:'var(--text-2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              background:`${col}12`, border:'none',
+              cursor:'pointer', color:col, display:'flex', alignItems:'center', justifyContent:'center' }}>
               <Ico d="M15 19l-7-7 7-7" size={16} />
             </button>
             <span style={{ flex:1, textAlign:'center', fontSize:14, fontWeight:700, color:'var(--text)', fontFamily:'Outfit' }}>
               {new Date(mesStr + '-02').toLocaleDateString('es-CO', { month:'long', year:'numeric' })}
             </span>
             <button onClick={nextMes} style={{ width:34, height:34, borderRadius:10,
-              background:'var(--card)', border:'1px solid var(--border)',
-              cursor:'pointer', color:'var(--text-2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              background:`${col}12`, border:'none',
+              cursor:'pointer', color:col, display:'flex', alignItems:'center', justifyContent:'center' }}>
               <Ico d="M9 5l7 7-7 7" size={16} />
             </button>
           </div>
@@ -625,8 +625,8 @@ export default function SalonComisiones() {
                           disabled={generandoPDF === d.profesional_id}
                           title="Descargar liquidación PDF"
                           style={{
-                            width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
-                            background:'var(--bg)', cursor:'pointer', display:'flex',
+                            width:32, height:32, borderRadius:9, border:'none',
+                            background:'rgba(255,255,255,0.08)', cursor:'pointer', display:'flex',
                             alignItems:'center', justifyContent:'center', color:'var(--text-3)',
                             opacity: generandoPDF === d.profesional_id ? 0.5 : 1, flexShrink:0,
                           }}>

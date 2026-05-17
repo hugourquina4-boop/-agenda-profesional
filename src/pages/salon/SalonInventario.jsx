@@ -612,8 +612,8 @@ export default function SalonInventario() {
                 Importar CSV
               </h3>
               <button onClick={descargarPlantilla} style={{
-                padding:'6px 12px', borderRadius:9, border:'1px solid var(--border)',
-                background:'var(--card)', color:'var(--text-2)', fontSize:12, fontWeight:700, cursor:'pointer',
+                padding:'6px 12px', borderRadius:9, border:'none',
+                background:`${col}12`, color:col, fontSize:12, fontWeight:700, cursor:'pointer',
                 display:'flex', alignItems:'center', gap:5,
               }}>
                 <Ico d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={14} />
@@ -646,7 +646,7 @@ export default function SalonInventario() {
                 </div>
 
                 {/* Preview tabla */}
-                <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border)', marginBottom:16 }}>
+                <div style={{ overflowX:'auto', borderRadius:12, boxShadow:'0 1px 8px rgba(0,0,0,0.1)', marginBottom:16 }}>
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
                     <thead>
                       <tr style={{ background:'var(--card)' }}>
