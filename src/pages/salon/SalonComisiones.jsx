@@ -113,7 +113,7 @@ export default function SalonComisiones() {
     setLoadingDes(false)
   }, [tenant, mesStr])
 
-  useEffect(() => { if (tab === 'desempeno') cargarDesempeno() }, [cargarDesempeno, tab])
+  useEffect(() => { if (tab === 'desempeño') cargarDesempeno() }, [cargarDesempeno, tab])
 
   const cargarAnticipos = useCallback(async () => {
     if (!tenant) return
@@ -405,17 +405,15 @@ export default function SalonComisiones() {
       )}
 
       {/* ── Tabs ─────────────────────────────────────────── */}
-      <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', paddingBottom:0 }}>
-        {[['comisiones','Comisiones'],['planilla','Planilla'],['desempeno','Desempeño']].map(([t, label]) => (
+      <div style={{ display:'flex', gap:4, margin:'16px 16px 0',
+        background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+        {[['comisiones','Comisiones'],['planilla','Planilla'],['desempeño','Desempeño']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
-            flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
-            fontWeight:700, fontSize:13, fontFamily:'Outfit',
-            background: tab === t ? col : 'var(--card)',
+            flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
+            background: tab === t ? col : 'transparent',
             color: tab === t ? '#fff' : 'var(--text-3)',
-            border: `1px solid ${tab === t ? col : 'var(--border)'}`,
-          }}>
-            {label}
-          </button>
+            fontWeight:700, fontSize:13, transition:'all 0.15s',
+          }}>{label}</button>
         ))}
       </div>
 
@@ -439,11 +437,11 @@ export default function SalonComisiones() {
 
                 return (
                   <div key={prof.id} style={{
-                    background:'var(--card)', border:'1px solid var(--border)',
                     borderRadius:18, overflow:'hidden',
+                    boxShadow:'0 2px 16px rgba(0,0,0,0.14)',
                   }}>
                     {/* Header prof */}
-                    <div style={{ padding:'14px 16px', background:`${profColor}08`, display:'flex', alignItems:'center', gap:12 }}>
+                    <div style={{ padding:'14px 16px', background:`linear-gradient(135deg, ${profColor}22, ${profColor}08)`, display:'flex', alignItems:'center', gap:12 }}>
                       <div style={{
                         width:38, height:38, borderRadius:12, background:`${profColor}22`,
                         display:'flex', alignItems:'center', justifyContent:'center',
@@ -469,19 +467,16 @@ export default function SalonComisiones() {
 
                     {/* Líneas de anticipo */}
                     {profAnt.length > 0 && (
-                      <div style={{ padding:'0 16px' }}>
+                      <div style={{ padding:'0 16px', background:'var(--card)' }}>
                         {profAnt.map(a => (
-                          <div key={a.id} style={{
-                            display:'flex', alignItems:'center', gap:8, padding:'8px 0',
-                            borderBottom:'1px solid var(--border)',
-                          }}>
+                          <div key={a.id} className="sp-tbl-row" style={{ padding:'9px 0' }}>
                             <span style={{
                               fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6,
                               background: a.tipo === 'anticipo' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.12)',
                               color: a.tipo === 'anticipo' ? '#f59e0b' : '#ef4444',
                               textTransform:'uppercase', flexShrink:0,
                             }}>
-                              {a.tipo === 'anticipo' ? 'Anticipo' : 'Deducción'}
+                              {a.tipo === 'anticipo' ? 'Anticipo' : 'Ded.'}
                             </span>
                             <span style={{ flex:1, fontSize:12, color:'var(--text-3)' }}>{a.concepto || '—'}</span>
                             <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:13,
@@ -489,7 +484,7 @@ export default function SalonComisiones() {
                               −${a.monto.toLocaleString('es-CO')}
                             </span>
                             <button onClick={() => eliminarAnticipo(a.id)} style={{
-                              background:'none', border:'none', cursor:'pointer', color:'var(--text-3)', fontSize:14, padding:'0 4px',
+                              background:'none', border:'none', cursor:'pointer', color:'var(--text-3)', fontSize:16, padding:'0 4px',
                             }}>×</button>
                           </div>
                         ))}
@@ -531,21 +526,22 @@ export default function SalonComisiones() {
                     )}
 
                     {/* Footer totales */}
-                    <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)' }}>
+                    <div style={{ padding:'12px 16px', background:'var(--card)' }}>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                        <div style={{ textAlign:'center' }}>
-                          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3, marginBottom:3 }}>COMISIÓN</div>
-                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:'var(--text)' }}>{fmtCOP(totalCom)}</div>
+                        <div className="sp-kpi-card" style={{ background:`linear-gradient(135deg,${profColor}20,transparent)`, textAlign:'center', padding:'10px 8px', gap:2 }}>
+                          <div style={{ fontSize:14, fontWeight:800, fontFamily:'Outfit', color:profColor }}>{fmtCOP(totalCom)}</div>
+                          <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3 }}>COMISIÓN</div>
                         </div>
-                        <div style={{ textAlign:'center' }}>
-                          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3, marginBottom:3 }}>ANTICIPOS</div>
-                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:'#f59e0b' }}>−{fmtCOP(totalAnt + totalDed)}</div>
+                        <div className="sp-kpi-card" style={{ background:'linear-gradient(135deg,rgba(245,158,11,0.15),transparent)', textAlign:'center', padding:'10px 8px', gap:2 }}>
+                          <div style={{ fontSize:14, fontWeight:800, fontFamily:'Outfit', color:'#f59e0b' }}>−{fmtCOP(totalAnt + totalDed)}</div>
+                          <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.3 }}>ANTICIPOS</div>
                         </div>
-                        <div style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>
-                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:0.3, marginBottom:3,
-                            color: neto > 0 ? '#22c55e' : 'var(--text-3)' }}>NETO A PAGAR</div>
-                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18,
-                            color: neto > 0 ? '#22c55e' : 'var(--text-3)' }}>{fmtCOP(neto)}</div>
+                        <div className="sp-kpi-card" style={{
+                          background: neto > 0 ? 'linear-gradient(135deg,rgba(34,197,94,0.18),transparent)' : 'transparent',
+                          textAlign:'center', padding:'10px 8px', gap:2,
+                        }}>
+                          <div style={{ fontSize:16, fontWeight:800, fontFamily:'Outfit', color: neto > 0 ? '#22c55e' : 'var(--text-3)' }}>{fmtCOP(neto)}</div>
+                          <div style={{ fontSize:9, fontWeight:700, letterSpacing:0.3, color: neto > 0 ? '#22c55e' : 'var(--text-3)' }}>NETO A PAGAR</div>
                         </div>
                       </div>
                     </div>
@@ -565,7 +561,7 @@ export default function SalonComisiones() {
         </div>
       )}
 
-      {tab === 'desempeno' && (
+      {tab === 'desempeño' && (
         <>
           {/* ── Selector de mes ───────────────────────────── */}
           <div style={{ padding:'16px 16px 8px', display:'flex', alignItems:'center', gap:12 }}>
@@ -602,11 +598,11 @@ export default function SalonComisiones() {
                 return (
                   <div key={d.profesional_id} style={{
                     borderRadius:18, background:'var(--card)',
-                    border:'1px solid var(--border)', overflow:'hidden',
+                    boxShadow:'0 2px 16px rgba(0,0,0,0.14)', overflow:'hidden',
                   }}>
                     {/* Header */}
                     <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
-                      borderBottom:'1px solid var(--border)' }}>
+                      background:`linear-gradient(135deg, ${color}22, ${color}08)` }}>
                       <div style={{ width:44, height:44, borderRadius:12, background:`${color}22`,
                         display:'flex', alignItems:'center', justifyContent:'center',
                         fontFamily:'Outfit', fontWeight:800, fontSize:17, color, flexShrink:0 }}>
@@ -643,20 +639,23 @@ export default function SalonComisiones() {
                     </div>
 
                     {/* Stats grid */}
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:1, background:'var(--border)' }}>
-                      {[
-                        ['Citas',       d.citas_completadas ?? 0, ''],
-                        ['Horas',       d.horas_trabajadas  ?? 0, 'h'],
-                        ['Ingresos',    fmtCOP(d.ingresos_cobrados ?? 0), ''],
-                        ['Comisión',    fmtCOP(d.comision_ganada   ?? 0), ''],
-                      ].map(([lbl, val, unit]) => (
-                        <div key={lbl} style={{ padding:'12px 16px', background:'var(--card)' }}>
-                          <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
-                            letterSpacing:0.8, textTransform:'uppercase', marginBottom:4 }}>{lbl}</div>
-                          <div style={{ fontSize:18, fontWeight:800, color:'var(--text)',
-                            fontFamily:'Outfit' }}>{val}{unit}</div>
-                        </div>
-                      ))}
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, padding:'12px 12px 4px' }}>
+                      <div className="sp-kpi-card" style={{ background:`linear-gradient(135deg,${color}20,transparent)`, padding:'10px 12px', gap:2 }}>
+                        <div style={{ fontSize:20, fontWeight:800, fontFamily:'Outfit', color }}>{d.citas_completadas ?? 0}</div>
+                        <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5 }}>CITAS</div>
+                      </div>
+                      <div className="sp-kpi-card" style={{ background:'linear-gradient(135deg,rgba(99,102,241,0.15),transparent)', padding:'10px 12px', gap:2 }}>
+                        <div style={{ fontSize:20, fontWeight:800, fontFamily:'Outfit', color:'#6366f1' }}>{d.horas_trabajadas ?? 0}<span style={{ fontSize:12 }}>h</span></div>
+                        <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5 }}>HORAS</div>
+                      </div>
+                      <div className="sp-kpi-card" style={{ background:'linear-gradient(135deg,rgba(34,197,94,0.15),transparent)', padding:'10px 12px', gap:2 }}>
+                        <div style={{ fontSize:16, fontWeight:800, fontFamily:'Outfit', color:'#22c55e' }}>{fmtCOP(d.ingresos_cobrados ?? 0)}</div>
+                        <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5 }}>INGRESOS</div>
+                      </div>
+                      <div className="sp-kpi-card" style={{ background:'linear-gradient(135deg,rgba(245,158,11,0.15),transparent)', padding:'10px 12px', gap:2 }}>
+                        <div style={{ fontSize:16, fontWeight:800, fontFamily:'Outfit', color:'#f59e0b' }}>{fmtCOP(d.comision_ganada ?? 0)}</div>
+                        <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5 }}>COMISIÓN</div>
+                      </div>
                     </div>
 
                     {/* Meta mensual progress */}
@@ -666,7 +665,7 @@ export default function SalonComisiones() {
                       const pct = Math.min(100, Math.round((d.ingresos_cobrados || 0) / meta * 100))
                       const barColor = pct >= 100 ? '#22c55e' : pct >= 60 ? col : '#f59e0b'
                       return (
-                        <div style={{ padding:'12px 16px', background:'var(--card)', borderTop:'1px solid var(--border)' }}>
+                        <div style={{ padding:'12px 16px 14px', background:'var(--card)' }}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                             <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
                               letterSpacing:0.8, textTransform:'uppercase' }}>Meta mensual</span>
@@ -692,6 +691,28 @@ export default function SalonComisiones() {
 
       {tab === 'comisiones' && (
         <>
+          {/* KPI total pendiente */}
+          {comisiones.length > 0 && (() => {
+            const totalPend = comisiones.reduce((s,c) => s + (c.monto_comision||0), 0)
+            return (
+              <div className="sp-kpi-card" style={{
+                margin:'16px 16px 0',
+                background:`linear-gradient(135deg, ${col}28, ${col}08)`,
+                flexDirection:'row', alignItems:'center', justifyContent:'space-between',
+              }}>
+                <div>
+                  <div style={{ fontSize:22, fontWeight:800, fontFamily:'Outfit', color:col }}>
+                    {fmtCOP(totalPend)}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5 }}>
+                    TOTAL PENDIENTE · {comisiones.length} registro{comisiones.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div style={{ fontSize:32, opacity:0.4 }}>💸</div>
+              </div>
+            )
+          })()}
+
       {/* ── Sección 1: Configurar porcentajes ─────────────── */}
       <div className="sp-section" style={{ marginTop:20 }}>
         <span className="sp-section-title">Configurar comisiones</span>
@@ -709,7 +730,8 @@ export default function SalonComisiones() {
             <div key={prof.id} style={{
               display:'flex', alignItems:'center', gap:12,
               padding:'14px 16px', borderRadius:16,
-              background:'var(--card)', border:'1px solid var(--border)',
+              background:`linear-gradient(135deg, ${color}12 0%, ${color}04 100%)`,
+              boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
             }}>
               <div style={{ width:42, height:42, borderRadius:12, background:`${color}22`,
                 display:'flex', alignItems:'center', justifyContent:'center',
@@ -863,15 +885,18 @@ export default function SalonComisiones() {
 
               return (
                 <div key={prof.id} style={{
-                  borderRadius:16, background:'var(--card)', border:`1px solid var(--border)`, overflow:'hidden',
+                  borderRadius:16, overflow:'hidden',
+                  boxShadow:'0 2px 16px rgba(0,0,0,0.14)',
                 }}>
                   {/* Header del profesional */}
                   <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
-                    borderBottom:'1px solid var(--border)', cursor:'pointer' }}
+                    background:`linear-gradient(135deg, ${color}22 0%, ${color}08 100%)`,
+                    borderBottom:'1px solid rgba(255,255,255,0.05)', cursor:'pointer' }}
                     onClick={toggleProf}>
-                    <div style={{ width:38, height:38, borderRadius:10, background:`${color}22`,
+                    <div style={{ width:38, height:38, borderRadius:10, background:`${color}30`,
                       display:'flex', alignItems:'center', justifyContent:'center',
-                      fontFamily:'Outfit', fontWeight:800, fontSize:15, color, flexShrink:0 }}>
+                      fontFamily:'Outfit', fontWeight:800, fontSize:15, color, flexShrink:0,
+                      boxShadow:`0 0 12px ${color}40` }}>
                       {prof.nombre[0]}
                     </div>
                     <div style={{ flex:1 }}>
@@ -883,7 +908,7 @@ export default function SalonComisiones() {
                       <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:600 }}>pendiente</div>
                     </div>
                     <div style={{
-                      width:20, height:20, borderRadius:6, border:`2px solid ${allSel ? col : 'var(--border)'}`,
+                      width:20, height:20, borderRadius:6, border:`2px solid ${allSel ? col : 'rgba(255,255,255,0.2)'}`,
                       background: allSel ? col : 'transparent', flexShrink:0, marginLeft:4,
                       display:'flex', alignItems:'center', justifyContent:'center',
                     }}>
@@ -902,17 +927,14 @@ export default function SalonComisiones() {
                           sel ? next.delete(com.id) : next.add(com.id)
                           return next
                         })}
-                        style={{
-                          display:'flex', alignItems:'center', gap:12, padding:'11px 16px',
-                          cursor:'pointer', background: sel ? `${col}08` : 'transparent',
-                          borderBottom:'1px solid var(--border)', transition:'background 0.15s',
-                        }}>
+                        className="sp-tbl-row"
+                        style={{ padding:'11px 16px', cursor:'pointer', background: sel ? `${col}10` : undefined }}>
                         <div style={{
-                          width:18, height:18, borderRadius:5, border:`2px solid ${sel ? col : 'var(--border)'}`,
+                          width:16, height:16, borderRadius:4, border:`2px solid ${sel ? col : 'var(--border)'}`,
                           background: sel ? col : 'transparent', flexShrink:0,
                           display:'flex', alignItems:'center', justifyContent:'center',
                         }}>
-                          {sel && <Ico d="M5 13l4 4L19 7" size={10} />}
+                          {sel && <Ico d="M5 13l4 4L19 7" size={9} />}
                         </div>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:12, color:'var(--text-2)', fontWeight:600 }}>{fecha}</div>
@@ -920,7 +942,7 @@ export default function SalonComisiones() {
                             Servicio: {fmtCOP(com.monto_servicio)}
                           </div>
                         </div>
-                        <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', fontFamily:'Outfit' }}>
+                        <div style={{ fontSize:13, fontWeight:700, color: sel ? col : 'var(--text)', fontFamily:'Outfit' }}>
                           {fmtCOP(com.monto_comision)}
                         </div>
                       </div>
