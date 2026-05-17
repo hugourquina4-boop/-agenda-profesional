@@ -254,7 +254,7 @@ export default function SalonAccesos() {
 
       {/* ── Tab switcher ── */}
       <div style={{ display:'flex', gap:4, marginBottom:18, background:'var(--surface)',
-        borderRadius:12, padding:4, border:'1px solid var(--border)' }}>
+        borderRadius:12, padding:4, boxShadow:'0 1px 8px rgba(0,0,0,0.1)' }}>
         {[
           { key:'equipo',   label:'Equipo' },
           { key:'permisos', label:'Permisos por rol' },
@@ -358,7 +358,8 @@ export default function SalonAccesos() {
                     <div key={u.user_id} style={{
                       display:'flex', alignItems:'center', gap:12,
                       padding:'14px 16px', borderRadius:14,
-                      background:'var(--card)', border:'1px solid var(--border)',
+                      background:`linear-gradient(135deg,${r.color}10,var(--card))`,
+                      boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
                       opacity: u.activo ? 1 : 0.5,
                     }}>
                       <div style={{
@@ -397,8 +398,8 @@ export default function SalonAccesos() {
                           onClick={() => { setResetSheet({ user_id:u.user_id, email:u.email, nuevaClave: genPassword() }); setResetSent(false) }}
                           title="Resetear contraseña"
                           style={{
-                            width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
-                            background:'var(--card)', color:'var(--text-3)', cursor:'pointer',
+                            width:32, height:32, borderRadius:9, border:'none',
+                            background:'rgba(255,255,255,0.08)', color:'var(--text-3)', cursor:'pointer',
                             display:'flex', alignItems:'center', justifyContent:'center',
                           }}>
                           <Ico d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" size={14} />
@@ -410,8 +411,8 @@ export default function SalonAccesos() {
                             onClick={() => setRolSheet({ user_id:u.user_id, rol:u.rol })}
                             title="Cambiar rol"
                             style={{
-                              width:32, height:32, borderRadius:9, border:'1px solid var(--border)',
-                              background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+                              width:32, height:32, borderRadius:9, border:'none',
+                              background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
                               display:'flex', alignItems:'center', justifyContent:'center',
                             }}>
                             <Ico d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" size={14} />
@@ -457,7 +458,8 @@ export default function SalonAccesos() {
                   <div key={p.id} style={{
                     display:'flex', alignItems:'center', gap:12,
                     padding:'14px 16px', borderRadius:14,
-                    background:'var(--card)', border:'1px solid var(--border)',
+                    background:`linear-gradient(135deg,${col}0d,var(--card))`,
+                    boxShadow:'0 2px 10px rgba(0,0,0,0.08)',
                   }}>
                     <div style={{
                       width:40, height:40, borderRadius:12, background:`${col}20`,
@@ -496,8 +498,8 @@ export default function SalonAccesos() {
           {/* URL de acceso */}
           {linkAcceso && (
             <div style={{
-              background:'rgba(128,128,128,0.06)', border:'1px solid var(--border)',
-              borderRadius:14, padding:'14px 16px', marginTop:8,
+              background:'var(--card)', borderRadius:14, padding:'14px 16px', marginTop:8,
+              boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
             }}>
               <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5,
                 textTransform:'uppercase', marginBottom:8 }}>
@@ -559,7 +561,7 @@ export default function SalonAccesos() {
             </div>
             <button onClick={() => setRolSheet(null)} style={{
               width:'100%', padding:'13px', borderRadius:14,
-              background:'var(--surface)', border:'1px solid var(--border)',
+              background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
               color:'var(--text-2)', fontWeight:600, fontSize:14, cursor:'pointer',
             }}>Cancelar</button>
           </div>
@@ -614,22 +616,23 @@ export default function SalonAccesos() {
                       onChange={e => setResetSheet(s => ({ ...s, nuevaClave: e.target.value }))}
                       style={{
                         flex:1, padding:'10px 12px', borderRadius:12,
-                        border:'1px solid var(--border)', background:'var(--bg)',
+                        border:'none', background:'var(--card)',
                         color:'var(--text)', fontSize:14, outline:'none', fontFamily:'monospace',
+                        boxShadow:'inset 0 1px 4px rgba(0,0,0,0.12)',
                       }}
                     />
                     <button
                       onClick={() => setResetSheet(s => ({ ...s, nuevaClave: genPassword() }))}
                       style={{
-                        padding:'10px 12px', borderRadius:12, border:'1px solid var(--border)',
-                        background:'var(--card)', color:'var(--text-2)', cursor:'pointer', fontSize:16,
+                        padding:'10px 12px', borderRadius:12, border:'none',
+                        background:`${col}14`, color:col, cursor:'pointer', fontSize:16,
                       }}>↺</button>
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={() => { setResetSheet(null); setResetSent(false) }} style={{
                     flex:1, padding:'12px', borderRadius:12, cursor:'pointer',
-                    background:'transparent', border:'1px solid var(--border)', color:'var(--text-2)', fontWeight:600,
+                    background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)', color:'var(--text-2)', fontWeight:600,
                   }}>Cancelar</button>
                   <button onClick={resetearClave} disabled={resetLoading || !resetSheet.nuevaClave?.trim()} style={{
                     flex:2, padding:'12px', borderRadius:12, border:'none', cursor:'pointer',
@@ -675,8 +678,8 @@ export default function SalonAccesos() {
                   <input className="sp-input" style={{ fontFamily:'monospace', flex:1, fontSize:13 }}
                     value={formPass} onChange={e => setFormPass(e.target.value)} />
                   <button onClick={() => setFormPass(genPassword())} style={{
-                    padding:'0 12px', borderRadius:12, border:'1px solid var(--border)',
-                    background:'var(--card)', color:'var(--text-2)', cursor:'pointer', fontSize:16,
+                    padding:'0 12px', borderRadius:12, border:'none',
+                    background:`${col}14`, color:col, cursor:'pointer', fontSize:16,
                   }}>↺</button>
                 </div>
               </div>
@@ -707,8 +710,8 @@ export default function SalonAccesos() {
 
             <button onClick={copiarCreds} style={{
               width:'100%', padding:'12px', borderRadius:12, marginBottom:10,
-              background:'rgba(128,128,128,0.08)', border:'1px solid var(--border)',
-              color:'var(--text-2)', fontWeight:600, fontSize:14, cursor:'pointer',
+              background:`${col}10`, border:'none',
+              color:col, fontWeight:700, fontSize:14, cursor:'pointer',
             }}>
               📋 Copiar credenciales para compartir
             </button>

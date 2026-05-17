@@ -331,7 +331,7 @@ export default function SalonCaja() {
 
           {/* Tabs */}
           <div style={{ display:'flex', gap:4, marginBottom:16,
-            background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:4 }}>
+            background:'var(--card)', borderRadius:14, padding:4, boxShadow:'0 1px 8px rgba(0,0,0,0.1)' }}>
             {[
               { key:'cobrar',    label:`Por cobrar${pendientes.length > 0 ? ` (${pendientes.length})` : ''}` },
               { key:'historial', label:`Cobrado (${historial.length})` },
@@ -445,8 +445,9 @@ export default function SalonCaja() {
                             background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, fontSize:12,
                           }}>Confirmar anulación</button>
                           <button onClick={() => { setConfirmAnular(null); setAnulNota('') }} style={{
-                            padding:'8px 14px', borderRadius:9, border:'1px solid var(--border)',
-                            background:'transparent', color:'var(--text-3)', fontWeight:700, fontSize:12, cursor:'pointer',
+                            padding:'8px 14px', borderRadius:9, border:'none',
+                            background:'var(--card)', color:'var(--text-3)', fontWeight:700, fontSize:12, cursor:'pointer',
+                            boxShadow:'0 1px 4px rgba(0,0,0,0.1)',
                           }}>Cancelar</button>
                         </div>
                       </div>
@@ -455,8 +456,8 @@ export default function SalonCaja() {
                 ))}
                 {historial.length > paginaHist && (
                   <button onClick={() => setPaginaHist(p => p + 20)} style={{
-                    width:'100%', padding:'12px', borderRadius:14, border:'1px solid var(--border)',
-                    background:'var(--card)', color:'var(--text-3)', fontWeight:700, fontSize:13, cursor:'pointer',
+                    width:'100%', padding:'12px', borderRadius:14, border:'none',
+                    background:`${col}10`, color:col, fontWeight:700, fontSize:13, cursor:'pointer',
                     marginTop:6,
                   }}>
                     Ver {Math.min(historial.length - paginaHist, 20)} más · {historial.length - paginaHist} restantes
