@@ -433,8 +433,8 @@ export default function SalonAgenda() {
             if (vistaAgenda === 'semana') shiftDia(-7)
             if (vistaAgenda === 'dia')    shiftDia(-1)
           }}
-          style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
-            background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+          style={{ width:38, height:38, borderRadius:12, border:'none',
+            background:`${col}12`, color:col, cursor:'pointer',
             display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <Ico d="M15 19l-7-7 7-7" size={18} />
         </button>
@@ -471,8 +471,8 @@ export default function SalonAgenda() {
             if (vistaAgenda === 'semana') shiftDia(+7)
             if (vistaAgenda === 'dia')    shiftDia(+1)
           }}
-          style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--border)',
-            background:'var(--card)', color:'var(--text-2)', cursor:'pointer',
+          style={{ width:38, height:38, borderRadius:12, border:'none',
+            background:`${col}12`, color:col, cursor:'pointer',
             display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <Ico d="M9 5l7 7-7 7" size={18} />
         </button>
@@ -480,7 +480,7 @@ export default function SalonAgenda() {
 
       {/* ── Toggle Mes / Semana / Día ── */}
       <div style={{ display:'flex', gap:4, margin:'0 16px 12px',
-        background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+        background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
         {[['mes','Mes'],['semana','Sem'],['dia','Día']].map(([v,label]) => (
           <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia') setFiltroProf(null) }} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
@@ -607,7 +607,8 @@ export default function SalonAgenda() {
             {citasDia.map(c => (
               <button key={c.id} onClick={() => setSelCita(c)} style={{
                 padding:'14px 16px', borderRadius:14, width:'100%', textAlign:'left',
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:`linear-gradient(135deg,${ESTADO_COLOR[c.estado] || col}10,var(--card))`,
+                boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
                 display:'flex', alignItems:'center', gap:14,
                 position:'relative', overflow:'hidden', cursor:'pointer',
               }}>
@@ -660,8 +661,8 @@ export default function SalonAgenda() {
                   {ESTADO_LABEL[selCita.estado] || selCita.estado}
                 </span>
                 <button onClick={() => setSelCita(null)} style={{
-                  width:30, height:30, borderRadius:8, border:'1px solid var(--border)',
-                  background:'transparent', color:'var(--text-3)', cursor:'pointer',
+                  width:30, height:30, borderRadius:8, border:'none',
+                  background:'rgba(255,255,255,0.08)', color:'var(--text-3)', cursor:'pointer',
                   display:'flex', alignItems:'center', justifyContent:'center',
                   fontSize:18, lineHeight:1,
                 }}>×</button>
@@ -718,7 +719,7 @@ export default function SalonAgenda() {
               ].map((row, i) => (
                 <div key={i} style={{
                   display:'flex', alignItems:'center', gap:12, padding:'12px 14px',
-                  borderRadius:12, background:'var(--card)', border:'1px solid var(--border)',
+                  borderRadius:12, background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
                 }}>
                   <div style={{ color:col, flexShrink:0 }}><Ico d={row.ico} size={17} /></div>
                   <div>

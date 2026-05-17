@@ -183,8 +183,8 @@ export default function SalonLogin({ onLogin, onRegistro }) {
 
         {/* Form */}
         <div style={{
-          background:'var(--card)', border:'1px solid var(--border)',
-          borderRadius:24, padding:28, boxShadow:'var(--shadow-sm)',
+          background:'var(--card)',
+          borderRadius:24, padding:28, boxShadow:'0 4px 24px rgba(0,0,0,0.12)',
         }}>
           <form onSubmit={handleLogin} style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div>
@@ -289,7 +289,8 @@ export default function SalonLogin({ onLogin, onRegistro }) {
                 style={{
                   display:'flex', alignItems:'center', gap:14,
                   padding:'16px 18px',
-                  background:'var(--card)', border:'1px solid var(--border)',
+                  background:`linear-gradient(135deg,${s.color_primario || '#f43f5e'}08,var(--card))`,
+                  border:'1px solid transparent', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
                   borderRadius:16, cursor:'pointer', textAlign:'left',
                   transition:'all 0.15s', width:'100%',
                 }}
@@ -298,8 +299,8 @@ export default function SalonLogin({ onLogin, onRegistro }) {
                   e.currentTarget.style.boxShadow = `0 4px 16px ${s.color_primario || '#f43f5e'}22`
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                  e.currentTarget.style.boxShadow = 'none'
+                  e.currentTarget.style.borderColor = 'transparent'
+                  e.currentTarget.style.boxShadow = '0 1px 8px rgba(0,0,0,0.08)'
                 }}
               >
                 {/* Color badge */}

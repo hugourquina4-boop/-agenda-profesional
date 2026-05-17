@@ -48,16 +48,16 @@ function CalendarioPicker({ value, onChange, col }) {
     <div style={{ marginBottom:16 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <button type="button" onClick={() => changeNav(-1)} style={{
-          width:36, height:36, borderRadius:10, border:'1px solid var(--border)',
-          background:'transparent', color:'var(--text-2)', cursor:'pointer',
+          width:36, height:36, borderRadius:10, border:'none',
+          background:`${col}12`, color:col, cursor:'pointer',
           display:'flex', alignItems:'center', justifyContent:'center',
         }}>{chev('l')}</button>
         <span style={{ fontWeight:700, fontSize:15, color:'var(--text)' }}>
           {MESES_CAL[nav.m - 1]} {nav.y}
         </span>
         <button type="button" onClick={() => changeNav(1)} style={{
-          width:36, height:36, borderRadius:10, border:'1px solid var(--border)',
-          background:'transparent', color:'var(--text-2)', cursor:'pointer',
+          width:36, height:36, borderRadius:10, border:'none',
+          background:`${col}12`, color:col, cursor:'pointer',
           display:'flex', alignItems:'center', justifyContent:'center',
         }}>{chev('r')}</button>
       </div>
@@ -290,8 +290,8 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, marginTop:8 }}>
           <p className="sp-sheet-title" style={{ margin:0 }}>Nueva cita</p>
           <button onClick={onClose} style={{
-            width:32, height:32, borderRadius:10, border:'1px solid var(--border)',
-            background:'var(--card)', color:'var(--text-2)', display:'flex',
+            width:32, height:32, borderRadius:10, border:'none',
+            background:'rgba(255,255,255,0.08)', color:'var(--text-2)', display:'flex',
             alignItems:'center', justifyContent:'center', cursor:'pointer',
           }}>
             <Ico d="M6 18L18 6M6 6l12 12" size={16} />
@@ -518,7 +518,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         {step > 0 && (
           <div style={{
             marginTop:16, padding:'12px 14px', borderRadius:14,
-            background:'var(--card)', border:'1px solid var(--border)', marginBottom:16,
+            background:'var(--card)', boxShadow:'0 2px 12px rgba(0,0,0,0.1)', marginBottom:16,
           }}>
             <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:8, fontWeight:600, letterSpacing:0.5, textTransform:'uppercase' }}>
               Resumen
@@ -555,7 +555,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
             {step > 0 && (
               <button onClick={() => setStep(s => s - 1)} style={{
                 flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                 color:'var(--text-2)', fontWeight:700, fontSize:15,
               }}>Atrás</button>
             )}
