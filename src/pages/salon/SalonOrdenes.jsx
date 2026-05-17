@@ -438,7 +438,7 @@ export default function SalonOrdenes() {
                 value={editServQ} onChange={e => setEditServQ(e.target.value)} />
               {editServsFiltrados.length > 0 && editServQ.trim() && (
                 <div style={{
-                  marginTop:4, background:'var(--card)', border:'1px solid var(--border)',
+                  marginTop:4, background:'var(--card)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)',
                   borderRadius:12, overflow:'hidden', maxHeight:200, overflowY:'auto',
                 }}>
                   {editServsFiltrados.map(s => (
@@ -459,7 +459,7 @@ export default function SalonOrdenes() {
             {/* Items */}
             {editItems.length > 0 && (
               <div style={{
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
                 borderRadius:14, overflow:'hidden', marginBottom:14,
               }}>
                 {editItems.map((it, i) => (
@@ -470,15 +470,15 @@ export default function SalonOrdenes() {
                     <span style={{ flex:1, fontSize:13, color:'var(--text)', fontWeight:600 }}>{it.nombre}</span>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                       <button onClick={() => editCambiarCantidad(it.servicio_id, -1)} style={{
-                        width:24, height:24, borderRadius:6, border:'1px solid var(--border)',
-                        background:'var(--bg)', color:'var(--text)', cursor:'pointer', fontWeight:700,
+                        width:24, height:24, borderRadius:6, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text)', cursor:'pointer', fontWeight:700,
                       }}>−</button>
                       <span style={{ fontSize:13, fontWeight:700, color:'var(--text)', minWidth:16, textAlign:'center' }}>
                         {it.cantidad}
                       </span>
                       <button onClick={() => editCambiarCantidad(it.servicio_id, 1)} style={{
-                        width:24, height:24, borderRadius:6, border:'1px solid var(--border)',
-                        background:'var(--bg)', color:'var(--text)', cursor:'pointer', fontWeight:700,
+                        width:24, height:24, borderRadius:6, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text)', cursor:'pointer', fontWeight:700,
                       }}>+</button>
                     </div>
                     <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:13, color:col, minWidth:56, textAlign:'right' }}>
@@ -550,7 +550,7 @@ export default function SalonOrdenes() {
               />
               {clientesFiltrados.length > 0 && (
                 <div style={{
-                  marginTop:4, background:'var(--card)', border:'1px solid var(--border)',
+                  marginTop:4, background:'var(--card)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)',
                   borderRadius:12, overflow:'hidden',
                 }}>
                   {clientesFiltrados.map(c => (
@@ -594,7 +594,7 @@ export default function SalonOrdenes() {
               />
               {servsFiltrados.length > 0 && (
                 <div style={{
-                  marginTop:4, background:'var(--card)', border:'1px solid var(--border)',
+                  marginTop:4, background:'var(--card)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)',
                   borderRadius:12, overflow:'hidden', maxHeight:220, overflowY:'auto',
                 }}>
                   {servsFiltrados.map(s => {
@@ -635,7 +635,7 @@ export default function SalonOrdenes() {
             {/* Items seleccionados */}
             {formItems.length > 0 && (
               <div style={{
-                background:'var(--card)', border:'1px solid var(--border)',
+                background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
                 borderRadius:14, overflow:'hidden', marginBottom:14,
               }}>
                 {formItems.map((it, i) => (
@@ -646,15 +646,15 @@ export default function SalonOrdenes() {
                     <span style={{ flex:1, fontSize:13, color:'var(--text)', fontWeight:600 }}>{it.nombre}</span>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                       <button onClick={() => cambiarCantidad(it.servicio_id, -1)} style={{
-                        width:24, height:24, borderRadius:6, border:'1px solid var(--border)',
-                        background:'var(--bg)', color:'var(--text)', cursor:'pointer', fontWeight:700,
+                        width:24, height:24, borderRadius:6, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text)', cursor:'pointer', fontWeight:700,
                       }}>−</button>
                       <span style={{ fontSize:13, fontWeight:700, color:'var(--text)', minWidth:16, textAlign:'center' }}>
                         {it.cantidad}
                       </span>
                       <button onClick={() => cambiarCantidad(it.servicio_id, 1)} style={{
-                        width:24, height:24, borderRadius:6, border:'1px solid var(--border)',
-                        background:'var(--bg)', color:'var(--text)', cursor:'pointer', fontWeight:700,
+                        width:24, height:24, borderRadius:6, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text)', cursor:'pointer', fontWeight:700,
                       }}>+</button>
                     </div>
                     <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:13, color:col, minWidth:56, textAlign:'right' }}>

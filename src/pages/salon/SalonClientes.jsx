@@ -383,7 +383,7 @@ export default function SalonClientes() {
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => setElimTarget(null)} style={{
                 flex:1, padding:'14px', borderRadius:14, cursor:'pointer',
-                background:'var(--surface)', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                 color:'var(--text-2)', fontWeight:600, fontSize:14,
               }}>Cancelar</button>
               <button onClick={eliminarCliente} style={{
@@ -416,7 +416,7 @@ export default function SalonClientes() {
               {importData.slice(0, 5).map((r, i) => (
                 <div key={i} style={{
                   padding:'10px 12px', borderRadius:10,
-                  background:'var(--card)', border:'1px solid var(--border)',
+                  background:'var(--card)', boxShadow:'0 1px 6px rgba(0,0,0,0.08)',
                 }}>
                   <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{r.nombre}</div>
                   <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>
@@ -438,7 +438,7 @@ export default function SalonClientes() {
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={() => { setImportModal(false); setImportData([]) }} style={{
                 flex:1, padding:'12px', borderRadius:14, cursor:'pointer',
-                background:'transparent', border:'1px solid var(--border)',
+                background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
                 color:'var(--text-2)', fontWeight:600, fontSize:14,
               }}>
                 Cancelar
@@ -466,7 +466,7 @@ export default function SalonClientes() {
 
             {/* Tabs */}
             <div style={{ display:'flex', gap:4, marginBottom:18,
-              background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+              background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
               {[['contacto','Contacto'],['perfil','Perfil'],['notas','Notas']].map(([t, label]) => (
                 <button key={t} onClick={() => setNuevoTab(t)} style={{
                   flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
@@ -570,8 +570,8 @@ export default function SalonClientes() {
             <button onClick={() => csvInputRef.current?.click()} title="Importar CSV"
               style={{
                 display:'flex', alignItems:'center', gap:5, padding:'9px 13px', borderRadius:12,
-                background:'var(--card)', border:'1px solid var(--border)',
-                color:'var(--text-2)', fontWeight:600, fontSize:13, cursor:'pointer',
+                background:`${col}12`, border:'none',
+                color:col, fontWeight:600, fontSize:13, cursor:'pointer',
               }}>
               <Ico d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" size={15} />
               Importar
@@ -580,8 +580,8 @@ export default function SalonClientes() {
               <button onClick={exportarCSV} title="Exportar CSV"
                 style={{
                   display:'flex', alignItems:'center', gap:5, padding:'9px 13px', borderRadius:12,
-                  background:'var(--card)', border:'1px solid var(--border)',
-                  color:'var(--text-2)', fontWeight:600, fontSize:13, cursor:'pointer',
+                  background:`${col}12`, border:'none',
+                  color:col, fontWeight:600, fontSize:13, cursor:'pointer',
                 }}>
                 <Ico d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" size={15} />
                 CSV
@@ -863,7 +863,7 @@ export default function SalonClientes() {
 
             {/* ── Notas ── */}
             <div style={{
-              background:'var(--card)', border:'1px solid var(--border)',
+              background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.08)',
               borderRadius:16, padding:'14px 16px', marginBottom:14,
             }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
@@ -925,7 +925,7 @@ export default function SalonClientes() {
 
             {/* ── Tabs Historial / Fotos ── */}
             <div style={{ display:'flex', gap:4, marginBottom:14,
-              background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:4 }}>
+              background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
               {[['historial','Historial'],['fotos','Fotos 📷']].map(([t, label]) => (
                 <button key={t} onClick={() => setTabCliente(t)} style={{
                   flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
@@ -1007,7 +1007,7 @@ export default function SalonClientes() {
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     {fotos.map(f => (
                       <div key={f.id} style={{ borderRadius:14, overflow:'hidden', position:'relative',
-                        aspectRatio:'1', background:'var(--card)', border:'1px solid var(--border)' }}>
+                        aspectRatio:'1', background:'var(--card)', boxShadow:'0 1px 6px rgba(0,0,0,0.1)' }}>
                         <img src={f.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         <div style={{ position:'absolute', top:6, left:6, padding:'3px 8px', borderRadius:7,
                           background:'rgba(0,0,0,0.6)', fontSize:10, fontWeight:700, color:'#fff' }}>
