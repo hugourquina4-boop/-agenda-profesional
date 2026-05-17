@@ -109,6 +109,45 @@ export default function SalonAnalytics() {
   const [loading,   setLoading]   = useState(!isDemo)
   const [tabA,      setTabA]      = useState('resumen')
 
+  // Finanzas
+  const [gastosHist, setGastosHist] = useState([])
+  const [gastosCat,  setGastosCat]  = useState([])
+  const [loadingF,   setLoadingF]   = useState(false)
+
+  async function cargarFinanzas() {
+    if (!tenant || loadingF) return
+    setLoadingF(true)
+    try {
+      const base = new Date(); base.setMonth(base.getMonth() - 5); base.setDate(1)
+      const desde = base.toISOString().slice(0, 10)
+      const mesActual = new Date().toISOString().slice(0, 7)
+      const { data } = await supabase
+        .from('gastos').select('monto,fecha,categoria')
+        .eq('tenant_id', tenant.id).gte('fecha', desde)
+      const porMes = {}, porCat = {}
+      ;(data || []).forEach(g => {
+        const mes = g.fecha.slice(0, 7)
+        porMes[mes] = (porMes[mes] || 0) + Number(g.monto)
+        if (mes === mesActual) {
+          const cat = g.categoria || 'Otros'
+          porCat[cat] = (porCat[cat] || 0) + Number(g.monto)
+        }
+      })
+      const histArr = []
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(); d.setMonth(d.getMonth() - i); d.setDate(1)
+        const mes = d.toISOString().slice(0, 7)
+        histArr.push({ mes, total: porMes[mes] || 0 })
+      }
+      setGastosHist(histArr)
+      setGastosCat(Object.entries(porCat).map(([cat,total]) => ({cat,total})).sort((a,b) => b.total - a.total))
+    } finally { setLoadingF(false) }
+  }
+
+  useEffect(() => {
+    if (tabA === 'finanzas' && tenant && gastosHist.length === 0) cargarFinanzas()
+  }, [tabA, tenant])
+
   // Informe citas
   const hoy = new Date().toISOString().slice(0,10)
   const primeroDeMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
@@ -292,8 +331,8 @@ export default function SalonAnalytics() {
       )}
 
       {/* ── Tabs ── */}
-      <div style={{ padding:'16px 16px 0', display:'flex', gap:8 }}>
-        {[['resumen','Resumen'],['citas','Informe citas']].map(([t,label]) => (
+      <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none' }}>
+        {[['resumen','Resumen'],['citas','Citas'],['finanzas','Finanzas']].map(([t,label]) => (
           <button key={t} onClick={() => setTabA(t)} style={{
             flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
             fontWeight:700, fontSize:13, fontFamily:'Outfit',
@@ -416,6 +455,142 @@ export default function SalonAnalytics() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Tab: Finanzas ─────────────────────────────────── */}
+      {tabA === 'finanzas' && (
+        <div style={{ padding:'16px' }}>
+          {loadingF ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
+              <div className="sp-spinner" style={{ borderTopColor:col }} />
+            </div>
+          ) : (() => {
+            const mesActual = new Date().toISOString().slice(0, 7)
+            const ingresosMes = historia.find(h => h.mes === mesActual)?.ingresos_brutos || 0
+            const gastosMesTotal = gastosHist.find(h => h.mes === mesActual)?.total || 0
+            const utilidad = ingresosMes - gastosMesTotal
+            const margen = ingresosMes > 0 ? Math.round(utilidad / ingresosMes * 100) : 0
+            const maxBar = Math.max(...historia.map(h => h.ingresos_brutos || 0), ...gastosHist.map(h => h.total), 1)
+            const totalGastosCat = gastosCat.reduce((s,c) => s + c.total, 0)
+
+            const CAT_COLORS2 = {
+              Insumos:'#f43f5e', Equipos:'#3b82f6', Servicios:'#a855f7',
+              Arriendo:'#f59e0b', Publicidad:'#ec4899', Nómina:'#22c55e', Otros:'#6b7280',
+            }
+
+            return (
+              <>
+                {/* 4 KPIs */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
+                  {[
+                    { label:'Ingresos mes',  value:fmtCOP(ingresosMes),      color:'#4ade80', icon:'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                    { label:'Gastos mes',    value:fmtCOP(gastosMesTotal),    color:'#f87171', icon:'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
+                    { label:'Utilidad neta', value:fmtCOP(Math.abs(utilidad)), color: utilidad >= 0 ? '#4ade80' : '#f87171', icon:'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+                    { label:'Margen',        value:`${margen}%`,              color: margen >= 40 ? '#4ade80' : margen >= 20 ? '#f59e0b' : '#f87171', icon:'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z' },
+                  ].map(k => (
+                    <div key={k.label} style={{
+                      padding:'14px 16px', borderRadius:16,
+                      background:'var(--card)', border:'1px solid var(--border)',
+                    }}>
+                      <div style={{ width:30, height:30, borderRadius:9, background:`${k.color}20`,
+                        display:'flex', alignItems:'center', justifyContent:'center', marginBottom:8, color:k.color }}>
+                        <Ico d={k.icon} size={14} />
+                      </div>
+                      <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:k.color }}>{k.value}</div>
+                      <div style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.4, marginTop:3 }}>
+                        {k.label.toUpperCase()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Gráfico 6 meses ingresos vs gastos */}
+                {(historia.length > 0 || gastosHist.some(h => h.total > 0)) && (
+                  <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, padding:'16px', marginBottom:16 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>
+                      Ingresos vs Gastos — últimos 6 meses
+                    </div>
+                    {/* Leyenda */}
+                    <div style={{ display:'flex', gap:14, marginBottom:12 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                        <span style={{ width:10, height:10, borderRadius:3, background:`${col}cc`, display:'inline-block' }} />
+                        <span style={{ fontSize:11, color:'var(--text-3)' }}>Ingresos</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                        <span style={{ width:10, height:10, borderRadius:3, background:'rgba(239,68,68,0.7)', display:'inline-block' }} />
+                        <span style={{ fontSize:11, color:'var(--text-3)' }}>Gastos</span>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:90 }}>
+                      {Array.from({length:6}, (_,i) => {
+                        const d = new Date(); d.setMonth(d.getMonth() - (5-i)); d.setDate(1)
+                        const mes = d.toISOString().slice(0,7)
+                        const ing = historia.find(h => h.mes === mes)?.ingresos_brutos || 0
+                        const gst = gastosHist.find(h => h.mes === mes)?.total || 0
+                        const label = MES_LABELS[d.getMonth()]
+                        return (
+                          <div key={mes} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                            <div style={{ width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:72 }}>
+                              <div style={{ flex:1, borderRadius:'4px 4px 0 0',
+                                background: mes === mesActual ? col : `${col}55`,
+                                height:`${Math.max(ing/maxBar*100,2)}%`,
+                                transition:'height 0.3s',
+                              }} />
+                              <div style={{ flex:1, borderRadius:'4px 4px 0 0',
+                                background: gst > 0 ? 'rgba(239,68,68,0.65)' : 'transparent',
+                                height:`${Math.max(gst/maxBar*100,gst>0?2:0)}%`,
+                                transition:'height 0.3s',
+                              }} />
+                            </div>
+                            <span style={{ fontSize:9, color:'var(--text-3)', fontWeight:600 }}>{label}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Breakdown categorías */}
+                {gastosCat.length > 0 && (
+                  <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, padding:'16px' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>
+                      Gastos por categoría — mes actual
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                      {gastosCat.map(c => {
+                        const pct = totalGastosCat > 0 ? Math.round(c.total / totalGastosCat * 100) : 0
+                        const color = CAT_COLORS2[c.cat] || '#6b7280'
+                        return (
+                          <div key={c.cat}>
+                            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                              <span style={{ fontSize:12, fontWeight:700, color:'var(--text-2)' }}>{c.cat}</span>
+                              <span style={{ fontSize:12, fontWeight:800, color }}>
+                                {fmtCOP(c.total)} <span style={{ fontWeight:500, color:'var(--text-3)' }}>({pct}%)</span>
+                              </span>
+                            </div>
+                            <div style={{ height:6, borderRadius:3, background:'var(--border)', overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${pct}%`, background:color, borderRadius:3, transition:'width 0.4s' }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {gastosHist.every(h => h.total === 0) && gastosCat.length === 0 && (
+                  <div style={{ textAlign:'center', padding:'40px 0', color:'var(--text-3)' }}>
+                    <div style={{ fontSize:32, marginBottom:12 }}>📊</div>
+                    <div style={{ fontSize:14, fontWeight:600 }}>Sin gastos registrados aún</div>
+                    <div style={{ fontSize:12, marginTop:4 }}>
+                      Registra gastos en el módulo Proveedores para ver el análisis aquí.
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 
