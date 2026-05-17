@@ -24,6 +24,14 @@ function fmtFechaHora(iso) {
     ' · ' + d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })
 }
 
+function tiempoEspera(iso) {
+  const mins = Math.round((Date.now() - new Date(iso)) / 60000)
+  if (mins < 1)  return 'ahora'
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h${mins % 60 > 0 ? ` ${mins % 60}m` : ''}`
+}
+
 const METODOS = ['efectivo','nequi','daviplata','transferencia','tarjeta']
 const METODO_COLORS = {
   efectivo:'#22c55e', nequi:'#a855f7', daviplata:'#f59e0b',
@@ -311,21 +319,22 @@ export default function SalonOrdenes() {
 
             return (
               <div key={ord.id} style={{
-                background:'var(--card)', border:'1px solid var(--border)',
-                borderRadius:18, overflow:'hidden',
+                background:'var(--card)', borderRadius:18, overflow:'hidden',
                 display:'flex', flexDirection:'column',
+                boxShadow:'0 2px 20px rgba(0,0,0,0.18)',
               }}>
                 {/* Header */}
                 <div style={{
                   padding:'14px 16px 12px',
-                  borderBottom:'1px solid var(--border)',
-                  background:`${col}08`,
+                  borderBottom:'1px solid rgba(255,255,255,0.05)',
+                  background:`linear-gradient(135deg, ${col}22 0%, ${col}08 100%)`,
                 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                     <div style={{
-                      width:38, height:38, borderRadius:11, background:`${col}22`,
+                      width:38, height:38, borderRadius:11, background:`${col}30`,
                       display:'flex', alignItems:'center', justifyContent:'center',
                       fontFamily:'Outfit', fontWeight:800, fontSize:16, color:col, flexShrink:0,
+                      boxShadow:`0 2px 10px ${col}30`,
                     }}>
                       {clienteNombre[0].toUpperCase()}
                     </div>
@@ -335,81 +344,60 @@ export default function SalonOrdenes() {
                         {clienteNombre}
                       </div>
                       <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
-                        {fmtFechaHora(ord.created_at)}
+                        {profNombre !== '—' ? profNombre : 'Sin asignar'}
                       </div>
                     </div>
+                    <span style={{
+                      fontSize:10, fontWeight:800, padding:'3px 8px', borderRadius:7,
+                      background:'rgba(255,255,255,0.08)', color:'var(--text-2)', flexShrink:0,
+                    }}>{tiempoEspera(ord.created_at)}</span>
                     <button onClick={() => abrirEditar(ord)}
-                      style={{ background:'none', border:'none', cursor:'pointer',
-                        color:'var(--text-3)', padding:4, borderRadius:6 }}>
-                      <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
+                      style={{ background:'rgba(255,255,255,0.07)', border:'none', cursor:'pointer',
+                        color:'var(--text-3)', padding:6, borderRadius:8 }}>
+                      <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={13} />
                     </button>
                     <button onClick={() => cancelarOrden(ord.id)}
-                      style={{ background:'none', border:'none', cursor:'pointer',
-                        color:'var(--text-3)', padding:4, borderRadius:6 }}>
-                      <Ico d="M6 18L18 6M6 6l12 12" size={14} />
+                      style={{ background:'rgba(239,68,68,0.1)', border:'none', cursor:'pointer',
+                        color:'#f87171', padding:6, borderRadius:8 }}>
+                      <Ico d="M6 18L18 6M6 6l12 12" size={13} />
                     </button>
                   </div>
                 </div>
 
                 {/* Items */}
                 <div style={{ padding:'12px 16px', flex:1 }}>
-                  <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
-                          textAlign:'left', paddingBottom:6, letterSpacing:0.5 }}>
-                          SERVICIO / PRODUCTO
-                        </th>
-                        <th style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
-                          textAlign:'right', paddingBottom:6, letterSpacing:0.5 }}>
-                          TOTAL
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((it, i) => (
-                        <tr key={i}>
-                          <td style={{ fontSize:13, color:'var(--text)', paddingBottom:4 }}>
-                            {it.nombre}
-                            {it.cantidad > 1 && (
-                              <span style={{ fontSize:11, color:'var(--text-3)', marginLeft:6 }}>
-                                ×{it.cantidad}
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ fontSize:13, color:col, fontWeight:700,
-                            textAlign:'right', paddingBottom:4 }}>
-                            ${((it.precio || 0) * (it.cantidad || 1)).toLocaleString('es-CO')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
+                  {items.map((it, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: i < items.length - 1 ? 7 : 0 }}>
+                      <span style={{ fontSize:13, color:'var(--text)', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {it.nombre}
+                        {it.cantidad > 1 && <span style={{ fontSize:11, color:'var(--text-3)', marginLeft:5 }}>×{it.cantidad}</span>}
+                      </span>
+                      <span style={{ fontSize:13, color:'var(--text-2)', fontWeight:700, marginLeft:8, flexShrink:0 }}>
+                        ${((it.precio || 0) * (it.cantidad || 1)).toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                  ))}
                   {ord.notas && (
-                    <p style={{ fontSize:11, color:'var(--text-3)', marginTop:8,
-                      fontStyle:'italic', lineHeight:1.4 }}>{ord.notas}</p>
+                    <p style={{ fontSize:11, color:'var(--text-3)', marginTop:8, fontStyle:'italic', lineHeight:1.4 }}>{ord.notas}</p>
                   )}
                 </div>
 
                 {/* Footer */}
                 <div style={{
-                  padding:'12px 16px', borderTop:'1px solid var(--border)',
+                  padding:'12px 16px',
+                  background:'rgba(0,0,0,0.12)',
                   display:'flex', alignItems:'center', justifyContent:'space-between',
                 }}>
-                  <div>
-                    <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:2 }}>
-                      {profNombre !== '—' ? profNombre : 'Sin asignar'}
-                    </div>
-                    <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:22, color:'var(--text)' }}>
-                      {fmtCOP(ord.total)}
-                    </div>
+                  <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:24, color:'var(--text)' }}>
+                    {fmtCOP(ord.total)}
                   </div>
                   <button onClick={() => abrirPagar(ord)} style={{
-                    padding:'10px 18px', borderRadius:12, border:'none', cursor:'pointer',
-                    background:col, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'Outfit',
+                    padding:'10px 20px', borderRadius:12, border:'none', cursor:'pointer',
+                    background:`linear-gradient(135deg, ${col}, ${col}cc)`,
+                    boxShadow:`0 4px 16px ${col}50`,
+                    color:'#fff', fontWeight:800, fontSize:14, fontFamily:'Outfit',
                   }}>
-                    Pagar
+                    Cobrar
                   </button>
                 </div>
               </div>
