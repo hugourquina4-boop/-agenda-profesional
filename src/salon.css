@@ -53,7 +53,10 @@
   background: var(--bg);
   color: var(--text);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  overflow-x: hidden;
+  /* clip vs hidden: clip prevents horizontal overflow WITHOUT creating a containing
+     block for position:fixed children — critical on Chrome Android where
+     overflow:hidden traps fixed sheets/nav inside sp-root instead of the viewport */
+  overflow-x: clip;
   padding-bottom: 90px;
   position: relative;
 }
@@ -798,6 +801,7 @@
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: sp-fadein-fast 0.2s ease forwards;
+  will-change: transform;
 }
 @keyframes sp-fadein-fast { from { opacity: 0; } to { opacity: 1; } }
 
@@ -814,9 +818,11 @@
   /* 80px top gap prevents sheet going above header; 100px bottom clears nav (72px) + system gesture bar */
   padding: 0 20px 100px;
   animation: sp-sheet-in 0.35s cubic-bezier(0.16,1,0.3,1) forwards;
-  max-height: calc(100dvh - 80px);
+  max-height: calc(100dvh - 100px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* GPU layer — ensures correct z-order above nav/header backdrop-filter on Android */
+  will-change: transform;
 }
 
 /* Header pegajoso dentro del sheet (handle + título + subtitle) */
