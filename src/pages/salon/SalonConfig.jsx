@@ -709,7 +709,7 @@ export default function SalonConfig() {
           const metodos = [
             { label:'Nequi',       value:'3155734848',                       color:'#a855f7', icon:'📱' },
             { label:'Transfiya',   value:'3155734848',                       color:'#3b82f6', icon:'💸' },
-            { label:'Bancolombia', value:'Transferencia al 315 573 4848',    color:'#f59e0b', icon:'🏦' },
+            { label:'Bancolombia', value:'Cta Ahorros 45492209477 · Hugo F. Urquina', color:'#f59e0b', icon:'🏦' },
           ]
           return (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>

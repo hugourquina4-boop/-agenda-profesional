@@ -312,7 +312,7 @@ export default function SalonDashboard({ onNavigate }) {
         const metodos = [
           { label:'Nequi',     value:'3155734848', color:'#a855f7' },
           { label:'Transfiya', value:'3155734848', color:'#3b82f6' },
-          { label:'Bancolombia', value:'Transferencia al 315 573 4848', color:'#f59e0b' },
+          { label:'Bancolombia', value:'Cta Ahorros 45492209477 · Hugo F. Urquina', color:'#f59e0b' },
         ]
         const vencida = dias <= 0
         const critica = dias !== null && dias <= 2 && dias > 0

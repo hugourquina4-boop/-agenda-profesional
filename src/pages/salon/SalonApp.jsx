@@ -231,8 +231,80 @@ function SetNewPassword() {
   )
 }
 
+function AppBloqueada({ suscripcion, onSignOut }) {
+  const dias = suscripcion?.dias_restantes ?? null
+  const diasVencidos = dias !== null ? Math.abs(dias) : '?'
+  const metodos = [
+    { icon:'📱', label:'Nequi', value:'3155734848', color:'#a855f7' },
+    { icon:'💸', label:'Transfiya', value:'3155734848', color:'#3b82f6' },
+    { icon:'🏦', label:'Bancolombia', value:'Cta Ahorros 45492209477 · Hugo F. Urquina', color:'#f59e0b' },
+  ]
+  function copiar(txt) { navigator.clipboard.writeText(txt).catch(() => {}) }
+
+  return (
+    <div style={{
+      minHeight:'100dvh', background:'var(--bg)', display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center', padding:'24px 20px',
+    }}>
+      <div style={{
+        position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
+        background:'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(239,68,68,0.12) 0%, transparent 70%)',
+      }} />
+      <div style={{ width:'100%', maxWidth:380, position:'relative', zIndex:1 }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <div style={{
+            width:72, height:72, borderRadius:22,
+            background:'linear-gradient(135deg, #ef4444, #dc2626)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            margin:'0 auto 16px', boxShadow:'0 8px 32px rgba(239,68,68,0.35)',
+            fontSize:32,
+          }}>🔒</div>
+          <h1 style={{ fontFamily:'Outfit', fontWeight:900, fontSize:24, color:'var(--text)', marginBottom:8 }}>
+            Acceso suspendido
+          </h1>
+          <p style={{ fontSize:14, color:'var(--text-3)', lineHeight:1.6 }}>
+            Tu plan venció hace <strong style={{ color:'#ef4444' }}>{diasVencidos} {diasVencidos === 1 ? 'día' : 'días'}</strong>.
+            Renueva tu suscripción para restablecer el acceso.
+          </p>
+        </div>
+
+        <div style={{ background:'var(--card)', borderRadius:20, padding:20, marginBottom:16,
+          boxShadow:'0 4px 24px rgba(0,0,0,0.12)' }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
+            textTransform:'uppercase', marginBottom:14 }}>Métodos de pago</p>
+          {metodos.map(m => (
+            <div key={m.label} style={{
+              display:'flex', alignItems:'center', gap:12,
+              padding:'12px 0', borderBottom:'1px solid var(--border)',
+            }}>
+              <span style={{ fontSize:20, flexShrink:0 }}>{m.icon}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{m.label}</div>
+                <div style={{ fontSize:13, color:'var(--text-3)', fontFamily:'monospace' }}>{m.value}</div>
+              </div>
+              <button onClick={() => copiar(m.value)} style={{
+                padding:'6px 12px', borderRadius:8, border:`1px solid ${m.color}40`,
+                background:`${m.color}12`, color:m.color, fontSize:12, fontWeight:700, cursor:'pointer',
+              }}>Copiar</button>
+            </div>
+          ))}
+          <p style={{ fontSize:12, color:'var(--text-3)', marginTop:14, lineHeight:1.5 }}>
+            Envía el comprobante de pago a tu asesor de Salón Pro para reactivar.
+          </p>
+        </div>
+
+        <button onClick={onSignOut} style={{
+          width:'100%', padding:'13px', borderRadius:14, border:'none', cursor:'pointer',
+          background:'var(--card)', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
+          color:'var(--text-3)', fontWeight:600, fontSize:14,
+        }}>Cerrar sesión</button>
+      </div>
+    </div>
+  )
+}
+
 export default function SalonApp() {
-  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso } = useTenant()
+  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso, suscripcion, rol } = useTenant()
   const [page,          setPage]          = useState('hoy')
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false)
   const [refreshKey,    setRefreshKey]    = useState(0)
@@ -255,6 +327,13 @@ export default function SalonApp() {
   // (no debería ocurrir normalmente, TenantContext selecciona automáticamente)
   if (!tenant && todosTenants.length > 0) {
     return <TenantPicker todosTenants={todosTenants} onSelect={seleccionarTenant} />
+  }
+
+  // Bloqueo por suscripción vencida: >2 días después de fecha_limite
+  // Superadmin siempre tiene acceso para gestionar / desbloquear
+  const diasRestantes = suscripcion?.dias_restantes ?? null
+  if (!esSuperadmin && rol !== 'superadmin' && diasRestantes !== null && diasRestantes < -2) {
+    return <AppBloqueada suscripcion={suscripcion} onSignOut={() => supabase.auth.signOut()} />
   }
 
   function renderPage() {
