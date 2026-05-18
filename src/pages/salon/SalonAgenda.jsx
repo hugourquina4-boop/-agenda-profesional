@@ -441,9 +441,12 @@ export default function SalonAgenda() {
                     boxShadow:`0 1px 4px ${profClr}20`,
                     opacity: cancelada ? 0.6 : 1,
                   }}>
-                    {/* Dot de estado */}
+                    {/* Dot de estado o candado si tiene pago */}
                     <div style={{ position:'absolute', top:5, right:5,
                       width:7, height:7, borderRadius:'50%', background:estColor }} />
+                    {c.estado === 'completada' && (
+                      <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, opacity:0.7 }}>🔒</div>
+                    )}
                     <div style={{ fontSize:10, fontWeight:800, color: cancelada ? '#71717a' : profClr, lineHeight:1.3 }}>
                       {fmtHora(c.fecha_inicio)}{isStar ? ' ⭐' : ''}
                     </div>
