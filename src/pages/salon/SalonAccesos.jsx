@@ -711,28 +711,29 @@ export default function SalonAccesos() {
                 </div>
               </div>
 
-              {!creandoPara?.nombre && (
-                <div>
-                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600,
-                    letterSpacing:0.5, display:'block', marginBottom:6 }}>ROL</label>
-                  <div style={{ display:'flex', gap:8 }}>
-                    {['admin','contable','recepcion','profesional'].map(key => {
-                      const r = ROL[key]
-                      return (
-                        <button key={key} type="button" onClick={() => setFormRol(key)} style={{
-                          flex:1, padding:'9px 4px', borderRadius:10, cursor:'pointer',
-                          border:`2px solid ${formRol === key ? r.color : 'var(--border)'}`,
-                          background: formRol === key ? `${r.color}15` : 'var(--card)',
-                          color: formRol === key ? r.color : 'var(--text-3)',
-                          fontWeight:700, fontSize:12, transition:'all 0.15s',
-                        }}>
-                          {r.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+              <div>
+                <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600,
+                  letterSpacing:0.5, display:'block', marginBottom:6 }}>ROL</label>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {['admin','contable','recepcion','profesional'].map(key => {
+                    const r = ROL[key]
+                    return (
+                      <button key={key} type="button" onClick={() => setFormRol(key)} style={{
+                        flex:1, minWidth:70, padding:'9px 4px', borderRadius:10, cursor:'pointer',
+                        border:`2px solid ${formRol === key ? r.color : 'var(--border)'}`,
+                        background: formRol === key ? `${r.color}15` : 'var(--card)',
+                        color: formRol === key ? r.color : 'var(--text-3)',
+                        fontWeight:700, fontSize:12, transition:'all 0.15s',
+                      }}>
+                        {r.label}
+                      </button>
+                    )
+                  })}
                 </div>
-              )}
+                <p style={{ fontSize:11, color:'var(--text-3)', marginTop:5 }}>
+                  {ROL[formRol]?.desc}
+                </p>
+              </div>
             </div>
 
             <button onClick={copiarCreds} style={{

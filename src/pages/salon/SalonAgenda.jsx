@@ -299,32 +299,44 @@ export default function SalonAgenda() {
 
   // ── Vista Día: grid por profesional ──────────────────────────────────
   function VistaDia() {
-    const H_START = 7
-    const H_END   = 21
-    const SLOT_H  = 44  // px per 30min
+    const SLOT_H  = 40  // px per 30min (reducido para más compacidad)
     const COL_W   = 110
     const PROFS_BASE = profesionales.length > 0 ? profesionales
       : [...new Map(citasDia.map(c => [c.profesionales?.nombre, { id: c.profesionales?.nombre, nombre: c.profesionales?.nombre, color: col }])).values()]
     const PROFS = filtroProf ? PROFS_BASE.filter(p => p.id === filtroProf) : PROFS_BASE
+
+    // Rango dinámico: mostrar solo las horas con citas (±1h buffer) para compactar
+    const horasCitas = citasDia.map(c => parseInt(c.fecha_inicio.substring(11, 13)))
+    const H_START = citasDia.length > 0 ? Math.max(7, Math.min(...horasCitas) - 1) : 8
+    const H_END   = citasDia.length > 0 ? Math.min(22, Math.max(...horasCitas) + 3) : 20
 
     function minOffset(iso) {
       const [h, m] = iso.substring(11, 16).split(':').map(Number)
       return ((h - H_START) * 60 + m) / 30 * SLOT_H
     }
     function durPx(c) {
+      // Usar duracion_min del servicio como fuente canónica de verdad.
+      // fecha_fin puede tener desfase UTC/local en citas antiguas.
+      const minutos = c.servicios?.duracion_min
+      if (minutos && minutos > 0) return Math.max(SLOT_H, minutos / 30 * SLOT_H)
       if (c.fecha_fin) {
         const dur = (new Date(c.fecha_fin) - new Date(c.fecha_inicio)) / 60000
-        return Math.max(SLOT_H, dur / 30 * SLOT_H)
+        if (dur > 0 && dur <= 480) return Math.max(SLOT_H, dur / 30 * SLOT_H)
       }
-      return Math.max(SLOT_H, (c.servicios?.duracion_min || 60) / 30 * SLOT_H)
+      return SLOT_H * 2 // fallback 60min
     }
 
     const TOTAL_H = (H_END - H_START) * 2 * SLOT_H
 
     return (
-      <div style={{ overflowX:'auto', overflowY:'clip', paddingBottom:80 }}>
+      // Contenedor acotado con overflow:auto → position:sticky funciona dentro
+      <div style={{
+        overflowX:'auto', overflowY:'auto',
+        maxHeight:'calc(100dvh - 210px)',
+        paddingBottom:16,
+      }}>
         <div style={{ minWidth: 56 + PROFS.length * COL_W, position:'relative' }}>
-          {/* Header profesionales */}
+          {/* Header profesionales — sticky dentro del scroll container */}
           <div style={{
             display:'grid', gridTemplateColumns:`56px repeat(${PROFS.length}, ${COL_W}px)`,
             position:'sticky', top:0, zIndex:10, background:'var(--bg)',

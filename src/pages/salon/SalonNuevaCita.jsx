@@ -220,7 +220,10 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
       const hh     = String(Math.floor(h / 60)).padStart(2, '0')
       const mm     = String(h % 60).padStart(2, '0')
       const inicio = `${f}T${hh}:${mm}:00`
-      const fin    = new Date(new Date(inicio).getTime() + durMin * 60000).toISOString().slice(0, 19)
+      // Calcular fin en tiempo local (sin conversión UTC) para evitar desfase timezone
+      const finDate = new Date(new Date(inicio).getTime() + durMin * 60000)
+      const pad2 = n => String(n).padStart(2, '0')
+      const fin = `${f}T${pad2(finDate.getHours())}:${pad2(finDate.getMinutes())}:00`
       const ocupado = (citasOcup || []).some(c => c.fecha_inicio < fin && c.fecha_fin > inicio)
       if (!ocupado) generados.push({ inicio, fin, label: `${hh}:${mm}` })
     }

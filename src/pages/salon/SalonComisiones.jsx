@@ -127,13 +127,13 @@ export default function SalonComisiones() {
     setLoadingAnt(false)
   }, [tenant])
 
-  useEffect(() => { if (tab === 'planilla') cargarAnticipos() }, [cargarAnticipos, tab])
+  useEffect(() => { cargarAnticipos() }, [cargarAnticipos])
 
   async function registrarAnticipo(profId) {
     const m = parseFloat(antMonto)
     if (!m || m <= 0) { showToast('Monto inválido', '#f87171'); return }
     setGuardandoAnt(true)
-    await supabase.from('anticipos_profesional').insert({
+    const { error } = await supabase.from('anticipos_profesional').insert({
       tenant_id: tenant.id,
       profesional_id: profId,
       monto: m,
@@ -141,6 +141,10 @@ export default function SalonComisiones() {
       tipo: antTipo,
     })
     setGuardandoAnt(false)
+    if (error) {
+      showToast(`Error al guardar: ${error.message}`, '#f87171')
+      return
+    }
     setAnticipoForm(null)
     setAntMonto(''); setAntConcepto(''); setAntTipo('anticipo')
     showToast('Registrado ✓')
