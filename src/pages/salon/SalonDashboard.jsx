@@ -69,6 +69,21 @@ const DEMO_EQUIPO = [
   { id:'p3', nombre:'Isabella Torres',  especialidad:'Manicurista & Nail Art', activo:true, foto_url:null },
 ]
 
+const DEMO_ANALYTICS = {
+  topServicios: [
+    { nombre:'Mechas + Tinte', count:8 },
+    { nombre:'Corte y secado', count:6 },
+    { nombre:'Manicure gel',   count:5 },
+    { nombre:'Keratina',       count:3 },
+  ],
+  diasSemana: [2, 8, 6, 7, 9, 11, 5], // Dom→Sáb
+  topProf: [
+    { nombre:'Valentina Cruz',  count:16 },
+    { nombre:'Carlos Herrera',  count:11 },
+    { nombre:'Isabella Torres', count:8  },
+  ],
+}
+
 function LinkReservas({ slug, col, showToast }) {
   const url = `${window.location.origin}/reservar/${slug}`
 
@@ -142,6 +157,7 @@ export default function SalonDashboard({ onNavigate }) {
     { nombre:'Valentina Cruz', telefono:'3001234567' }
   ] : [])
   const [toast,          setToast]          = useState(null)
+  const [analyticsData,  setAnalyticsData]  = useState(isDemo ? DEMO_ANALYTICS : null)
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -163,7 +179,7 @@ export default function SalonDashboard({ onNavigate }) {
         const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10)
       })()
 
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -194,6 +210,12 @@ export default function SalonDashboard({ onNavigate }) {
           .select('id,nombre,telefono')
           .eq('tenant_id', tenant.id).eq('activo', true)
           .like('fecha_nacimiento', `%-${fecha.slice(5)}`),
+        supabase.from('citas')
+          .select('fecha_inicio,servicios(id,nombre),profesionales(id,nombre)')
+          .eq('tenant_id', tenant.id)
+          .in('estado', ['completada','confirmada','pendiente'])
+          .gte('fecha_inicio', `${mesInicio}T00:00:00`)
+          .lte('fecha_inicio', `${mesFin}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -219,6 +241,25 @@ export default function SalonDashboard({ onNavigate }) {
         })),
       })
       setCumpleaneros(cumplRes?.data || [])
+
+      // Analytics del mes
+      const citasMes = analyticsMesRes.data || []
+      const svcCount = {}
+      const profCount = {}
+      const diasSemana = [0,0,0,0,0,0,0]
+      citasMes.forEach(c => {
+        const svcNombre = c.servicios?.nombre
+        if (svcNombre) svcCount[svcNombre] = (svcCount[svcNombre] || 0) + 1
+        const profNombre = c.profesionales?.nombre
+        if (profNombre) profCount[profNombre] = (profCount[profNombre] || 0) + 1
+        const dow = new Date(c.fecha_inicio).getDay()
+        diasSemana[dow]++
+      })
+      setAnalyticsData({
+        topServicios: Object.entries(svcCount).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([nombre,count])=>({nombre,count})),
+        topProf:      Object.entries(profCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([nombre,count])=>({nombre,count})),
+        diasSemana,
+      })
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -591,6 +632,101 @@ export default function SalonDashboard({ onNavigate }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Analytics del mes ───────────────────────────── */}
+      {analyticsData && (analyticsData.topServicios.length > 0 || analyticsData.topProf.length > 0) && (
+        <div style={{ margin:'16px 16px 0', display:'flex', flexDirection:'column', gap:10 }}>
+
+          {/* Top servicios + Más activos — 2 columnas */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+
+            {/* Top servicios */}
+            <div className="sp-kpi-card" style={{ padding:'14px 14px 12px' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>
+                Top servicios
+              </div>
+              {analyticsData.topServicios.slice(0,4).map((s, i) => {
+                const max = analyticsData.topServicios[0]?.count || 1
+                return (
+                  <div key={i} style={{ marginBottom: i < 3 ? 8 : 0 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--text-2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, paddingRight:4 }}>
+                        {s.nombre}
+                      </span>
+                      <span style={{ fontSize:10, fontWeight:800, color:col, flexShrink:0 }}>{s.count}</span>
+                    </div>
+                    <div style={{ height:3, borderRadius:2, background:'var(--border)' }}>
+                      <div style={{ height:'100%', width:`${s.count/max*100}%`, background:col, borderRadius:2 }} />
+                    </div>
+                  </div>
+                )
+              })}
+              {analyticsData.topServicios.length === 0 && (
+                <div style={{ fontSize:11, color:'var(--text-3)' }}>Sin datos aún</div>
+              )}
+            </div>
+
+            {/* Más activos */}
+            <div className="sp-kpi-card" style={{ padding:'14px 14px 12px' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>
+                Más activos
+              </div>
+              {analyticsData.topProf.slice(0,3).map((p, i) => {
+                const max = analyticsData.topProf[0]?.count || 1
+                const clr = PROF_COLORS[i % PROF_COLORS.length]
+                return (
+                  <div key={i} style={{ marginBottom: i < 2 ? 8 : 0 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--text-2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, paddingRight:4 }}>
+                        {p.nombre.split(' ')[0]}
+                      </span>
+                      <span style={{ fontSize:10, fontWeight:800, color:clr, flexShrink:0 }}>{p.count}</span>
+                    </div>
+                    <div style={{ height:3, borderRadius:2, background:'var(--border)' }}>
+                      <div style={{ height:'100%', width:`${p.count/max*100}%`, background:clr, borderRadius:2 }} />
+                    </div>
+                  </div>
+                )
+              })}
+              {analyticsData.topProf.length === 0 && (
+                <div style={{ fontSize:11, color:'var(--text-3)' }}>Sin datos aún</div>
+              )}
+            </div>
+          </div>
+
+          {/* Heatmap días de la semana */}
+          <div className="sp-kpi-card" style={{ padding:'14px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:12, textTransform:'uppercase', letterSpacing:0.5 }}>
+              Días más concurridos
+            </div>
+            <div style={{ display:'flex', gap:5, alignItems:'flex-end', height:60 }}>
+              {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((dia, i) => {
+                const count = analyticsData.diasSemana[i] || 0
+                const max   = Math.max(...analyticsData.diasSemana, 1)
+                const pct   = count / max
+                const isTop = count === max && count > 0
+                return (
+                  <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                    <span style={{ fontSize:9, fontWeight:800, color: isTop ? col : 'var(--text-3)', opacity: count ? 1 : 0.3 }}>
+                      {count || ''}
+                    </span>
+                    <div style={{ width:'100%', height:36, borderRadius:6, background:'var(--border)', display:'flex', alignItems:'flex-end', overflow:'hidden' }}>
+                      <div style={{
+                        width:'100%', borderRadius:6,
+                        height:`${Math.max(pct > 0 ? 14 : 0, pct * 100)}%`,
+                        background: pct > 0.75 ? col : pct > 0.4 ? `${col}99` : `${col}44`,
+                        transition:'height 0.5s',
+                      }} />
+                    </div>
+                    <span style={{ fontSize:9, fontWeight:600, color:'var(--text-3)' }}>{dia}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
         </div>
       )}
 
