@@ -108,6 +108,8 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
 
   const [step,       setStep]       = useState(0)
   const [profs,      setProfs]      = useState([])
+  const [sedes,      setSedes]      = useState([])
+  const [filtroSede, setFiltroSede] = useState(null)
   const [servs,      setServs]      = useState([])
   const [slots,      setSlots]      = useState([])
   const [sinHorario, setSinHorario] = useState(false)
@@ -151,13 +153,18 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
     setSlot(null)
   }
 
-  // Carga profesionales
+  // Carga profesionales + sedes
   useEffect(() => {
     if (!tenant) return
-    supabase.from('profesionales')
-      .select('id, nombre, especialidad, foto_url, activo')
-      .eq('tenant_id', tenant.id).order('nombre')
-      .then(({ data }) => setProfs((data || []).filter(p => p.activo)))
+    Promise.all([
+      supabase.from('profesionales').select('id, nombre, especialidad, foto_url, activo, sede_id')
+        .eq('tenant_id', tenant.id).order('nombre'),
+      supabase.from('sedes').select('id, nombre')
+        .eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+    ]).then(([pr, sr]) => {
+      setProfs((pr.data || []).filter(p => p.activo))
+      setSedes(sr.data || [])
+    })
   }, [tenant])
 
   // Carga servicios al elegir profesional — filtra por profesional_servicios si hay filas
@@ -265,6 +272,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         fecha_fin:      slot.fin,
         estado:         'confirmada',
         precio_cobrado: precioTotal || null,
+        sede_id:        profs.find(p => p.id === profId)?.sede_id || null,
       }).select('id').single()
       if (error) throw error
       if (citaNew?.id) supabase.functions.invoke('notificacion-cita', { body: { cita_id: citaNew.id } }).catch(() => {})
@@ -331,7 +339,26 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         {/* ── Step 0 — Profesional ── */}
         {step === 0 && (
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {profs.map(p => (
+            {/* Filtro de sede — solo cuando hay múltiples sedes */}
+            {sedes.length > 1 && (
+              <div style={{ display:'flex', gap:6, marginBottom:4, flexWrap:'wrap' }}>
+                <button onClick={() => { setFiltroSede(null); if (filtroSede) setProfId(null) }} style={{
+                  padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                  background: filtroSede === null ? col : 'var(--card)',
+                  color: filtroSede === null ? '#fff' : 'var(--text-3)',
+                  fontSize:12, fontWeight:700, transition:'all 0.15s',
+                }}>Todas</button>
+                {sedes.map(s => (
+                  <button key={s.id} onClick={() => { setFiltroSede(filtroSede === s.id ? null : s.id); setProfId(null) }} style={{
+                    padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                    background: filtroSede === s.id ? col : 'var(--card)',
+                    color: filtroSede === s.id ? '#fff' : 'var(--text-3)',
+                    fontSize:12, fontWeight:700, transition:'all 0.15s',
+                  }}>📍 {s.nombre}</button>
+                ))}
+              </div>
+            )}
+            {(filtroSede ? profs.filter(p => p.sede_id === filtroSede) : profs).map(p => (
               <button key={p.id} onClick={() => setProfId(p.id)} style={{
                 display:'flex', alignItems:'center', gap:14, padding:'14px 16px',
                 borderRadius:14, cursor:'pointer', textAlign:'left',

@@ -31,6 +31,11 @@ const METODO_COLORS = {
   daviplata:     '#f59e0b',
   transferencia: '#3b82f6',
   tarjeta:       '#06b6d4',
+  wompi:         '#10b981',
+}
+
+const METODO_LABELS = {
+  wompi: '🌐 Portal',
 }
 
 const CATS_GASTO = ['Insumos','Servicios','Arriendo','Nómina','Marketing','Equipos','Otros']
@@ -516,7 +521,7 @@ export default function SalonCaja() {
                             {c.servicios?.nombre || '—'}
                             {c.profesionales?.nombre ? ` · ${c.profesionales.nombre.split(' ')[0]}` : ''}
                             {' · '}
-                            <span style={{ color:METODO_COLORS[c.pago.metodo]||col, fontWeight:700 }}>{c.pago.metodo}</span>
+                            <span style={{ color:METODO_COLORS[c.pago.metodo]||col, fontWeight:700 }}>{METODO_LABELS[c.pago.metodo] || c.pago.metodo}</span>
                             {' · '}{fmtFecha(c.pago.created_at)} {fmtHora(c.pago.created_at)}
                           </div>
                           {c.pago.referencia && (

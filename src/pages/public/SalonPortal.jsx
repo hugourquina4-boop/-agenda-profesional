@@ -558,6 +558,19 @@ export default function SalonPortal() {
         {/* ════ STEP 0: Servicios ════ */}
         {step === 0 && (
           <>
+            {/* Galería del negocio */}
+            {(tenant.config_vertical?.fotos_galeria || []).filter(Boolean).length > 0 && (
+              <div style={{ margin:'0 -20px 24px', overflowX:'auto', overflowY:'hidden' }}>
+                <div style={{ display:'flex', gap:10, padding:'0 20px' }}>
+                  {tenant.config_vertical.fotos_galeria.filter(Boolean).map((url, i) => (
+                    <img key={i} src={url} alt=""
+                      style={{ width:160, height:110, borderRadius:14, objectFit:'cover', flexShrink:0,
+                        boxShadow:`0 4px 20px rgba(0,0,0,0.25)`, border:`1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:26, marginBottom:6, letterSpacing:-0.5, color:T.text }}>
               ¿Qué servicio necesitas?
             </h2>

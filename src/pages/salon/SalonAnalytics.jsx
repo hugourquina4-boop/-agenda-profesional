@@ -464,7 +464,8 @@ export default function SalonAnalytics() {
             const totalVentas = ventasMetodo.reduce((s,m) => s+m.total, 0)
             const maxSvc = Math.max(...ventasServicio.map(s => s.total), 1)
             const maxProf = Math.max(...ventasProf.map(p => p.total), 1)
-            const METODO_CLR = { efectivo:'#22c55e', nequi:'#a855f7', daviplata:'#f59e0b', tarjeta:'#3b82f6', transferencia:'#06b6d4', otro:'#6b7280' }
+            const METODO_CLR    = { efectivo:'#22c55e', nequi:'#a855f7', daviplata:'#f59e0b', tarjeta:'#3b82f6', transferencia:'#06b6d4', wompi:'#10b981', otro:'#6b7280' }
+            const METODO_LABELS = { wompi:'🌐 Portal' }
             return (
               <>
                 {/* KPI total */}
@@ -492,7 +493,7 @@ export default function SalonAnalytics() {
                         return (
                           <div key={m.metodo}>
                             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-                              <span style={{ fontSize:12, fontWeight:700, color:'var(--text)', textTransform:'capitalize' }}>{m.metodo}</span>
+                              <span style={{ fontSize:12, fontWeight:700, color:'var(--text)', textTransform: METODO_LABELS[m.metodo] ? 'none' : 'capitalize' }}>{METODO_LABELS[m.metodo] || m.metodo}</span>
                               <span style={{ fontSize:12, fontWeight:800, color:clr }}>{fmtCOP(m.total)} <span style={{ fontWeight:500, color:'var(--text-3)' }}>({pct}%)</span></span>
                             </div>
                             <div style={{ height:6, borderRadius:4, background:'rgba(255,255,255,0.07)' }}>

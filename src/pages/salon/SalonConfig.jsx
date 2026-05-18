@@ -108,6 +108,7 @@ export default function SalonConfig() {
       politica_cancelacion:tenant.config_vertical?.politica_cancelacion|| '',
       wompi_public_key:    tenant.wompi_public_key    || '',
       pagos_portal_activo: tenant.pagos_portal_activo ?? false,
+      fotos_galeria:       (tenant.config_vertical?.fotos_galeria || []).concat(['','','','']).slice(0,4),
     })
   }, [tenant])
 
@@ -137,6 +138,7 @@ export default function SalonConfig() {
       pagos_portal_activo:  form.pagos_portal_activo,
       config_vertical: {
         ...(tenant.config_vertical || {}),
+        fotos_galeria:        form.fotos_galeria.filter(Boolean),
         promo:                form.promo.trim()                || null,
         horario_texto:        form.horario_texto.trim()        || null,
         tipologia:            form.tipologia,
@@ -699,6 +701,32 @@ export default function SalonConfig() {
             </div>
           )
         })()}
+      </Seccion>
+
+      {/* ── Galería del negocio (portal) ─────────────────── */}
+      <Seccion titulo="Galería para el portal (hasta 4 fotos)">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'center' }}>
+              <ImageUploader
+                value={form.fotos_galeria[i] || ''}
+                onChange={url => {
+                  const arr = [...form.fotos_galeria]
+                  arr[i] = url
+                  set('fotos_galeria', arr)
+                }}
+                label={`Foto ${i + 1}`}
+                shape="square"
+                size={100}
+                folder="galeria"
+                accent={col}
+              />
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize:11, color:'var(--text-3)', margin:'8px 0 0' }}>
+          Estas fotos aparecen en la portada de tu portal de reservas
+        </p>
       </Seccion>
 
       {/* ── Pagos en línea (portal) ──────────────────────── */}
