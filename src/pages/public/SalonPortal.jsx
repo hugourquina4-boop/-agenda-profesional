@@ -220,6 +220,15 @@ export default function SalonPortal() {
   const stepRef = useRef(step)
   useEffect(() => { stepRef.current = step }, [step])
 
+  // Cargar Wompi widget SDK
+  useEffect(() => {
+    const script = document.createElement('script')
+    script.src = 'https://checkout.wompi.co/widget.js'
+    script.async = true
+    document.head.appendChild(script)
+    return () => { if (document.head.contains(script)) document.head.removeChild(script) }
+  }, [])
+
   // ── Botón atrás del navegador → retroceder paso sin salir de la app ──
   useEffect(() => {
     // Empujar estado inicial al historial para interceptar el primer "atrás"
@@ -367,10 +376,7 @@ export default function SalonPortal() {
     setSlots(gen); setCargandoSlots(false)
   }
 
-  async function confirmar() {
-    if (!nombre.trim())  { setError('Ingresa tu nombre'); return }
-    if (!slot)           { setError('Selecciona un horario'); return }
-    if (!servIds.length) { setError('Selecciona al menos un servicio'); return }
+  async function crearReserva(wompiTransactionId = null) {
     setSaving(true); setError(null)
     let cliId
     if (telefono.trim()) {
@@ -384,9 +390,41 @@ export default function SalonPortal() {
     }
     const { data: cita, error: eCita } = await supabase.from('citas').insert({ tenant_id: tenant.id, profesional_id: profId, servicio_id: servIds[0], servicios_ids: servIds, cliente_id: cliId, fecha_inicio: slot.inicio, fecha_fin: slot.fin, estado: 'confirmada', precio_cobrado: precioTotal||null }).select('id').single()
     if (eCita) { setError('Error al agendar. Intenta de nuevo.'); setSaving(false); return }
+    if (wompiTransactionId) {
+      await supabase.from('pagos').insert({ tenant_id: tenant.id, cita_id: cita.id, monto: precioTotal, metodo: 'wompi', estado: 'pagado', referencia: wompiTransactionId })
+    }
     supabase.functions.invoke('notificacion-cita', { body: { cita_id: cita.id } }).catch(()=>{})
     setConfirmada({ prof: profs.find(p=>p.id===profId), servs: selectedServs, duracionTotal, precioTotal, slot, fecha, nombre: nombre.trim() })
     avanzar(4); setSaving(false)
+  }
+
+  async function confirmar() {
+    if (!nombre.trim())  { setError('Ingresa tu nombre'); return }
+    if (!slot)           { setError('Selecciona un horario'); return }
+    if (!servIds.length) { setError('Selecciona al menos un servicio'); return }
+    setError(null)
+
+    const pagoRequerido = tenant.pagos_portal_activo && tenant.wompi_public_key && precioTotal > 0
+    if (pagoRequerido && window.WidgetCheckout) {
+      const ref = `booking-${Date.now()}-${Math.random().toString(36).slice(2,7)}`
+      const checkout = new window.WidgetCheckout({
+        currency: 'COP',
+        amountInCents: Math.round(precioTotal * 100),
+        reference: ref,
+        publicKey: tenant.wompi_public_key,
+      })
+      checkout.open(async (result) => {
+        const tx = result.transaction
+        if (tx?.status === 'APPROVED') {
+          await crearReserva(tx.id)
+        } else {
+          setError(tx?.status === 'DECLINED' ? 'Pago rechazado. Intenta con otro medio de pago.' : 'El pago no se completó. Intenta de nuevo.')
+        }
+      })
+      return
+    }
+
+    await crearReserva()
   }
 
   async function unirseEspera() {
@@ -771,12 +809,29 @@ export default function SalonPortal() {
                 <p style={{ color:'#f87171', fontSize:13, margin:0, textAlign:'center' }}>{error}</p>
               </div>
             )}
-            <button onClick={confirmar} disabled={saving || !nombre.trim()} style={primaryBtn(col, saving || !nombre.trim())}>
-              {saving ? 'Confirmando…' : '¡Confirmar cita!'}
-            </button>
-            <p style={{ fontSize:11, color:T.faint, textAlign:'center', marginTop:18, lineHeight:1.6 }}>
-              Al confirmar aceptas que el salón guarde tus datos de contacto
-            </p>
+            {(() => {
+              const pagoRequerido = tenant.pagos_portal_activo && tenant.wompi_public_key && precioTotal > 0
+              return (
+                <>
+                  <button onClick={confirmar} disabled={saving || !nombre.trim()} style={primaryBtn(col, saving || !nombre.trim())}>
+                    {saving
+                      ? (pagoRequerido ? 'Procesando pago…' : 'Confirmando…')
+                      : pagoRequerido
+                        ? `💳 Pagar y confirmar — ${fmtCOP(precioTotal)}`
+                        : '¡Confirmar cita!'}
+                  </button>
+                  {pagoRequerido && (
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:14 }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={T.faint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                      <p style={{ fontSize:11, color:T.faint, margin:0 }}>Pago seguro procesado por Wompi</p>
+                    </div>
+                  )}
+                  <p style={{ fontSize:11, color:T.faint, textAlign:'center', marginTop: pagoRequerido ? 6 : 18, lineHeight:1.6 }}>
+                    Al confirmar aceptas que el salón guarde tus datos de contacto
+                  </p>
+                </>
+              )
+            })()}
           </>
         )}
       </div>

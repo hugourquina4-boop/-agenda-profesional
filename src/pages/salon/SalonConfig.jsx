@@ -106,6 +106,8 @@ export default function SalonConfig() {
       duracion_slot_min:   tenant.config_vertical?.duracion_slot_min   || 30,
       anticipacion_horas:  tenant.config_vertical?.anticipacion_horas  || 2,
       politica_cancelacion:tenant.config_vertical?.politica_cancelacion|| '',
+      wompi_public_key:    tenant.wompi_public_key    || '',
+      pagos_portal_activo: tenant.pagos_portal_activo ?? false,
     })
   }, [tenant])
 
@@ -130,7 +132,9 @@ export default function SalonConfig() {
       direccion:       form.direccion.trim()  || null,
       logo_url:        form.logo_url.trim()   || null,
       color_primario:  form.color_primario,
-      descripcion:     form.descripcion.trim() || null,
+      descripcion:          form.descripcion.trim() || null,
+      wompi_public_key:     form.wompi_public_key.trim()  || null,
+      pagos_portal_activo:  form.pagos_portal_activo,
       config_vertical: {
         ...(tenant.config_vertical || {}),
         promo:                form.promo.trim()                || null,
@@ -695,6 +699,64 @@ export default function SalonConfig() {
             </div>
           )
         })()}
+      </Seccion>
+
+      {/* ── Pagos en línea (portal) ──────────────────────── */}
+      <Seccion titulo="Pagos en línea desde el portal">
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {/* Toggle activar */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+            padding:'14px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>Activar cobro online</div>
+              <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                Tus clientes pagan al reservar desde el portal
+              </div>
+            </div>
+            <button type="button" onClick={() => set('pagos_portal_activo', !form.pagos_portal_activo)} style={{
+              width:46, height:26, borderRadius:13, border:'none', cursor:'pointer',
+              background: form.pagos_portal_activo ? col : 'var(--border)',
+              position:'relative', transition:'background 0.2s', flexShrink:0,
+            }}>
+              <span style={{
+                position:'absolute', top:3, left: form.pagos_portal_activo ? 22 : 3,
+                width:20, height:20, borderRadius:'50%', background:'#fff',
+                transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+          </div>
+
+          {/* Clave pública Wompi */}
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <label style={{ fontSize:12, fontWeight:700, color:'var(--text-3)' }}>
+              Clave pública Wompi
+            </label>
+            <input
+              value={form.wompi_public_key}
+              onChange={e => set('wompi_public_key', e.target.value)}
+              placeholder="pub_stagtest_xxxxx o pub_prod_xxxxx"
+              style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1px solid var(--border)',
+                background:'var(--card)', color:'var(--text)', fontSize:13, fontFamily:'monospace',
+                outline:'none', boxSizing:'border-box' }}
+            />
+            <p style={{ fontSize:11, color:'var(--text-3)', margin:0 }}>
+              Consíguela en app.wompi.co → Desarrolladores → Llaves. Solo la clave pública (pub_…) — nunca la privada.
+            </p>
+          </div>
+
+          {form.pagos_portal_activo && !form.wompi_public_key && (
+            <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(245,158,11,0.1)',
+              border:'1px solid rgba(245,158,11,0.3)', fontSize:12, color:'#fbbf24', fontWeight:600 }}>
+              ⚠️ Activa los pagos y agrega tu clave pública para que funcione en el portal.
+            </div>
+          )}
+          {form.pagos_portal_activo && form.wompi_public_key && (
+            <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(34,197,94,0.08)',
+              border:'1px solid rgba(34,197,94,0.25)', fontSize:12, color:'#4ade80', fontWeight:600 }}>
+              ✓ Tus clientes podrán pagar con tarjeta o PSE al reservar en el portal.
+            </div>
+          )}
+        </div>
       </Seccion>
 
       {/* ── Suscripción y pagos ──────────────────────────── */}
