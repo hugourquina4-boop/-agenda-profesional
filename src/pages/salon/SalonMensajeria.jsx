@@ -96,6 +96,37 @@ export default function SalonMensajeria() {
   const [sheetOpen,      setSheetOpen]      = useState(false)
   const [clienteSel,     setClienteSel]     = useState(null)
   const [enviados,       setEnviados]       = useState({})
+  const [plantillas,     setPlantillas]     = useState([])
+  const [editMode,       setEditMode]       = useState(false)
+  const [draftPl,        setDraftPl]        = useState([])
+  const [savingPl,       setSavingPl]       = useState(false)
+
+  const cargarPlantillas = useCallback(async () => {
+    if (!tenant?.id) return
+    const { data } = await supabase
+      .from('plantillas_mensajeria')
+      .select('id, titulo, emoji, texto, orden')
+      .eq('tenant_id', tenant.id)
+      .eq('activo', true)
+      .order('orden')
+    setPlantillas(data && data.length ? data : [])
+  }, [tenant?.id])
+
+  async function guardarPlantillas() {
+    setSavingPl(true)
+    await supabase.from('plantillas_mensajeria').delete().eq('tenant_id', tenant.id)
+    if (draftPl.length) {
+      await supabase.from('plantillas_mensajeria').insert(
+        draftPl.map((p, i) => ({
+          tenant_id: tenant.id,
+          titulo: p.titulo, emoji: p.emoji, texto: p.texto, orden: i, activo: true,
+        }))
+      )
+    }
+    await cargarPlantillas()
+    setSavingPl(false)
+    setEditMode(false)
+  }
 
   const cargar = useCallback(async () => {
     if (!tenant?.id) return
@@ -138,7 +169,7 @@ export default function SalonMensajeria() {
     setLoading(false)
   }, [tenant?.id])
 
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => { cargar(); cargarPlantillas() }, [cargar, cargarPlantillas])
 
   const clientesFiltrados = clientes.filter(c => {
     const telefono = c.telefono?.replace(/\D/g, '') || ''
@@ -367,71 +398,144 @@ export default function SalonMensajeria() {
       {/* Sheet plantillas */}
       {sheetOpen && clienteSel && (
         <>
-          <div className="sp-sheet-overlay" onClick={() => setSheetOpen(false)} />
+          <div className="sp-sheet-overlay" onClick={() => { setSheetOpen(false); setEditMode(false) }} />
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
-            <p className="sp-sheet-title" style={{ marginBottom: 4 }}>
-              Mensaje para {clienteSel.nombre.split(' ')[0]}
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px' }}>
-              Elige una plantilla para enviar por WhatsApp
-            </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {TEMPLATES.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => enviarWA(t)}
-                  style={{
-                    display: 'flex', flexDirection: 'column', gap: 6,
-                    padding: '14px 16px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
-                    background: 'rgba(128,128,128,0.06)',
-                    border: '1px solid rgba(128,128,128,0.12)',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = col + '60'
-                    e.currentTarget.style.background = col + '10'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'rgba(128,128,128,0.12)'
-                    e.currentTarget.style.background = 'rgba(128,128,128,0.06)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 18 }}>{t.emoji}</span>
-                    <span style={{
-                      fontWeight: 700, fontSize: 14, color: 'var(--text)',
-                    }}>
-                      {t.titulo}
-                    </span>
-                  </div>
-                  <p style={{
-                    margin: 0, fontSize: 12, color: 'var(--text-3)',
-                    lineHeight: 1.5,
-                    overflow: 'hidden', display: '-webkit-box',
-                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                  }}>
-                    {t.texto
-                      .replace(/{{nombre}}/g, clienteSel.nombre.split(' ')[0])
-                      .replace(/{{negocio}}/g, tenant?.nombre || 'el salón')}
-                  </p>
+            {/* ── Vista: editar plantillas ──────────────────────────────────── */}
+            {editMode ? (<>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <p className="sp-sheet-title" style={{ margin:0 }}>Personalizar plantillas</p>
+                <button onClick={() => setEditMode(false)}
+                  style={{ background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', fontSize:13 }}>
+                  ← Volver
                 </button>
-              ))}
-            </div>
+              </div>
+              <p style={{ fontSize:12, color:'var(--text-3)', margin:'0 0 14px' }}>
+                Usa {'{{nombre}}'} y {'{{negocio}}'} como variables.
+              </p>
 
-            <button
-              onClick={() => setSheetOpen(false)}
-              style={{
-                marginTop: 14, width: '100%', padding: '13px',
-                borderRadius: 14, background: 'transparent',
-                border: '1px solid var(--border)',
-                color: 'var(--text-3)', fontWeight: 600, fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              Cancelar
-            </button>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                {draftPl.map((p, i) => (
+                  <div key={i} style={{
+                    background:'rgba(128,128,128,0.05)', border:'1px solid var(--border)',
+                    borderRadius:14, padding:'12px 14px',
+                  }}>
+                    <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                      <input
+                        value={p.emoji}
+                        onChange={e => setDraftPl(d => d.map((x,j) => j===i ? {...x,emoji:e.target.value} : x))}
+                        style={{ width:40, textAlign:'center', background:'var(--bg)', border:'1px solid var(--border)',
+                          borderRadius:8, padding:'6px 4px', fontSize:16 }}
+                      />
+                      <input
+                        value={p.titulo}
+                        onChange={e => setDraftPl(d => d.map((x,j) => j===i ? {...x,titulo:e.target.value} : x))}
+                        placeholder="Título"
+                        style={{ flex:1, background:'var(--bg)', border:'1px solid var(--border)',
+                          borderRadius:8, padding:'6px 10px', fontSize:13, color:'var(--text)' }}
+                      />
+                      <button onClick={() => setDraftPl(d => d.filter((_,j) => j!==i))}
+                        style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', padding:'0 4px', fontSize:18, lineHeight:1 }}>
+                        ×
+                      </button>
+                    </div>
+                    <textarea
+                      value={p.texto}
+                      onChange={e => setDraftPl(d => d.map((x,j) => j===i ? {...x,texto:e.target.value} : x))}
+                      rows={3}
+                      style={{ width:'100%', background:'var(--bg)', border:'1px solid var(--border)',
+                        borderRadius:8, padding:'8px 10px', fontSize:12, color:'var(--text)',
+                        resize:'vertical', boxSizing:'border-box', lineHeight:1.5 }}
+                    />
+                  </div>
+                ))}
+
+                <button onClick={() => setDraftPl(d => [...d, { emoji:'💬', titulo:'Nueva plantilla', texto:'Hola {{nombre}}!' }])}
+                  style={{ padding:'11px', borderRadius:12, border:`1.5px dashed ${col}60`,
+                    background:'transparent', color:col, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                  + Nueva plantilla
+                </button>
+              </div>
+
+              <button onClick={guardarPlantillas} disabled={savingPl}
+                style={{ marginTop:14, width:'100%', padding:'14px', borderRadius:14, border:'none',
+                  background:`linear-gradient(135deg, ${col}, ${col}bb)`, color:'#fff',
+                  fontWeight:700, fontSize:15, cursor:'pointer', opacity:savingPl ? 0.7 : 1 }}>
+                {savingPl ? 'Guardando…' : 'Guardar plantillas'}
+              </button>
+            </>) : (<>
+
+              {/* ── Vista: elegir plantilla ───────────────────────────────────── */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                <p className="sp-sheet-title" style={{ margin:0 }}>
+                  Mensaje para {clienteSel.nombre.split(' ')[0]}
+                </p>
+                <button
+                  onClick={() => { setDraftPl(plantillas.length ? plantillas.map(p => ({...p})) : TEMPLATES.map(t => ({...t}))); setEditMode(true) }}
+                  style={{ background:'none', border:'none', cursor:'pointer', fontSize:12,
+                    color:col, fontWeight:600, padding:'4px 8px' }}>
+                  ✏️ Editar
+                </button>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px' }}>
+                Elige una plantilla para enviar por WhatsApp
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(plantillas.length ? plantillas : TEMPLATES).map((t, idx) => (
+                  <button
+                    key={t.id || idx}
+                    onClick={() => enviarWA(t)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                      padding: '14px 16px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
+                      background: 'rgba(128,128,128,0.06)',
+                      border: '1px solid rgba(128,128,128,0.12)',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = col + '60'
+                      e.currentTarget.style.background = col + '10'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'rgba(128,128,128,0.12)'
+                      e.currentTarget.style.background = 'rgba(128,128,128,0.06)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 18 }}>{t.emoji}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                        {t.titulo}
+                      </span>
+                    </div>
+                    <p style={{
+                      margin: 0, fontSize: 12, color: 'var(--text-3)',
+                      lineHeight: 1.5,
+                      overflow: 'hidden', display: '-webkit-box',
+                      WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}>
+                      {t.texto
+                        .replace(/{{nombre}}/g, clienteSel.nombre.split(' ')[0])
+                        .replace(/{{negocio}}/g, tenant?.nombre || 'el salón')}
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setSheetOpen(false)}
+                style={{
+                  marginTop: 14, width: '100%', padding: '13px',
+                  borderRadius: 14, background: 'transparent',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-3)', fontWeight: 600, fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+            </>)}
           </div>
         </>
       )}
