@@ -491,68 +491,116 @@ export default function SalonDashboard({ onNavigate }) {
         </div>
       )}
 
-      {/* ── Onboarding: primer acceso con salón vacío ── */}
-      {!isDemo && serviciosCount === 0 && equipo.length === 0 && (
-        <div style={{
-          margin:'16px 16px 0', borderRadius:18,
-          background:`linear-gradient(135deg,${col}12,${col}06)`,
-          border:`1px solid ${col}30`, overflow:'hidden',
-        }}>
-          <div style={{ padding:'20px 20px 4px' }}>
-            <div style={{ fontSize:13, fontWeight:800, color:'var(--text)', marginBottom:4 }}>
-              🎉 ¡Bienvenido a Salón Pro!
-            </div>
-            <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:16 }}>
-              Configura tu salón en 3 pasos para empezar a recibir reservas.
-            </div>
-          </div>
-          {[
-            {
-              num:1, label:'Agrega tus servicios', done: false,
-              icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-              page:'servicios', desc:'Cortes, tintes, tratamientos…',
-            },
-            {
-              num:2, label:'Agrega tu equipo', done: false,
-              icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
-              page:'equipo', desc:'Profesionales y sus horarios.',
-            },
-            {
-              num:3, label:'Comparte tu link de reservas', done: false,
-              icon:'M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z',
-              page:'config', desc:'QR + link en Configuración.',
-            },
-          ].map((step, i) => (
-            <div key={i} style={{
-              display:'flex', alignItems:'center', gap:12,
-              padding:'12px 20px',
-              borderTop: i === 0 ? `1px solid ${col}20` : `1px solid ${col}15`,
-            }}>
+      {/* ── Onboarding: checklist de configuración inicial ── */}
+      {!isDemo && !loading && (() => {
+        const steps = [
+          {
+            label: 'Agrega tus servicios',
+            desc:  'Cortes, tintes, tratamientos…',
+            done:  (serviciosCount ?? 0) > 0,
+            page:  'servicios',
+            icon:  'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+          },
+          {
+            label: 'Añade tu equipo',
+            desc:  'Profesionales y sus horarios.',
+            done:  equipo.length > 0,
+            page:  'equipo',
+            icon:  'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+          },
+          {
+            label: 'Configura tu WhatsApp',
+            desc:  'Para enviar recordatorios automáticos.',
+            done:  !!(tenant?.telefono),
+            page:  'config',
+            icon:  'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
+          },
+        ]
+        const doneCount = steps.filter(s => s.done).length
+        if (doneCount === 3) return null
+        return (
+          <div style={{ margin:'16px 16px 0', borderRadius:20,
+            background:`linear-gradient(135deg,${col}10,${col}05)`,
+            border:`1.5px solid ${col}25`, overflow:'hidden' }}>
+
+            {/* Header */}
+            <div style={{ padding:'18px 20px 12px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:800, color:'var(--text)', marginBottom:2 }}>
+                  Configura tu negocio
+                </div>
+                <div style={{ fontSize:12, color:'var(--text-3)' }}>
+                  {doneCount} de 3 pasos completados
+                </div>
+              </div>
               <div style={{
-                width:28, height:28, borderRadius:8, flexShrink:0,
-                background:`${col}20`, display:'flex', alignItems:'center',
-                justifyContent:'center', color:col,
+                width:44, height:44, borderRadius:'50%', flexShrink:0,
+                background: doneCount === 0 ? 'var(--border)' : `${col}20`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontFamily:'Outfit', fontWeight:900, fontSize:15,
+                color: doneCount === 0 ? 'var(--text-3)' : col,
               }}>
-                <Ico d={step.icon} size={14} />
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{step.label}</div>
-                <div style={{ fontSize:11, color:'var(--text-3)' }}>{step.desc}</div>
-              </div>
-              <div style={{
-                fontSize:11, fontWeight:700, color:col,
-                padding:'5px 12px', borderRadius:8,
-                background:`${col}15`, border:`1px solid ${col}30`,
-                cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
-              }}
-                onClick={() => onNavigate?.(step.page)}>
-                Ir →
+                {doneCount}/3
               </div>
             </div>
-          ))}
-          <div style={{ height:8 }} />
-        </div>
-      )}
+
+            {/* Barra de progreso */}
+            <div style={{ margin:'0 20px 14px', height:5, borderRadius:5, background:'var(--border)' }}>
+              <div style={{
+                height:'100%', borderRadius:5,
+                background:`linear-gradient(90deg, ${col}, ${col}bb)`,
+                width:`${(doneCount/3)*100}%`,
+                transition:'width 0.6s cubic-bezier(0.34,1.56,0.64,1)',
+              }} />
+            </div>
+
+            {/* Steps */}
+            {steps.map((step, i) => (
+              <div key={i} style={{
+                display:'flex', alignItems:'center', gap:12,
+                padding:'11px 20px',
+                borderTop:`1px solid ${col}15`,
+                opacity: step.done ? 0.6 : 1,
+              }}>
+                {/* Check / ícono */}
+                <div style={{
+                  width:30, height:30, borderRadius:9, flexShrink:0,
+                  background: step.done ? '#22c55e' : `${col}18`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                }}>
+                  {step.done
+                    ? <Ico d="M5 13l4 4L19 7" size={14} />
+                    : <Ico d={step.icon} size={14} />
+                  }
+                </div>
+
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{
+                    fontSize:13, fontWeight: step.done ? 500 : 700,
+                    color: step.done ? 'var(--text-3)' : 'var(--text)',
+                    textDecoration: step.done ? 'line-through' : 'none',
+                  }}>{step.label}</div>
+                  {!step.done && (
+                    <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{step.desc}</div>
+                  )}
+                </div>
+
+                {!step.done && (
+                  <button onClick={() => onNavigate?.(step.page)} style={{
+                    fontSize:11, fontWeight:700, color:col,
+                    padding:'5px 12px', borderRadius:8,
+                    background:`${col}15`, border:`1px solid ${col}30`,
+                    cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+                  }}>
+                    Ir →
+                  </button>
+                )}
+              </div>
+            ))}
+            <div style={{ height:10 }} />
+          </div>
+        )
+      })()}
 
       {/* ── Tarjeta: link de reservas ── */}
       {tenant?.slug && (
