@@ -22,6 +22,7 @@ const SalonAccesos    = lazy(() => import('./SalonAccesos'))
 const SalonSuperadmin = lazy(() => import('./SalonSuperadmin'))
 const SalonMensajeria  = lazy(() => import('./SalonMensajeria'))
 const SalonProveedores = lazy(() => import('./SalonProveedores'))
+const SalonSedes       = lazy(() => import('./SalonSedes'))
 
 function PageLoader() {
   return (
@@ -354,6 +355,7 @@ export default function SalonApp() {
       case 'analytics':  return <SalonAnalytics />
       case 'mensajeria':   return <SalonMensajeria />
       case 'proveedores':  return <SalonProveedores />
+      case 'sedes':        return <SalonSedes />
       case 'accesos':    return <SalonAccesos />
       case 'config':     return <SalonConfig />
       case 'superadmin': return (
