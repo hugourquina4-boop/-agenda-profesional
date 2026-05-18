@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-17 (sesión 6)
-> **Versión actual en producción: v1.3-dev** (commit 6003192)
+> Actualizado: 2026-05-17 (sesión 7)
+> **Versión actual en producción: v1.3-dev** (commit 9bb8d33)
 
 ---
 
@@ -131,6 +131,16 @@ v53_profesional_servicios.sql     ✅ tabla profesional_servicios (muchos-a-much
 | SQL v50 billing | sql/v50_pagos_plataforma.sql | tablas pagos_plataforma + RPCs salon_admin_registrar_pago/get_pagos ✅ APLICADO |
 | Dashboard preview mañana | SalonDashboard.jsx | Card "Mañana" con citas del día siguiente + botón "Ver agenda →" |
 | Cobro rápido inline en timeline | SalonDashboard.jsx | Botón muestra monto; click expande selector método + "Cobrar"/"Sin cobro" |
+
+### Features deployadas — sesión 7 (2026-05-17)
+
+| Feature | Archivos | Notas |
+| ------- | -------- | ----- |
+| Countdown suscripción en Dashboard | SalonDashboard.jsx | Pill verde >10 días, tarjeta amarilla ≤5, tarjeta roja ≤0 con Nequi/Transfiya/Bancolombia copiables |
+| Bloqueo automático por vencimiento | SalonApp.jsx | Pantalla de bloqueo tras >2 días de gracia; superadmin siempre accede |
+| Sección "Suscripción y pagos" en Config | SalonConfig.jsx | Estado plan+fecha+días restantes + 3 métodos de pago con botón Copiar |
+| SQL v54 RLS suscripciones_negocio | sql/v54_suscripcion_status.sql | SELECT policy para tenants; planes_salon lectura pública |
+| TenantContext carga suscripción | TenantContext.jsx | `suscripcion` {fecha_limite, estado, plan_nombre, dias_restantes} en contexto |
 
 ### Bug fixes deployados — sesión 6 (2026-05-17)
 
