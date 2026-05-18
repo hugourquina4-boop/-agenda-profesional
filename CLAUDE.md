@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-17 (sesión 7)
-> **Versión actual en producción: v1.3-dev** (commit 9bb8d33)
+> Actualizado: 2026-05-17 (sesión 8)
+> **Versión actual en producción: v1.3-dev** (commit 3c6bfc4)
 
 ---
 
@@ -49,7 +49,7 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Panel Maestro Superadmin (standalone) | public/superadmin.html | SHA-256 HFURQUINA12, gestión negocios, reset claves, pagos, sin React |
 | Panel Suscripción (React, solo Hugo) | SalonSuperadmin.jsx | 5 KPIs (Total/Activos/Suspendidos/CitasHoy/MRR), 4 tabs (Negocios/Accesos/Pagos/Usuarios), Mi acceso maestro, soft delete negocios |
 | Dashboard hoy | SalonDashboard.jsx | Timeline, stats ingresos, equipo libre/ocupado, alerta stock, onboarding |
-| Agenda Mes / Semana / Día | SalonAgenda.jsx | Toggle 3 vistas, grid por profesional, bloques proporcionales, pago inline |
+| Agenda Mes / Semana / Día | SalonAgenda.jsx | Toggle 3 vistas, grid por profesional, bloques con color de profesional + candado 🔒 en completadas, STAR/VIP badge, nota auto-save, pago inline |
 | Nueva cita (5 pasos) | SalonNuevaCita.jsx | Horarios, slots, anti-solapamiento, WA confirmación al crear |
 | Portal público | SalonPortal.jsx | Reservas online, precios dinámicos, lista de espera, WA confirmación |
 | Servicios CRUD | SalonServicios.jsx | 4 tabs: Detalles, Precio (base+oferta+duración), Equipo (profesionales asignados), Recordatorio (template WA con preview) |
@@ -57,9 +57,9 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Mensajería WA | SalonMensajeria.jsx | Lista clientes con filtros (todos/mayorista/cumpleaños/sin visita 30d), 6 plantillas con sustitución {{nombre}}/{{negocio}}, wa.me links directos |
 | HorarioGrid (componente reutilizable) | components/HorarioGrid.jsx | Drag-to-select táctil, pointer capture, exports: rangeToSlots, slotsToRange, slotsToFranjas |
 | Clientes CRUD + historial + fotos | SalonClientes.jsx | Cumpleaños, segmento, historial, galería, CSV export + import, tipo_precio (Normal/Mayorista), badge MAYOR en lista, toggle rápido en detalle |
-| Caja — Registro de cobros | SalonCaja.jsx | Tabla pagos, tabs Por cobrar/Cobrado, métodos pago, PDF export, breakdown por método, anulación, # movimiento, especialista en historial |
+| Caja — Registro de cobros | SalonCaja.jsx | KPI 2×2 (Ingresos/Egresos/Saldo), tabs Por cobrar/Cobrado/Egresos, buscador en Cobrado, modal egreso con categoría, PDF export, anulación |
 | Comisiones — Reglas + liquidación | SalonComisiones.jsx | % por profesional, meta mensual, liquidación PDF individual, tab Planilla con anticipos/deducciones/neto |
-| Órdenes en espera | SalonOrdenes.jsx | Grid tarjetas 2 col, nueva orden, editar orden (modal), cobrar → pagos → comisión |
+| Órdenes en espera | SalonOrdenes.jsx | Grid tarjetas 2 col, buscador + filtro por profesional, cancelar-todas con confirm, nueva orden, cobrar → pagos → comisión |
 | Inventario de productos | SalonInventario.jsx | CRUD + CSV import (preview → upsert por SKU), subcategoria/marca/codigo/contenido/proveedor |
 | Analytics — KPIs y métricas | SalonAnalytics.jsx | v_kpis_mes, v_revenue_staff, v_retention, gráficos, PDF export |
 | Configuración del negocio | SalonConfig.jsx | Logo, color, WhatsApp, tipología, horario, slots, QR, plan |
@@ -139,8 +139,21 @@ v53_profesional_servicios.sql     ✅ tabla profesional_servicios (muchos-a-much
 | Countdown suscripción en Dashboard | SalonDashboard.jsx | Pill verde >10 días, tarjeta amarilla ≤5, tarjeta roja ≤0 con Nequi/Transfiya/Bancolombia copiables |
 | Bloqueo automático por vencimiento | SalonApp.jsx | Pantalla de bloqueo tras >2 días de gracia; superadmin siempre accede |
 | Sección "Suscripción y pagos" en Config | SalonConfig.jsx | Estado plan+fecha+días restantes + 3 métodos de pago con botón Copiar |
-| SQL v54 RLS suscripciones_negocio | sql/v54_suscripcion_status.sql | SELECT policy para tenants; planes_salon lectura pública |
+| SQL v54 (solo comentario) | sql/v54_suscripcion_status.sql | No requiere correr SQL — suscripción se lee de tenants.fecha_vencimiento; planes_salon y suscripciones_negocio NO existen |
 | TenantContext carga suscripción | TenantContext.jsx | `suscripcion` {fecha_limite, estado, plan_nombre, dias_restantes} en contexto |
+
+### Features deployadas — sesión 8 — Sprint 1 completo (2026-05-17)
+
+| Feature | Archivos | Notas |
+| ------- | -------- | ----- |
+| Agenda: bloques por color de profesional | SalonAgenda.jsx | PROF_CLR map desde `profesionales.color` (fallback palette); estado como dot top-right; canceladas gris+opacidad |
+| Agenda: nota en cita con auto-save | SalonAgenda.jsx | textarea en popup, guardar en onBlur vía `guardarNota()`, estado local `nota`/`guardandoNota` |
+| Agenda: STAR/VIP badge en popup | SalonAgenda.jsx | Badge color accent en header del detalle si cliente tiene tag 'vip' o 'star' |
+| Agenda: 🔒 candado en completadas | SalonAgenda.jsx | Icono 🔒 en bloque de cita con estado 'completada' en VistaDia |
+| Agenda: nowOffset en minutos crudos | SalonAgenda.jsx | `setNowOffset(h*60+m)`; conversión a px dentro de VistaDia donde H_START/SLOT_H son conocidos |
+| Caja: reescritura completa | SalonCaja.jsx | KPI grid 2×2, 3 tabs (PorCobrar/Cobrado/Egresos), buscador useMemo, modal egreso, fetch paralelo |
+| Órdenes: buscador + filtro prof | SalonOrdenes.jsx | `busqOrden`, `filtroProf` state; `ordenesFiltradas` computed; dropdown solo si >1 profesional |
+| Órdenes: cancelar todas con confirm | SalonOrdenes.jsx | Botón header → confirm inline → `eliminarTodas()` marca 'cancelado' |
 
 ### Bug fixes deployados — sesión 6 (2026-05-17)
 
@@ -323,7 +336,38 @@ Estado: [lo que está pendiente según este CLAUDE.md]
 v49_proveedores_gastos.sql        ✅ APLICADO
 v50_pagos_plataforma.sql          ✅ APLICADO (2026-05-16)
 v53_profesional_servicios.sql     ✅ APLICADO (2026-05-17)
+v54_suscripcion_status.sql        ✅ NO REQUIERE SQL (solo comentario)
+v55_anticipo_citas.sql            📋 PENDIENTE — columna anticipo NUMERIC en citas (Bloque A)
+v56_descuentos_pagos.sql          📋 PENDIENTE — columnas descuento + tipo_descuento en pagos (Bloque A)
 ```
+
+---
+
+## Backlog de Features — Sesión 8
+
+### Bloque A — Quick wins (próximo sprint)
+
+| Feature | SQL necesario | Archivos UI | Notas |
+| ------- | ------------- | ----------- | ----- |
+| Abono a reserva | v55: `anticipo NUMERIC` en `citas` | SalonAgenda.jsx popup | Mostrar monto anticipo + saldo restante al cobrar |
+| Descuento / cortesía en cobro | v56: `descuento NUMERIC`, `tipo_descuento TEXT` en `pagos` | SalonCaja.jsx modal cobro | Tipos: descuento% / cortesia_nc (no cobra) / cortesia_c (cobra pero exonera) |
+| Estado de cuenta colaboradores | ❌ ninguno (usa `anticipos_profesional` existente) | SalonComisiones.jsx | Nueva vista: Colaborador \| Préstamos totales \| Abonos \| Saldo pendiente |
+
+### Bloque B — Sprint siguiente
+
+| Feature | SQL necesario | Notas |
+| ------- | ------------- | ----- |
+| Productos + propina en modal de cobro | ninguno (usa productos_salon) | Agregar líneas de producto al cobro; propina distribuida entre profesionales |
+| Dashboard analytics avanzado | vistas SQL o RPC | Heatmap días concurridos, top servicios/profesional, comparativa mensual, porcentajes |
+| Insumos por servicio | nueva tabla `servicio_insumos` | Descuento automático de stock al completar cita |
+
+### Bloque C — Sprint 3
+
+| Feature | SQL necesario | Notas |
+| ------- | ------------- | ----- |
+| Pedidos a proveedores (estados completos) | nueva tabla `pedidos_proveedor` | Estados: Abierto → Cotizaciones → Aceptado → Entregado → Pagado |
+| Paquetes de servicios | nueva tabla `paquetes_salon` | Agrupar servicios con precio especial; reservable desde portal |
+| Préstamo a clientes | nueva tabla `prestamos_cliente` | Saldo deudor, abonos, historial |
 
 ---
 

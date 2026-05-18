@@ -80,6 +80,8 @@ export default function SalonCaja() {
   const [monto,        setMonto]        = useState('')
   const [metodo,       setMetodo]       = useState('efectivo')
   const [referencia,   setReferencia]   = useState('')
+  const [descuento,    setDescuento]    = useState('')
+  const [tipoDesc,     setTipoDesc]     = useState(null) // null | 'descuento' | 'cortesia'
   const [saving,       setSaving]       = useState(false)
   const [toast,        setToast]        = useState(null)
   const [confirmAnular, setConfirmAnular] = useState(null)
@@ -205,6 +207,8 @@ export default function SalonCaja() {
     setMonto(String(cita.servicios?.precio || ''))
     setMetodo('efectivo')
     setReferencia('')
+    setDescuento('')
+    setTipoDesc(null)
   }
 
   async function anularPago(pago) {
@@ -219,9 +223,20 @@ export default function SalonCaja() {
     if (!modalCita || !monto) return
     setSaving(true)
     try {
+      const base = parseFloat(monto) || 0
+      const desc = tipoDesc === 'descuento' ? (parseFloat(descuento) || 0) : 0
+      const montoFinal = tipoDesc === 'cortesia' ? 0 : Math.max(0, base - desc)
       const { data: pago, error: errIns } = await supabase.from('pagos')
-        .insert({ tenant_id: tenant.id, cita_id: modalCita.id, monto: parseFloat(monto),
-          metodo, referencia: referencia || null, estado:'pendiente' })
+        .insert({
+          tenant_id:     tenant.id,
+          cita_id:       modalCita.id,
+          monto:         montoFinal,
+          metodo,
+          referencia:    referencia || null,
+          estado:        'pendiente',
+          descuento:     tipoDesc === 'cortesia' ? base : desc,
+          tipo_descuento: tipoDesc || null,
+        })
         .select('id').single()
       if (errIns) throw errIns
       const { error: errUpd } = await supabase.from('pagos').update({ estado:'pagado' }).eq('id', pago.id)
@@ -615,13 +630,52 @@ export default function SalonCaja() {
                 <input type="text" value={referencia} onChange={e => setReferencia(e.target.value)}
                   className="sp-input" placeholder="Nro. de transacción, voucher…" />
               </div>
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>
+                  DESCUENTO <span style={{ fontWeight:400 }}>(opcional)</span>
+                </label>
+                <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                  {[['descuento','Descuento $'],['cortesia','Cortesía']].map(([t, label]) => (
+                    <button key={t} type="button" onClick={() => { setTipoDesc(tipoDesc === t ? null : t); setDescuento('') }} style={{
+                      flex:1, padding:'8px', borderRadius:10, cursor:'pointer',
+                      border:`1.5px solid ${tipoDesc === t ? col : 'var(--border)'}`,
+                      background: tipoDesc === t ? `${col}15` : 'var(--card)',
+                      color: tipoDesc === t ? col : 'var(--text-2)',
+                      fontWeight:700, fontSize:12, transition:'all 0.15s',
+                    }}>{label}</button>
+                  ))}
+                </div>
+                {tipoDesc === 'descuento' && (
+                  <div style={{ position:'relative' }}>
+                    <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)', fontWeight:700, fontSize:14, pointerEvents:'none' }}>$</span>
+                    <input type="number" min="0" max={Number(monto||0)} step="100" value={descuento}
+                      onChange={e => setDescuento(e.target.value)}
+                      className="sp-input" style={{ paddingLeft:28 }} placeholder="Monto a descontar" />
+                  </div>
+                )}
+                {tipoDesc === 'cortesia' && (
+                  <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', fontSize:12, color:'#fbbf24', fontWeight:600 }}>
+                    Se registra como $0 — cliente no paga
+                  </div>
+                )}
+              </div>
+              {tipoDesc && (
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                  padding:'12px 16px', borderRadius:12, background:`${col}10`, border:`1px solid ${col}20` }}>
+                  <span style={{ fontSize:13, color:'var(--text-3)', fontWeight:600 }}>Total a cobrar</span>
+                  <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:col }}>
+                    {fmtCOPFull(tipoDesc === 'cortesia' ? 0 : Math.max(0, (parseFloat(monto)||0) - (parseFloat(descuento)||0)))}
+                  </span>
+                </div>
+              )}
               <button type="submit" disabled={saving || !monto} style={{
                 marginTop:4, padding:'16px', borderRadius:16, border:'none', cursor:'pointer',
                 background: saving || !monto ? 'var(--border)' : col,
                 color: saving || !monto ? 'var(--text-3)' : '#fff',
                 fontFamily:'Outfit', fontWeight:800, fontSize:16, transition:'all 0.2s',
               }}>
-                {saving ? 'Guardando…' : `Cobrar ${fmtCOPFull(Number(monto||0))}`}
+                {saving ? 'Guardando…' :
+                  `Cobrar ${fmtCOPFull(tipoDesc === 'cortesia' ? 0 : Math.max(0, (parseFloat(monto)||0) - (parseFloat(descuento)||0)))}`}
               </button>
             </form>
           </div>

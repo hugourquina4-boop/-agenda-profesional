@@ -76,8 +76,10 @@ export default function SalonAgenda() {
   const [guardandoPago,setGuardandoPago]= useState(false)
   const [filtroProf,   setFiltroProf]   = useState(null)
   const [nowOffset,    setNowOffset]    = useState(null)
-  const [nota,         setNota]         = useState('')
-  const [guardandoNota,setGuardandoNota]= useState(false)
+  const [nota,             setNota]             = useState('')
+  const [guardandoNota,    setGuardandoNota]    = useState(false)
+  const [anticoInput,      setAnticoInput]      = useState('')
+  const [guardandoAnticipo,setGuardandoAnticipo]= useState(false)
 
   useEffect(() => {
     if (!tenant) return
@@ -97,7 +99,7 @@ export default function SalonAgenda() {
     try {
       const { data } = await supabase
         .from('citas')
-        .select('id, fecha_inicio, fecha_fin, estado, notas, clientes_agenda(nombre,telefono,tags), servicios(nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
+        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, clientes_agenda(nombre,telefono,tags), servicios(nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
         .eq('tenant_id', tenant.id)
         .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
         .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
@@ -113,8 +115,9 @@ export default function SalonAgenda() {
   useEffect(() => { cargarMes() }, [cargarMes])
 
   useEffect(() => {
-    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); return }
+    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); return }
     setNota(selCita.notas || '')
+    setAnticoInput('')
     setLoadPago(true)
     supabase.from('pagos').select('*').eq('cita_id', selCita.id).maybeSingle()
       .then(({ data }) => { setPago(data || null); setLoadPago(false) })
@@ -161,6 +164,20 @@ export default function SalonAgenda() {
     await supabase.from('citas').update({ notas: nota.trim() || null }).eq('id', selCita.id)
     setSelCita(c => ({ ...c, notas: nota.trim() || null }))
     setGuardandoNota(false)
+  }
+
+  async function registrarAnticipo() {
+    const monto = parseFloat(anticoInput)
+    if (!monto || monto <= 0 || !selCita) return
+    setGuardandoAnticipo(true)
+    const nuevo = (Number(selCita.anticipo) || 0) + monto
+    const { error } = await supabase.from('citas').update({ anticipo: nuevo }).eq('id', selCita.id)
+    if (!error) {
+      setSelCita(c => ({ ...c, anticipo: nuevo }))
+      setAnticoInput('')
+      cargarMes()
+    }
+    setGuardandoAnticipo(false)
   }
 
   async function registrarPago() {
@@ -785,6 +802,51 @@ export default function SalonAgenda() {
                 </div>
               ))}
             </div>
+
+            {/* ── Abono a reserva ── */}
+            {selCita.servicios?.precio > 0 && !['cancelada','no_asistio'].includes(selCita.estado) && (() => {
+              const precio = Number(selCita.servicios.precio)
+              const anticipo = Number(selCita.anticipo) || 0
+              const saldo = Math.max(0, precio - anticipo)
+              return (
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>
+                    Abono a reserva
+                  </div>
+                  <div style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.08)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                      <span style={{ fontSize:12, color:'var(--text-3)' }}>Precio</span>
+                      <span style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>${precio.toLocaleString('es-CO')}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                      <span style={{ fontSize:12, color:'var(--text-3)' }}>Anticipo pagado</span>
+                      <span style={{ fontSize:13, fontWeight:700, color:'#22c55e' }}>${anticipo.toLocaleString('es-CO')}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid var(--border)', paddingTop:8, marginBottom: saldo > 0 && !pago ? 10 : 0 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text-3)' }}>Saldo pendiente</span>
+                      <span style={{ fontSize:14, fontWeight:800, color: saldo > 0 ? col : '#22c55e' }}>
+                        ${saldo.toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                    {saldo > 0 && !pago && (
+                      <div style={{ display:'flex', gap:8 }}>
+                        <input className="sp-input" type="number" value={anticoInput}
+                          onChange={e => setAnticoInput(e.target.value)}
+                          placeholder="Registrar abono ($)" style={{ flex:1, fontSize:13 }} />
+                        <button onClick={registrarAnticipo} disabled={guardandoAnticipo || !anticoInput}
+                          style={{
+                            padding:'10px 14px', borderRadius:9, border:'none', cursor:'pointer',
+                            background: col, color:'#fff', fontWeight:700, fontSize:12, flexShrink:0,
+                            opacity: (guardandoAnticipo || !anticoInput) ? 0.6 : 1,
+                          }}>
+                          {guardandoAnticipo ? '…' : '+ Abono'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Nota rápida */}
             <div style={{ marginBottom:16 }}>

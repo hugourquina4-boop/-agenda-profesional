@@ -411,7 +411,7 @@ export default function SalonComisiones() {
       {/* ── Tabs ─────────────────────────────────────────── */}
       <div style={{ display:'flex', gap:4, margin:'16px 16px 0',
         background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
-        {[['comisiones','Comisiones'],['planilla','Planilla'],['desempeño','Desempeño']].map(([t, label]) => (
+        {[['comisiones','Comisiones'],['planilla','Planilla'],['cuenta','Cuentas'],['desempeño','Desempeño']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
             background: tab === t ? col : 'transparent',
@@ -560,6 +560,76 @@ export default function SalonComisiones() {
                   <p className="sp-empty-sub">Agrega profesionales en el módulo Equipo</p>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'cuenta' && (
+        <div style={{ padding:'16px' }}>
+          <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:16 }}>
+            Saldo de préstamos y deducciones pendientes de liquidar por colaborador.
+          </p>
+          {loadingAnt ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
+              <div className="sp-spinner" style={{ borderTopColor:col }} />
+            </div>
+          ) : profesionales.length === 0 ? (
+            <div className="sp-empty">
+              <span className="sp-empty-icon">👤</span>
+              <p className="sp-empty-title">Sin colaboradores</p>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {profesionales.map((prof, pi) => {
+                const profAnt = anticipos.filter(a => a.profesional_id === prof.id)
+                const totalPrestamos = profAnt.filter(a => a.tipo === 'anticipo').reduce((s,a) => s+Number(a.monto||0), 0)
+                const totalAbonos    = profAnt.filter(a => a.tipo === 'abono').reduce((s,a) => s+Number(a.monto||0), 0)
+                const totalDeduc     = profAnt.filter(a => a.tipo === 'deduccion').reduce((s,a) => s+Number(a.monto||0), 0)
+                const saldo = Math.max(0, totalPrestamos - totalAbonos - totalDeduc)
+                const profColor = PROF_COLORS[pi % PROF_COLORS.length]
+                return (
+                  <div key={prof.id} style={{
+                    borderRadius:16, background:'var(--card)', boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
+                    overflow:'hidden',
+                  }}>
+                    <div style={{ padding:'12px 16px', background:`${profColor}12`, display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{
+                        width:36, height:36, borderRadius:10, background:`${profColor}22`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontFamily:'Outfit', fontWeight:800, fontSize:15, color:profColor, flexShrink:0,
+                      }}>{prof.nombre[0]}</div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{prof.nombre}</div>
+                        {prof.especialidad && <div style={{ fontSize:11, color:'var(--text-3)' }}>{prof.especialidad}</div>}
+                      </div>
+                      <div style={{
+                        fontFamily:'Outfit', fontWeight:800, fontSize:18,
+                        color: saldo > 0 ? '#f87171' : '#22c55e',
+                      }}>
+                        {saldo > 0 ? `-$${saldo.toLocaleString('es-CO')}` : '✓ Al día'}
+                      </div>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:0, padding:'12px 16px' }}>
+                      {[
+                        { label:'Préstamos', val:totalPrestamos, color:'#f87171' },
+                        { label:'Abonos / deduc.', val:totalAbonos + totalDeduc, color:'#22c55e' },
+                        { label:'Saldo pendiente', val:saldo, color: saldo > 0 ? '#f87171' : '#22c55e' },
+                      ].map(({ label, val, color }) => (
+                        <div key={label} style={{ textAlign:'center' }}>
+                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color }}>${val.toLocaleString('es-CO')}</div>
+                          <div style={{ fontSize:10, color:'var(--text-3)', marginTop:2 }}>{label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {profAnt.length === 0 && (
+                      <div style={{ padding:'0 16px 12px', fontSize:12, color:'var(--text-3)', textAlign:'center' }}>
+                        Sin movimientos pendientes
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
