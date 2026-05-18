@@ -110,6 +110,9 @@ export default function SalonAnalytics() {
   const [retention, setRetention] = useState(isDemo ? DEMO_RETENTION : null)
   const [loading,   setLoading]   = useState(!isDemo)
   const [tabA,      setTabA]      = useState('resumen')
+  const [topServs,  setTopServs]  = useState([])
+  const [heatmap,   setHeatmap]   = useState(new Array(7).fill(0)) // Lun→Dom
+  const [kpiPrev,   setKpiPrev]   = useState(null) // mes anterior para comparativa
 
   // Finanzas
   const [gastosHist, setGastosHist] = useState([])
@@ -165,18 +168,39 @@ export default function SalonAnalytics() {
     if (!tenant) return
     setLoading(true)
     try {
-      const [kpiRes, staffRes, retRes] = await Promise.all([
+      const now = new Date()
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+      const [kpiRes, staffRes, retRes, citasRes] = await Promise.all([
         supabase.from('v_kpis_mes').select('*').eq('tenant_id', tenant.id).order('mes', { ascending: false }),
         supabase.from('v_revenue_staff').select('*').eq('tenant_id', tenant.id).order('ingresos_brutos', { ascending: false }),
         supabase.from('v_retention').select('*').eq('tenant_id', tenant.id).maybeSingle(),
+        supabase.from('citas').select('fecha_inicio, servicios(id,nombre,precio)').eq('tenant_id', tenant.id).eq('estado', 'completada').gte('fecha_inicio', firstOfMonth),
       ])
 
       const kpiRows = kpiRes.data || []
-      const mesActual = kpiRows[0] || null
-      setKpi(mesActual)
+      setKpi(kpiRows[0] || null)
+      setKpiPrev(kpiRows[1] || null)
       setHistoria([...kpiRows].reverse().slice(-6))
       setStaff(staffRes.data || [])
       setRetention(retRes.data || null)
+
+      // Heatmap día de semana (0=Dom→6=Sáb, reordenamos a Lun→Dom)
+      const dow = new Array(7).fill(0)
+      ;(citasRes.data || []).forEach(c => { dow[new Date(c.fecha_inicio).getDay()]++ })
+      // Reordenar: Lun(1)→Dom(0)
+      setHeatmap([dow[1],dow[2],dow[3],dow[4],dow[5],dow[6],dow[0]])
+
+      // Top servicios por ingresos
+      const svcMap = {}
+      ;(citasRes.data || []).forEach(c => {
+        const s = c.servicios
+        if (!s) return
+        if (!svcMap[s.id]) svcMap[s.id] = { nombre:s.nombre, precio:s.precio||0, count:0, total:0 }
+        svcMap[s.id].count++
+        svcMap[s.id].total += s.precio || 0
+      })
+      setTopServs(Object.values(svcMap).sort((a,b) => b.total - a.total).slice(0,5))
     } catch (e) {
       console.error('[SalonAnalytics]', e)
     } finally {
@@ -614,20 +638,30 @@ export default function SalonAnalytics() {
       </div>
 
       <div style={{ padding:'0 16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-        <KpiCard
-          label="Citas completadas"
-          value={kpi?.completadas ?? '—'}
-          sub={`de ${kpi?.total_citas ?? '—'} totales`}
-          icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          color="#4ade80"
-        />
-        <KpiCard
-          label="Ingresos brutos"
-          value={fmtCOP(kpi?.ingresos_brutos)}
-          sub={`ticket prom. ${fmtCOP(kpi?.avg_ticket)}`}
-          icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          color={col}
-        />
+        {(() => {
+          const trendCitas = kpiPrev?.completadas > 0
+            ? Math.round(((kpi?.completadas||0) - kpiPrev.completadas) / kpiPrev.completadas * 100) : null
+          const trendIng = kpiPrev?.ingresos_brutos > 0
+            ? Math.round(((kpi?.ingresos_brutos||0) - kpiPrev.ingresos_brutos) / kpiPrev.ingresos_brutos * 100) : null
+          return (<>
+            <KpiCard
+              label="Citas completadas"
+              value={kpi?.completadas ?? '—'}
+              sub={`de ${kpi?.total_citas ?? '—'} totales`}
+              icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              color="#4ade80"
+              trend={trendCitas}
+            />
+            <KpiCard
+              label="Ingresos brutos"
+              value={fmtCOP(kpi?.ingresos_brutos)}
+              sub={`ticket prom. ${fmtCOP(kpi?.avg_ticket)}`}
+              icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              color={col}
+              trend={trendIng}
+            />
+          </>)
+        })()}
         <KpiCard
           label="No-show rate"
           value={fmtPct(kpi?.no_show_rate)}
@@ -747,6 +781,88 @@ export default function SalonAnalytics() {
           })}
         </div>
       )}
+      {/* ── Top Servicios ────────────────────────────────── */}
+      {topServs.length > 0 && (<>
+        <div className="sp-section" style={{ marginTop:20 }}>
+          <span className="sp-section-title">Top servicios</span>
+          <span style={{ fontSize:12, color:'var(--text-3)', fontWeight:600 }}>este mes</span>
+        </div>
+        <div style={{ padding:'0 16px' }}>
+          <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+            {(() => {
+              const maxT = Math.max(...topServs.map(s => s.total), 1)
+              return topServs.map((s, i) => {
+                const sColor = PROF_COLORS[i % PROF_COLORS.length]
+                const pct = Math.round(s.total / maxT * 100)
+                return (
+                  <div key={s.nombre} style={{ marginBottom: i < topServs.length-1 ? 14 : 0 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:5 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <span style={{ fontSize:13, fontWeight:700, color:'var(--text)', display:'block',
+                          overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.nombre}</span>
+                        <span style={{ fontSize:10, color:'var(--text-3)' }}>{s.count} cita{s.count !== 1 ? 's' : ''}</span>
+                      </div>
+                      <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:14, color:sColor, marginLeft:8, flexShrink:0 }}>
+                        {fmtCOP(s.total)}
+                      </span>
+                    </div>
+                    <div style={{ height:6, borderRadius:3, background:'var(--border)', overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, background:sColor, borderRadius:3, transition:'width 0.4s' }} />
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </div>
+      </>)}
+
+      {/* ── Heatmap días semana ───────────────────────────── */}
+      {heatmap.some(v => v > 0) && (<>
+        <div className="sp-section" style={{ marginTop:20 }}>
+          <span className="sp-section-title">Días más activos</span>
+          <span style={{ fontSize:12, color:'var(--text-3)', fontWeight:600 }}>citas completadas</span>
+        </div>
+        <div style={{ padding:'0 16px' }}>
+          <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+            {(() => {
+              const dias = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+              const maxH = Math.max(...heatmap, 1)
+              return (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:6 }}>
+                  {dias.map((dia, i) => {
+                    const val = heatmap[i]
+                    const pct = val / maxH
+                    const intensity = Math.round(pct * 100)
+                    const isMax = val === maxH && val > 0
+                    return (
+                      <div key={dia} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+                        <div style={{
+                          width:'100%', aspectRatio:'1/1', borderRadius:10,
+                          background: val === 0 ? 'var(--border)' : `${col}`,
+                          opacity: val === 0 ? 0.3 : Math.max(0.18, pct),
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          position:'relative',
+                          boxShadow: isMax ? `0 0 10px ${col}60` : 'none',
+                          border: isMax ? `1.5px solid ${col}` : '1.5px solid transparent',
+                        }}>
+                          <span style={{
+                            fontFamily:'Outfit', fontWeight:800,
+                            fontSize: val >= 10 ? 13 : 15,
+                            color: pct > 0.4 ? '#fff' : 'var(--text)',
+                          }}>{val}</span>
+                        </div>
+                        <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:700 }}>{dia}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      </>)}
+
       <div style={{ height:24 }} />
       </>)}
     </>
