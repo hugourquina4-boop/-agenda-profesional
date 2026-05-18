@@ -454,15 +454,26 @@ v69_wompi_portal.sql              ✅ APLICADO (2026-05-18) — wompi_public_key
 
 ---
 
-## Bloque K — Próximo Sprint
+### ✅ Bloque K — COMPLETADO (sesión 12 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Recordatorios WA desde cita (botón en popup agenda) | sin SQL | ✅ Ya existía desde sesión 8 (línea 831 SalonAgenda) |
+| Caja: descarga CSV (abre en Excel) del período filtrado | sin SQL | ✅ `descargarCSV()` + botón "↓ CSV" junto a PDF |
+| Accesos: desvincular usuario del negocio | v70 pendiente | ✅ RPC `desvincular_usuario_tenant` + UI con confirmación en panel expandido |
+| Dashboard: tendencia ingresos semana actual vs semana anterior | sin SQL | ✅ Gráfico de barras dobles (gris=anterior, col=actual) + % cambio + totales |
+
+**v70 pendiente de aplicar en Supabase:** `sql/v70_desvincular_usuario.sql`
+
+## Bloque L — Próximo Sprint
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Recordatorios WA manuales desde cita (botón en popup agenda) | sin SQL | Alta |
-| Caja: descarga Excel (XLSX) del período filtrado | sin SQL | Alta |
-| Portal: confirmación de disponibilidad en tiempo real (sin recargar) | sin SQL | Media |
-| Accesos: ver en qué negocios está cada usuario + desvinculación | sin SQL | Media |
-| Dashboard: gráfico tendencia ingresos semana actual vs semana anterior | sin SQL | Media |
+| Portal: check disponibilidad en tiempo real antes de confirmar (anti double-booking) | sin SQL | Alta |
+| Caja: filtrar historial por rango de fechas personalizado | sin SQL | Alta |
+| Dashboard: acceso rápido a lista de espera del día | sin SQL | Media |
+| Agenda: copiar/duplicar cita a otra fecha | sin SQL | Media |
+| Config: gestión de múltiples sedes con horarios independientes | sin SQL | Media |
 
 ---
 
