@@ -189,6 +189,8 @@ export default function SalonPortal() {
   const [profs,         setProfs]         = useState([])
   const [servs,         setServs]         = useState([])     // todos los servicios del tenant
   const [profServMap,   setProfServMap]   = useState({})    // { profId: [servId,...] }
+  const [sedes,         setSedes]         = useState([])
+  const [filtroSede,    setFiltroSede]    = useState(null)
   const [diasTrabaja,   setDiasTrabaja]   = useState(new Set())
   const [slots,         setSlots]         = useState([])
   const [sinHorario,    setSinHorario]    = useState(false)
@@ -255,14 +257,16 @@ export default function SalonPortal() {
           .select('*').eq('slug', slug).eq('activo', true).maybeSingle()
         if (!t) { setNotFound(true); setLoading(false); return }
         setTenant(t)
-        const [profsRes, servsRes, psRes, reglasRes] = await Promise.all([
-          supabase.from('profesionales').select('id, nombre, especialidad, foto_url').eq('tenant_id', t.id).eq('activo', true).order('nombre'),
+        const [profsRes, servsRes, psRes, reglasRes, sedesRes] = await Promise.all([
+          supabase.from('profesionales').select('id, nombre, especialidad, foto_url, sede_id').eq('tenant_id', t.id).eq('activo', true).order('nombre'),
           supabase.from('servicios').select('id, nombre, precio, duracion_min, categoria').eq('tenant_id', t.id).eq('activo', true).order('categoria').order('nombre'),
           supabase.from('profesional_servicios').select('profesional_id, servicio_id').eq('tenant_id', t.id).eq('activo', true),
           supabase.from('reglas_precio_dinamico').select('*').eq('tenant_id', t.id).eq('activo', true),
+          supabase.from('sedes').select('id, nombre').eq('tenant_id', t.id).eq('activo', true).order('nombre'),
         ])
         setProfs(profsRes.data || [])
         setServs(servsRes.data || [])
+        setSedes(sedesRes.data || [])
         setReglas(reglasRes.data || [])
         const map = {}
         ;(psRes.data || []).forEach(r => {
@@ -299,13 +303,14 @@ export default function SalonPortal() {
 
   // Profesionales que pueden hacer TODOS los servicios seleccionados
   const profsParaServicios = useMemo(() => {
-    if (servIds.length === 0) return profs
-    return profs.filter(p => {
+    let lista = servIds.length === 0 ? profs : profs.filter(p => {
       const psIds = profServMap[p.id]
-      if (!psIds || psIds.length === 0) return true // sin restricción → puede todo
+      if (!psIds || psIds.length === 0) return true
       return servIds.every(sid => psIds.includes(sid))
     })
-  }, [profs, servIds, profServMap])
+    if (filtroSede) lista = lista.filter(p => p.sede_id === filtroSede)
+    return lista
+  }, [profs, servIds, profServMap, filtroSede])
 
   const selectedServs = useMemo(() => servs.filter(s => servIds.includes(s.id)), [servs, servIds])
   const duracionTotal = useMemo(() => selectedServs.reduce((s, x) => s + (x.duracion_min || 0), 0), [selectedServs])
@@ -405,6 +410,7 @@ export default function SalonPortal() {
     setFecha(new Date().toISOString().slice(0,10))
     setNombre(''); setTelefono(''); setError(null); setConfirmada(null)
     setWlMode(false); setWlOk(false); setWlNombre(''); setWlTel('')
+    setFiltroSede(null)
     window.history.replaceState({ portalStep: 0 }, '', window.location.href)
   }
 
@@ -572,10 +578,32 @@ export default function SalonPortal() {
           <>
             {backBtn(0, () => { setServIds([]); setProfId(null) })}
             <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:26, marginBottom:6, letterSpacing:-0.5, color:T.text }}>¿Con quién?</h2>
-            <p style={{ color:T.muted, fontSize:14, marginBottom:28 }}>
+            <p style={{ color:T.muted, fontSize:14, marginBottom:22 }}>
               {selectedServs.map(s=>s.nombre).join(' + ')} · {duracionTotal}min
               {profsParaServicios.length < profs.length && <span style={{ color:col, fontWeight:700 }}> · {profsParaServicios.length} disponible{profsParaServicios.length !== 1 ? 's' : ''}</span>}
             </p>
+
+            {/* Selector de sede — solo cuando hay más de una */}
+            {sedes.length > 1 && (
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20 }}>
+                <button onClick={() => setFiltroSede(null)} style={{
+                  padding:'7px 16px', borderRadius:20, cursor:'pointer', flexShrink:0,
+                  border: filtroSede === null ? `1.5px solid ${col}` : `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
+                  background: filtroSede === null ? col : 'transparent',
+                  color: filtroSede === null ? '#fff' : T.muted,
+                  fontSize:13, fontWeight:700, transition:'all 0.15s',
+                }}>Todas las sedes</button>
+                {sedes.map(s => (
+                  <button key={s.id} onClick={() => setFiltroSede(filtroSede === s.id ? null : s.id)} style={{
+                    padding:'7px 16px', borderRadius:20, cursor:'pointer', flexShrink:0,
+                    border: filtroSede === s.id ? `1.5px solid ${col}` : `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
+                    background: filtroSede === s.id ? col : 'transparent',
+                    color: filtroSede === s.id ? '#fff' : T.muted,
+                    fontSize:13, fontWeight:700, transition:'all 0.15s',
+                  }}>📍 {s.nombre}</button>
+                ))}
+              </div>
+            )}
 
             {profsParaServicios.length === 0 ? (
               <div style={{ ...T.card({ borderRadius:24 }), padding:'48px 24px', textAlign:'center' }}>

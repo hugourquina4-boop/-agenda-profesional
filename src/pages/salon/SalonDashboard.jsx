@@ -144,7 +144,7 @@ export default function SalonDashboard({ onNavigate }) {
   const [equipo,      setEquipo]      = useState(isDemo ? DEMO_EQUIPO : [])
   const [ingresosHoy, setIngresosHoy] = useState(isDemo ? 235000 : 0)
   const [loading,     setLoading]     = useState(!isDemo)
-  const [stockAlertas,   setStockAlertas]   = useState(0)
+  const [stockAlertas,   setStockAlertas]   = useState([])
   const [serviciosCount, setServiciosCount] = useState(null)
   const [gastosMes,      setGastosMes]      = useState(isDemo ? 890000 : 0)
   const [ingresosMes,    setIngresosMes]    = useState(isDemo ? 7252000 : 0)
@@ -188,7 +188,7 @@ export default function SalonDashboard({ onNavigate }) {
           .select('id,nombre,foto_url,especialidad,activo')
           .eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
         supabase.from('productos_salon')
-          .select('id,stock,stock_minimo')
+          .select('id,nombre,stock,stock_minimo')
           .eq('tenant_id', tenant.id).eq('activo', true).gt('stock_minimo', 0),
         supabase.from('servicios')
           .select('id', { count: 'exact', head: true })
@@ -221,13 +221,13 @@ export default function SalonDashboard({ onNavigate }) {
       const equipoList = equipoRes.data || []
       const ingresos = citasList.filter(c=>c.estado==='completada')
         .reduce((s,c) => s+(c.servicios?.precio||0), 0)
-      const alertas = (stockRes.data || []).filter(p => p.stock <= p.stock_minimo).length
+      const alertasList = (stockRes.data || []).filter(p => p.stock <= p.stock_minimo)
       const totalGastos   = (gastosRes.data || []).reduce((s,g) => s + Number(g.monto), 0)
       const totalIngresos = (ingresosMesRes.data || []).reduce((s,p) => s + Number(p.monto), 0)
       setCitas(citasList)
       setEquipo(equipoList)
       setIngresosHoy(ingresos)
-      setStockAlertas(alertas)
+      setStockAlertas(alertasList)
       setServiciosCount(servRes.count ?? 0)
       setGastosMes(totalGastos)
       setIngresosMes(totalIngresos)
@@ -809,14 +809,27 @@ export default function SalonDashboard({ onNavigate }) {
       )}
 
       {/* ── Alerta stock bajo ───────────────────────────── */}
-      {stockAlertas > 0 && (
-        <div className="sp-alert warn" style={{ marginBottom:4 }}>
-          <Ico d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={18} />
-          <div style={{ flex:1 }}>
+      {stockAlertas.length > 0 && (
+        <div className="sp-alert warn" style={{ marginBottom:4, alignItems:'flex-start' }}>
+          <Ico d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={18} style={{ flexShrink:0, marginTop:1 }} />
+          <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
-              {stockAlertas} producto{stockAlertas !== 1 ? 's' : ''} bajo stock mínimo
+              {stockAlertas.length} producto{stockAlertas.length !== 1 ? 's' : ''} bajo stock mínimo
             </div>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+            <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:5 }}>
+              {stockAlertas.slice(0, 5).map(p => (
+                <div key={p.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:12, color:'var(--text-2)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.nombre}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#f59e0b', flexShrink:0 }}>
+                    {p.stock} / mín {p.stock_minimo}
+                  </span>
+                </div>
+              ))}
+              {stockAlertas.length > 5 && (
+                <div style={{ fontSize:11, color:'var(--text-3)' }}>+{stockAlertas.length - 5} más…</div>
+              )}
+            </div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:6 }}>
               Revisa el módulo de Inventario
             </div>
           </div>

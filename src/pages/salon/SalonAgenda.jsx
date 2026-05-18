@@ -75,6 +75,8 @@ export default function SalonAgenda() {
   const [pagoRef,      setPagoRef]      = useState('')
   const [guardandoPago,setGuardandoPago]= useState(false)
   const [filtroProf,   setFiltroProf]   = useState(null)
+  const [sedes,        setSedes]        = useState([])
+  const [filtroSede,   setFiltroSede]   = useState(null)
   const [nowOffset,    setNowOffset]    = useState(null)
   const [nota,             setNota]             = useState('')
   const [guardandoNota,    setGuardandoNota]    = useState(false)
@@ -87,12 +89,17 @@ export default function SalonAgenda() {
 
   useEffect(() => {
     if (!tenant) return
-    supabase.from('profesionales')
-      .select('id,nombre,color,foto_url')
-      .eq('tenant_id', tenant.id)
-      .eq('activo', true)
-      .order('nombre')
-      .then(({ data }) => setProfesionales(data || []))
+    Promise.all([
+      supabase.from('profesionales')
+        .select('id,nombre,color,foto_url,sede_id')
+        .eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+      supabase.from('sedes')
+        .select('id,nombre')
+        .eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+    ]).then(([pr, sr]) => {
+      setProfesionales(pr.data || [])
+      setSedes(sr.data || [])
+    })
   }, [tenant])
 
   const cargarMes = useCallback(async () => {
@@ -335,7 +342,8 @@ export default function SalonAgenda() {
     const COL_W   = 110
     const PROFS_BASE = profesionales.length > 0 ? profesionales
       : [...new Map(citasDia.map(c => [c.profesionales?.nombre, { id: c.profesionales?.nombre, nombre: c.profesionales?.nombre, color: col }])).values()]
-    const PROFS = filtroProf ? PROFS_BASE.filter(p => p.id === filtroProf) : PROFS_BASE
+    const PROFS_SEDE = filtroSede ? PROFS_BASE.filter(p => p.sede_id === filtroSede) : PROFS_BASE
+    const PROFS = filtroProf ? PROFS_SEDE.filter(p => p.id === filtroProf) : PROFS_SEDE
 
     // Rango dinámico: mostrar solo las horas con citas (±1h buffer) para compactar
     const horasCitas = citasDia.map(c => parseInt(c.fecha_inicio.substring(11, 13)))
@@ -604,7 +612,7 @@ export default function SalonAgenda() {
       <div style={{ display:'flex', gap:4, margin:'0 16px 12px',
         background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
         {[['mes','Mes'],['semana','Sem'],['dia','Día']].map(([v,label]) => (
-          <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia') setFiltroProf(null) }} style={{
+          <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia') { setFiltroProf(null); setFiltroSede(null) } }} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
             background: vistaAgenda === v ? col : 'transparent',
             color: vistaAgenda === v ? '#fff' : 'var(--text-3)',
@@ -615,6 +623,26 @@ export default function SalonAgenda() {
 
       {vistaAgenda === 'semana' && <VistaSemana />}
       {vistaAgenda === 'dia' && (<>
+        {/* Filtro de sede — solo visible cuando hay más de una */}
+        {sedes.length > 1 && (
+          <div style={{ display:'flex', gap:6, padding:'0 16px 6px', overflowX:'auto', overflowY:'clip' }}>
+            <button onClick={() => { setFiltroSede(null); setFiltroProf(null) }} style={{
+              padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+              background: filtroSede === null ? col : 'rgba(255,255,255,0.06)',
+              color: filtroSede === null ? '#fff' : 'var(--text-3)',
+              fontSize:12, fontWeight:700, transition:'all 0.15s',
+            }}>Todas las sedes</button>
+            {sedes.map(s => (
+              <button key={s.id} onClick={() => { setFiltroSede(filtroSede === s.id ? null : s.id); setFiltroProf(null) }} style={{
+                padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                background: filtroSede === s.id ? col : 'rgba(255,255,255,0.06)',
+                color: filtroSede === s.id ? '#fff' : 'var(--text-3)',
+                fontSize:12, fontWeight:700, transition:'all 0.15s',
+              }}>📍 {s.nombre}</button>
+            ))}
+          </div>
+        )}
+        {/* Filtro de profesional */}
         {profesionales.length > 1 && (
           <div style={{ display:'flex', gap:6, padding:'0 16px 10px', overflowX:'auto', overflowY:'clip' }}>
             <button onClick={() => setFiltroProf(null)} style={{
