@@ -76,6 +76,8 @@ export default function SalonAgenda() {
   const [guardandoPago,setGuardandoPago]= useState(false)
   const [filtroProf,   setFiltroProf]   = useState(null)
   const [nowOffset,    setNowOffset]    = useState(null)
+  const [nota,         setNota]         = useState('')
+  const [guardandoNota,setGuardandoNota]= useState(false)
 
   useEffect(() => {
     if (!tenant) return
@@ -95,7 +97,7 @@ export default function SalonAgenda() {
     try {
       const { data } = await supabase
         .from('citas')
-        .select('id, fecha_inicio, fecha_fin, estado, clientes_agenda(nombre,telefono), servicios(nombre,precio,duracion_min), profesionales(nombre)')
+        .select('id, fecha_inicio, fecha_fin, estado, notas, clientes_agenda(nombre,telefono,tags), servicios(nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
         .eq('tenant_id', tenant.id)
         .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
         .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
@@ -111,7 +113,8 @@ export default function SalonAgenda() {
   useEffect(() => { cargarMes() }, [cargarMes])
 
   useEffect(() => {
-    if (!selCita) { setPago(null); setPagoForm(false); return }
+    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); return }
+    setNota(selCita.notas || '')
     setLoadPago(true)
     supabase.from('pagos').select('*').eq('cita_id', selCita.id).maybeSingle()
       .then(({ data }) => { setPago(data || null); setLoadPago(false) })
@@ -136,7 +139,7 @@ export default function SalonAgenda() {
     function calcOffset() {
       const now = new Date()
       if (selDay !== now.toISOString().slice(0,10)) { setNowOffset(null); return }
-      setNowOffset(((now.getHours() - 7) * 60 + now.getMinutes()) / 30 * 44)
+      setNowOffset(now.getHours() * 60 + now.getMinutes()) // minutos desde medianoche
     }
     calcOffset()
     const iv = setInterval(calcOffset, 60000)
@@ -150,6 +153,14 @@ export default function SalonAgenda() {
     setActualizando(false)
     setSelCita(null)
     cargarMes()
+  }
+
+  async function guardarNota() {
+    if (!selCita) return
+    setGuardandoNota(true)
+    await supabase.from('citas').update({ notas: nota.trim() || null }).eq('id', selCita.id)
+    setSelCita(c => ({ ...c, notas: nota.trim() || null }))
+    setGuardandoNota(false)
   }
 
   async function registrarPago() {
@@ -328,6 +339,15 @@ export default function SalonAgenda() {
 
     const TOTAL_H = (H_END - H_START) * 2 * SLOT_H
 
+    // Ahora: offset en px calculado con H_START y SLOT_H dinámicos
+    const nowTop = nowOffset !== null
+      ? ((nowOffset / 60 - H_START) * 60 / 30) * SLOT_H
+      : null
+
+    // Color por profesional (campo color de BD, fallback a paleta)
+    const PROF_CLR = {}
+    PROFS.forEach((p, i) => { PROF_CLR[p.id || p.nombre] = p.color || PROF_COLORS[i % PROF_COLORS.length] })
+
     return (
       // Contenedor acotado con overflow:auto → position:sticky funciona dentro
       <div style={{
@@ -386,8 +406,8 @@ export default function SalonAgenda() {
             ))}
 
             {/* Línea hora actual */}
-            {nowOffset !== null && nowOffset >= 0 && nowOffset <= TOTAL_H && (
-              <div style={{ position:'absolute', left:56, right:0, top:nowOffset, zIndex:6, pointerEvents:'none', display:'flex', alignItems:'center' }}>
+            {nowTop !== null && nowTop >= 0 && nowTop <= TOTAL_H && (
+              <div style={{ position:'absolute', left:56, right:0, top:nowTop, zIndex:6, pointerEvents:'none', display:'flex', alignItems:'center' }}>
                 <div style={{ width:9, height:9, borderRadius:'50%', background:'#ef4444', flexShrink:0, marginLeft:-1 }} />
                 <div style={{ flex:1, height:2, background:'linear-gradient(90deg, #ef4444 70%, transparent)' }} />
               </div>
@@ -395,11 +415,18 @@ export default function SalonAgenda() {
 
             {/* Bloques de citas */}
             {PROFS.map((prof, pi) => {
-              const profCitas = citasDia.filter(c => c.profesionales?.nombre === prof.nombre)
+              const profKey   = prof.id || prof.nombre
+              const profClr   = PROF_CLR[profKey] || col
+              const profCitas = citasDia.filter(c =>
+                (c.profesionales?.id || c.profesionales?.nombre) === profKey
+              )
               return profCitas.map(c => {
-                const top    = minOffset(c.fecha_inicio)
-                const height = durPx(c)
-                const clr    = ESTADO_COLOR[c.estado] || col
+                const top      = minOffset(c.fecha_inicio)
+                const height   = durPx(c)
+                const estColor = ESTADO_COLOR[c.estado] || '#71717a'
+                const cancelada = ['cancelada','no_asistio'].includes(c.estado)
+                const tags = c.clientes_agenda?.tags || []
+                const isStar = tags.includes('star') || tags.includes('vip')
                 if (top < 0 || top > TOTAL_H) return null
                 return (
                   <div key={c.id} onClick={() => setSelCita(c)} style={{
@@ -407,12 +434,18 @@ export default function SalonAgenda() {
                     top, left: 56 + pi * COL_W + 3,
                     width: COL_W - 6, height: height - 2,
                     borderRadius:8, cursor:'pointer',
-                    background:`${clr}18`, border:`1.5px solid ${clr}55`,
+                    background: cancelada ? 'rgba(113,113,122,0.10)' : `${profClr}18`,
+                    border:`1.5px solid ${cancelada ? '#71717a44' : profClr + '60'}`,
+                    borderLeft:`3px solid ${cancelada ? '#71717a' : profClr}`,
                     padding:'4px 7px', overflow:'hidden',
-                    boxShadow:`0 1px 4px ${clr}22`,
+                    boxShadow:`0 1px 4px ${profClr}20`,
+                    opacity: cancelada ? 0.6 : 1,
                   }}>
-                    <div style={{ fontSize:10, fontWeight:800, color:clr, lineHeight:1.3 }}>
-                      {fmtHora(c.fecha_inicio)}
+                    {/* Dot de estado */}
+                    <div style={{ position:'absolute', top:5, right:5,
+                      width:7, height:7, borderRadius:'50%', background:estColor }} />
+                    <div style={{ fontSize:10, fontWeight:800, color: cancelada ? '#71717a' : profClr, lineHeight:1.3 }}>
+                      {fmtHora(c.fecha_inicio)}{isStar ? ' ⭐' : ''}
                     </div>
                     <div style={{ fontSize:11, fontWeight:600, color:'var(--text)',
                       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -663,7 +696,15 @@ export default function SalonAgenda() {
             <div className="sp-sheet-handle" />
 
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <p className="sp-sheet-title" style={{ margin:0 }}>Detalle cita</p>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <p className="sp-sheet-title" style={{ margin:0 }}>Detalle cita</p>
+                {(() => {
+                  const tags = selCita.clientes_agenda?.tags || []
+                  if (tags.includes('vip'))  return <span style={{ fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6, background:'rgba(251,191,36,0.15)', color:'#fbbf24' }}>VIP</span>
+                  if (tags.includes('star')) return <span style={{ fontSize:13 }}>⭐</span>
+                  return null
+                })()}
+              </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <span style={{
                   fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:8,
@@ -740,6 +781,33 @@ export default function SalonAgenda() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Nota rápida */}
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>
+                Nota interna
+              </div>
+              <div style={{ position:'relative' }}>
+                <textarea
+                  value={nota}
+                  onChange={e => setNota(e.target.value)}
+                  onBlur={guardarNota}
+                  placeholder="Agregar nota sobre esta cita…"
+                  rows={2}
+                  style={{
+                    width:'100%', padding:'10px 12px', borderRadius:10,
+                    border:'1px solid var(--border)', background:'var(--card)',
+                    color:'var(--text)', fontSize:13, resize:'none', outline:'none',
+                    boxSizing:'border-box', fontFamily:'inherit',
+                  }}
+                />
+                {guardandoNota && (
+                  <div style={{ position:'absolute', top:8, right:8 }}>
+                    <div className="sp-spinner" style={{ width:14, height:14, borderWidth:2 }} />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Acciones */}
