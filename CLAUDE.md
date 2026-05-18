@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-17 (sesión 8)
-> **Versión actual en producción: v1.3-dev** (commit 3c6bfc4)
+> Actualizado: 2026-05-18 (sesión 9)
+> **Versión actual en producción: v1.3-dev** (commit b79a4bd)
 
 ---
 
@@ -58,7 +58,11 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | HorarioGrid (componente reutilizable) | components/HorarioGrid.jsx | Drag-to-select táctil, pointer capture, exports: rangeToSlots, slotsToRange, slotsToFranjas |
 | Clientes CRUD + historial + fotos | SalonClientes.jsx | Cumpleaños, segmento, historial, galería, CSV export + import, tipo_precio (Normal/Mayorista), badge MAYOR en lista, toggle rápido en detalle |
 | Caja — Registro de cobros | SalonCaja.jsx | KPI 2×2 (Ingresos/Egresos/Saldo), tabs Por cobrar/Cobrado/Egresos, buscador en Cobrado, modal egreso con categoría, PDF export, anulación |
-| Comisiones — Reglas + liquidación | SalonComisiones.jsx | % por profesional, meta mensual, liquidación PDF individual, tab Planilla con anticipos/deducciones/neto |
+| Comisiones — Reglas + liquidación | SalonComisiones.jsx | % por profesional, meta mensual, liquidación PDF individual, tab Planilla con anticipos/deducciones/neto, tab Cuentas (estado deuda colaboradores) |
+| Analytics avanzados | SalonAnalytics.jsx | KPIs MoM con trend %, heatmap días semana, top 5 servicios por ingresos, comparativa histórica 6 meses |
+| Proveedores — Pedidos con flujo estados | SalonProveedores.jsx | Tab Pedidos: Abierto→Cotizaciones→Aceptado→Entregado→Pagado, ítems con precio unitario |
+| Servicios — Paquetes combos | SalonServicios.jsx | Toggle Servicios/Paquetes, CRUD con selección servicios, precio especial, % OFF, visible_portal |
+| Clientes — Préstamos y abonos | SalonClientes.jsx | Tab Crédito: préstamos/abonos por cliente, saldo deudor en tiempo real |
 | Órdenes en espera | SalonOrdenes.jsx | Grid tarjetas 2 col, buscador + filtro por profesional, cancelar-todas con confirm, nueva orden, cobrar → pagos → comisión |
 | Inventario de productos | SalonInventario.jsx | CRUD + CSV import (preview → upsert por SKU), subcategoria/marca/codigo/contenido/proveedor |
 | Analytics — KPIs y métricas | SalonAnalytics.jsx | v_kpis_mes, v_revenue_staff, v_retention, gráficos, PDF export |
@@ -342,35 +346,55 @@ v56_descuentos_pagos.sql          ✅ APLICADO (2026-05-17) — columnas descuen
 v57_propina_pagos_lineas.sql      ✅ APLICADO (2026-05-17) — propina en pagos + tabla pagos_lineas
 v58_servicio_insumos.sql          ✅ APLICADO (2026-05-17) — tabla servicio_insumos
 v59_fixes_portal_anticipos.sql    ✅ APLICADO (2026-05-18) — RLS anticipos unificado + ps_anon_select portal
+v60_pedidos_proveedor.sql         ✅ APLICADO (2026-05-18) — pedidos_proveedor + pedidos_proveedor_items
+v61_paquetes_salon.sql            ✅ APLICADO (2026-05-18) — paquetes_salon + paquetes_servicios
+v62_prestamos_cliente.sql         ✅ APLICADO (2026-05-18) — prestamos_cliente (préstamos/abonos por cliente)
 ```
 
 ---
 
-## Backlog de Features — Sesión 8
+## Backlog de Features — Sesión 9 (2026-05-18)
 
-### Bloque A — Quick wins (próximo sprint)
+### ✅ Bloque A — COMPLETADO (sesión 8)
 
-| Feature | SQL necesario | Archivos UI | Notas |
-| ------- | ------------- | ----------- | ----- |
-| Abono a reserva | v55: `anticipo NUMERIC` en `citas` | SalonAgenda.jsx popup | Mostrar monto anticipo + saldo restante al cobrar |
-| Descuento / cortesía en cobro | v56: `descuento NUMERIC`, `tipo_descuento TEXT` en `pagos` | SalonCaja.jsx modal cobro | Tipos: descuento% / cortesia_nc (no cobra) / cortesia_c (cobra pero exonera) |
-| Estado de cuenta colaboradores | ❌ ninguno (usa `anticipos_profesional` existente) | SalonComisiones.jsx | Nueva vista: Colaborador \| Préstamos totales \| Abonos \| Saldo pendiente |
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Abono a reserva | v55 | ✅ |
+| Descuento / cortesía en cobro | v56 | ✅ |
+| Estado de cuenta colaboradores | sin SQL | ✅ (tab "Cuentas" en SalonComisiones) |
 
-### Bloque B — Sprint siguiente
+### ✅ Bloque B — COMPLETADO (sesiones 8–9)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Productos + propina en modal de cobro | v57 | ✅ |
+| Insumos por servicio | v58 | ✅ |
+| Analytics avanzado: heatmap, top servicios, trend MoM | sin SQL | ✅ |
+
+### ✅ Bloque C — COMPLETADO (sesión 9)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Pedidos a proveedores (flujo estados) | v60 | ✅ |
+| Paquetes de servicios + portal | v61 | ✅ |
+| Préstamos a clientes | v62 | ✅ |
+
+### ✅ Brand — COMPLETADO (sesión 9)
+
+| Feature | Estado |
+| ------- | ------ |
+| favicon.svg — corona+tijeras charcoal/verde | ✅ |
+| logo192.png + logo512.png (iOS homescreen) | ✅ |
+| Playfair Display añadida para wordmark | ✅ |
+
+### Bloque D — Próximo sprint
 
 | Feature | SQL necesario | Notas |
 | ------- | ------------- | ----- |
-| Productos + propina en modal de cobro | ninguno (usa productos_salon) | Agregar líneas de producto al cobro; propina distribuida entre profesionales |
-| Dashboard analytics avanzado | vistas SQL o RPC | Heatmap días concurridos, top servicios/profesional, comparativa mensual, porcentajes |
-| Insumos por servicio | nueva tabla `servicio_insumos` | Descuento automático de stock al completar cita |
-
-### Bloque C — Sprint 3
-
-| Feature | SQL necesario | Notas |
-| ------- | ------------- | ----- |
-| Pedidos a proveedores (estados completos) | nueva tabla `pedidos_proveedor` | Estados: Abierto → Cotizaciones → Aceptado → Entregado → Pagado |
-| Paquetes de servicios | nueva tabla `paquetes_salon` | Agrupar servicios con precio especial; reservable desde portal |
-| Préstamo a clientes | nueva tabla `prestamos_cliente` | Saldo deudor, abonos, historial |
+| Descuento automático de stock al completar cita | Edge Function o trigger | Descontar insumos de `servicio_insumos` del stock en `productos_salon` |
+| Portal público muestra paquetes | sin SQL nuevo | Listar `paquetes_salon` con visible_portal=true en SalonPortal |
+| Programa de puntos / fidelización | nueva tabla `movimientos_puntos` | Acumular puntos por visita, canjear en próxima cita |
+| Recordatorio automático 24h/1h | Supabase cron activo | Activar `notificacion-recordatorio` edge function + pg_cron |
 
 ---
 
