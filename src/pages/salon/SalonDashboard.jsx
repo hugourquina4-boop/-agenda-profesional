@@ -269,6 +269,16 @@ export default function SalonDashboard({ onNavigate }) {
 
   useEffect(() => { cargar() }, [cargar])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('nuevo') === 'true') {
+      showToast('¡Bienvenido! Tienes 14 días gratis para explorar todo 🎉', '#8b5cf6')
+      const url = new URL(window.location)
+      url.searchParams.delete('nuevo')
+      window.history.replaceState({}, '', url)
+    }
+  }, [])
+
   async function marcarCompletada(citaId) {
     if (isDemo) { showToast('Demo — conecta Supabase para guardar', '#f59e0b'); return }
     await supabase.from('citas').update({estado:'completada'}).eq('id', citaId)

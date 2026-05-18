@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 function Ico({ d, size = 20 }) {
@@ -10,7 +11,8 @@ function Ico({ d, size = 20 }) {
   )
 }
 
-export default function SalonLogin({ onLogin, onRegistro }) {
+export default function SalonLogin({ onLogin }) {
+  const navigate = useNavigate()
   // paso: 'selector' | 'login' | 'recovery'
   const [paso,     setPaso]    = useState('selector')
   const [salones,  setSalones] = useState([])
@@ -327,6 +329,26 @@ export default function SalonLogin({ onLogin, onRegistro }) {
             ))}
           </div>
         )}
+
+        {/* CTA registro */}
+        <div style={{ marginTop:36, textAlign:'center' }}>
+          <div style={{ fontSize:13, color:'var(--text-3)', marginBottom:14 }}>
+            ¿Aún no tienes Salón Pro?
+          </div>
+          <button
+            onClick={() => navigate('/salon-registro')}
+            style={{
+              width:'100%', padding:'15px', borderRadius:16, border:'none', cursor:'pointer',
+              background:'linear-gradient(135deg, #f43f5e, #e11d48)',
+              color:'#fff', fontFamily:'Outfit', fontWeight:700, fontSize:15,
+              boxShadow:'0 4px 20px rgba(244,63,94,0.35)', transition:'opacity 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity='0.9'}
+            onMouseLeave={e => e.currentTarget.style.opacity='1'}
+          >
+            Crear cuenta gratis — 14 días de prueba
+          </button>
+        </div>
 
       </div>
     </div>

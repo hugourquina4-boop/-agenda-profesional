@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 import { TenantProvider, useTenant } from './context/TenantContext'
 import Login from './pages/Login'
 import SalonApp from './pages/salon/SalonApp'
+import SalonRegistroPublico from './pages/salon/SalonRegistroPublico'
 import Registro from './pages/public/Registro'
 import SalonPortal from './pages/public/SalonPortal'
 import TenantLayout from './components/TenantLayout'
@@ -97,6 +98,9 @@ export default function App() {
             <Route path="mi-agenda"     element={<MiAgenda />} />
             <Route path="mis-clientes"  element={<Clientes />} />
           </Route>
+
+          {/* Self-service trial para Salón Pro */}
+          <Route path="/salon-registro" element={<SalonRegistroPublico />} />
 
           {/* Panel salón / peluquería — sin auth por ahora */}
           <Route path="/salon" element={<SalonApp />} />
