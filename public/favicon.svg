@@ -1,40 +1,63 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+
   <!-- White background circle -->
   <circle cx="256" cy="256" r="256" fill="#ffffff"/>
 
-  <!-- Outer ring -->
-  <circle cx="256" cy="256" r="230" fill="none" stroke="#2d2d2d" stroke-width="12"/>
+  <!-- ── CORONA ── -->
+  <!-- Base band of crown -->
+  <rect x="128" y="310" width="256" height="52" rx="6" fill="#2d2d2d"/>
 
-  <!-- Left wavy hair strand (teal) -->
-  <path d="M 155 110 C 120 140, 100 190, 115 240 C 125 275, 140 300, 135 340 C 130 370, 115 390, 120 420"
-    fill="none" stroke="#1a7a7a" stroke-width="28" stroke-linecap="round"/>
+  <!-- Crown points: 5 peaks
+       Left outer → left inner → left-center → center-top → right-center → right inner → right outer
+       Then down to base band -->
+  <path d="
+    M 128 310
+    L 128 230
+    L 178 290
+    L 206 195
+    L 256 265
+    L 306 195
+    L 334 290
+    L 384 230
+    L 384 310
+    Z"
+    fill="#2d2d2d"/>
 
-  <!-- Right wavy hair strand (teal) -->
-  <path d="M 357 110 C 392 140, 412 190, 397 240 C 387 275, 372 300, 377 340 C 382 370, 397 390, 392 420"
-    fill="none" stroke="#1a7a7a" stroke-width="28" stroke-linecap="round"/>
+  <!-- Green fill triangles between crown peaks (the "windows" of the crown) -->
+  <!-- Left window -->
+  <path d="M 148 300 L 178 260 L 210 300 Z" fill="#1e8c45"/>
+  <!-- Center-left window -->
+  <path d="M 210 300 L 230 240 L 256 285 Z" fill="#1e8c45"/>
+  <!-- Center-right window -->
+  <path d="M 256 285 L 282 240 L 302 300 Z" fill="#1e8c45"/>
+  <!-- Right window -->
+  <path d="M 302 300 L 334 260 L 364 300 Z" fill="#1e8c45"/>
 
-  <!-- Inner hair highlights -->
-  <path d="M 167 115 C 138 148, 122 195, 136 243 C 145 276, 158 298, 154 336"
-    fill="none" stroke="#2aa8a8" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
-  <path d="M 345 115 C 374 148, 390 195, 376 243 C 367 276, 354 298, 358 336"
-    fill="none" stroke="#2aa8a8" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+  <!-- Base band accent line -->
+  <rect x="128" y="348" width="256" height="8" rx="3" fill="#1e8c45"/>
 
-  <!-- Scissors body - left blade -->
-  <path d="M 220 165 L 248 310" fill="none" stroke="#9e9e9e" stroke-width="14" stroke-linecap="round"/>
-  <!-- Scissors body - right blade -->
-  <path d="M 292 165 L 264 310" fill="none" stroke="#9e9e9e" stroke-width="14" stroke-linecap="round"/>
+  <!-- Crown feet / bracket base -->
+  <rect x="128" y="356" width="36" height="22" rx="4" fill="#2d2d2d"/>
+  <rect x="338" y="356" width="36" height="22" rx="4" fill="#2d2d2d"/>
+  <rect x="220" y="356" width="72" height="22" rx="4" fill="#2d2d2d"/>
 
-  <!-- Scissors pivot -->
-  <circle cx="256" cy="242" r="14" fill="#b0b0b0"/>
-  <circle cx="256" cy="242" r="7" fill="#7a7a7a"/>
+  <!-- ── TIJERAS (superpuestas sobre la corona) ── -->
+  <!-- Left blade -->
+  <path d="M 236 150 L 252 310" fill="none" stroke="#2d2d2d" stroke-width="13" stroke-linecap="round"/>
+  <!-- Right blade -->
+  <path d="M 276 150 L 260 310" fill="none" stroke="#2d2d2d" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- Blade inner highlight -->
+  <path d="M 240 150 L 254 304" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <path d="M 272 150 L 258 304" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Pivot point -->
+  <circle cx="256" cy="232" r="13" fill="#2d2d2d"/>
+  <circle cx="256" cy="232" r="6"  fill="#1e8c45"/>
 
   <!-- Left handle ring -->
-  <circle cx="218" cy="340" r="30" fill="none" stroke="#8a8a8a" stroke-width="14"/>
+  <circle cx="230" cy="335" r="22" fill="none" stroke="#2d2d2d" stroke-width="12"/>
   <!-- Right handle ring -->
-  <circle cx="294" cy="340" r="30" fill="none" stroke="#8a8a8a" stroke-width="14"/>
+  <circle cx="282" cy="335" r="22" fill="none" stroke="#2d2d2d" stroke-width="12"/>
 
-  <!-- Left blade edge (sharper look) -->
-  <path d="M 228 165 L 252 305" fill="none" stroke="#c8c8c8" stroke-width="5" stroke-linecap="round"/>
-  <!-- Right blade edge -->
-  <path d="M 284 165 L 260 305" fill="none" stroke="#c8c8c8" stroke-width="5" stroke-linecap="round"/>
 </svg>
