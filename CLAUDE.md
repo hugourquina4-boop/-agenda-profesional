@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 10)
-> **Versión actual en producción: v1.4-dev** (commit 16b20e2)
+> Actualizado: 2026-05-18 (sesión 11)
+> **Versión actual en producción: v1.4-dev** (commit 89272bf)
 
 ---
 
@@ -354,7 +354,8 @@ v64_recordatorios_cron.sql        ✅ APLICADO (2026-05-18) — pg_cron: recorda
 v65_self_service_trial.sql        ✅ APLICADO (2026-05-18) — salon_self_service_registrar SECURITY DEFINER grant anon
 v66_plantillas_mensajeria.sql     ✅ APLICADO (2026-05-18) — tabla plantillas_mensajeria + RLS tenant
 v67_sedes.sql                     ✅ APLICADO (2026-05-18) — tabla sedes + sede_id en profesionales y citas
-v68_trigger_stock.sql             📋 PENDIENTE aplicar — trigger descuento automático stock al completar cita
+v68_trigger_stock.sql             ✅ APLICADO (2026-05-18) — trigger fn_descontar_insumos_cita activo
+v69_wompi_portal.sql              ✅ APLICADO (2026-05-18) — wompi_public_key + pagos_portal_activo en tenants
 ```
 
 ---
@@ -432,14 +433,36 @@ v68_trigger_stock.sql             📋 PENDIENTE aplicar — trigger descuento a
 | Multi-sede | v67 ✅ | ✅ SalonSedes.jsx — CRUD + asignación profesionales |
 | Descuento automático de stock | v68 pendiente | ✅ trigger fn_descontar_insumos_cita + insumos_descontados |
 
-### Bloque I — Próximo sprint
+### ✅ Bloque I — COMPLETADO (sesión 11 — 2026-05-18)
 
-| Feature | SQL necesario | Notas |
-| ------- | ------------- | ----- |
-| Agenda: filtro por sede | sin SQL | Pill selector de sede en VistaDia cuando hay >1 sede |
-| Portal: selector de sede antes del profesional | sin SQL | Paso 0 extra si tenant tiene >1 sede activa |
-| Notificación stock bajo en Dashboard | sin SQL | Expandir alerta stockAlertas con lista de productos |
-| Pagos en línea desde portal (Wompi/PSE) | Edge Function + v69 | Monetización directa para clientes del salón |
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Agenda: filtro por sede en VistaDia | sin SQL | ✅ Pills sede encima de pills prof; filtra PROFS por sede_id |
+| Portal: selector de sede en step 1 | sin SQL | ✅ Pills sede + filtroSede en profsParaServicios |
+| Stock bajo detallado en Dashboard | sin SQL | ✅ Card expandida muestra lista nombre/stock/mínimo |
+| Pagos en línea desde portal (Wompi/PSE) | v69 ✅ | ✅ WidgetCheckout CDN; SalonConfig configura clave pública; portal detecta pagos_portal_activo y cobra antes de crear cita |
+
+### ✅ Bloque J — COMPLETADO (sesión 11 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| NuevaCita: filtro por sede en paso 0 | sin SQL | ✅ Pills sede encima de lista de profesionales; inserta sede_id en cita |
+| Caja: badge "🌐 Portal" para pagos Wompi | sin SQL | ✅ METODO_LABELS + METODO_COLORS con wompi verde |
+| Analytics: label "🌐 Portal" en desglose métodos | sin SQL | ✅ METODO_LABELS + color verde en ventas por método |
+| Config: galería 4 fotos para portal + config Wompi | sin SQL | ✅ 2×2 ImageUploaders; toggle pagos + input clave pública; guardado en config_vertical.fotos_galeria |
+| Portal: strip de fotos en paso 0 | sin SQL | ✅ Carrusel horizontal scrollable (fotos_galeria de config_vertical) |
+
+---
+
+## Bloque K — Próximo Sprint
+
+| Feature | SQL necesario | Prioridad |
+| ------- | ------------- | --------- |
+| Recordatorios WA manuales desde cita (botón en popup agenda) | sin SQL | Alta |
+| Caja: descarga Excel (XLSX) del período filtrado | sin SQL | Alta |
+| Portal: confirmación de disponibilidad en tiempo real (sin recargar) | sin SQL | Media |
+| Accesos: ver en qué negocios está cada usuario + desvinculación | sin SQL | Media |
+| Dashboard: gráfico tendencia ingresos semana actual vs semana anterior | sin SQL | Media |
 
 ---
 
