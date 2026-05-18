@@ -4,7 +4,6 @@ import { useAuth } from './hooks/useAuth'
 import { TenantProvider, useTenant } from './context/TenantContext'
 import Login from './pages/Login'
 import SalonApp from './pages/salon/SalonApp'
-import Portal from './pages/public/Portal'
 import Registro from './pages/public/Registro'
 import SalonPortal from './pages/public/SalonPortal'
 import TenantLayout from './components/TenantLayout'
@@ -69,7 +68,6 @@ export default function App() {
         <Routes>
           <Route path="/login"    element={<Login />} />
           <Route path="/registro" element={<Registro />} />
-          <Route path="/agenda/:slug" element={<Portal />} />
 
           {/* Panel superadmin → redirige al panel HTML estático */}
           <Route path="/superadmin" element={<SuperadminRedirect />} />

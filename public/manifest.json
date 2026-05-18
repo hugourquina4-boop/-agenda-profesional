@@ -2,13 +2,15 @@
   "name": "Salón Pro",
   "short_name": "Salón Pro",
   "description": "Gestión profesional para tu salón de belleza",
-  "start_url": "/",
+  "start_url": "/salon",
   "display": "standalone",
-  "background_color": "#020817",
-  "theme_color": "#f43f5e",
+  "background_color": "#ffffff",
+  "theme_color": "#1a7a7a",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/logo192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon.svg", "sizes": "any",     "type": "image/svg+xml", "purpose": "any" }
   ],
   "categories": ["business", "productivity"],
   "lang": "es-CO"

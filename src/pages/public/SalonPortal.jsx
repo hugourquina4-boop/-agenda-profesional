@@ -250,27 +250,32 @@ export default function SalonPortal() {
   // ── Carga inicial: tenant + profs + servs + profServMap + reglas ──
   useEffect(() => {
     async function load() {
-      const { data: t } = await supabase.from('tenants')
-        .select('*').eq('slug', slug).eq('activo', true).maybeSingle()
-      if (!t) { setNotFound(true); setLoading(false); return }
-      setTenant(t)
-      const [profsRes, servsRes, psRes, reglasRes] = await Promise.all([
-        supabase.from('profesionales').select('id, nombre, especialidad, foto_url').eq('tenant_id', t.id).eq('activo', true).order('nombre'),
-        supabase.from('servicios').select('id, nombre, precio, duracion_min, categoria').eq('tenant_id', t.id).eq('activo', true).order('categoria').order('nombre'),
-        supabase.from('profesional_servicios').select('profesional_id, servicio_id').eq('tenant_id', t.id).eq('activo', true),
-        supabase.from('reglas_precio_dinamico').select('*').eq('tenant_id', t.id).eq('activo', true),
-      ])
-      setProfs(profsRes.data || [])
-      setServs(servsRes.data || [])
-      setReglas(reglasRes.data || [])
-      // Construir mapa prof → servicios habilitados
-      const map = {}
-      ;(psRes.data || []).forEach(r => {
-        if (!map[r.profesional_id]) map[r.profesional_id] = []
-        map[r.profesional_id].push(r.servicio_id)
-      })
-      setProfServMap(map)
-      setLoading(false)
+      try {
+        const { data: t } = await supabase.from('tenants')
+          .select('*').eq('slug', slug).eq('activo', true).maybeSingle()
+        if (!t) { setNotFound(true); setLoading(false); return }
+        setTenant(t)
+        const [profsRes, servsRes, psRes, reglasRes] = await Promise.all([
+          supabase.from('profesionales').select('id, nombre, especialidad, foto_url').eq('tenant_id', t.id).eq('activo', true).order('nombre'),
+          supabase.from('servicios').select('id, nombre, precio, duracion_min, categoria').eq('tenant_id', t.id).eq('activo', true).order('categoria').order('nombre'),
+          supabase.from('profesional_servicios').select('profesional_id, servicio_id').eq('tenant_id', t.id).eq('activo', true),
+          supabase.from('reglas_precio_dinamico').select('*').eq('tenant_id', t.id).eq('activo', true),
+        ])
+        setProfs(profsRes.data || [])
+        setServs(servsRes.data || [])
+        setReglas(reglasRes.data || [])
+        const map = {}
+        ;(psRes.data || []).forEach(r => {
+          if (!map[r.profesional_id]) map[r.profesional_id] = []
+          map[r.profesional_id].push(r.servicio_id)
+        })
+        setProfServMap(map)
+      } catch (err) {
+        console.error('[SalonPortal] load error', err)
+        setNotFound(true)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [slug])
