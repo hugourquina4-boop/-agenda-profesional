@@ -121,7 +121,7 @@ function LinkReservas({ slug, col, showToast }) {
 }
 
 export default function SalonDashboard({ onNavigate }) {
-  const { tenant } = useTenant()
+  const { tenant, suscripcion, esSuperadmin } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
   const isDemo = !tenant
 
@@ -303,6 +303,90 @@ export default function SalonDashboard({ onNavigate }) {
           <span>Modo demo — datos de ejemplo. Conecta Supabase para ver tu negocio real.</span>
         </div>
       )}
+
+      {/* ── Alerta suscripción ───────────────────────────── */}
+      {(() => {
+        if (esSuperadmin || !suscripcion) return null
+        const dias = suscripcion.dias_restantes
+        if (dias === null || dias > 10) return null
+        const metodos = [
+          { label:'Nequi',     value:'3155734848', color:'#a855f7' },
+          { label:'Transfiya', value:'3155734848', color:'#3b82f6' },
+          { label:'Bancolombia', value:'Transferencia al 315 573 4848', color:'#f59e0b' },
+        ]
+        const vencida = dias <= 0
+        const critica = dias !== null && dias <= 2 && dias > 0
+        const alerta  = dias !== null && dias > 2 && dias <= 5
+        const ok      = dias !== null && dias > 5
+
+        let bg, border, titleColor, icon, title, sub
+        if (vencida) {
+          bg = 'rgba(239,68,68,0.10)'; border = 'rgba(239,68,68,0.4)'
+          titleColor = '#f87171'; icon = '🔴'
+          title = `Plan vencido hace ${Math.abs(dias)} día${Math.abs(dias)!==1?'s':''}`
+          sub = 'Renueva tu plan para continuar usando todas las funciones.'
+        } else if (critica) {
+          bg = 'rgba(239,68,68,0.08)'; border = 'rgba(239,68,68,0.35)'
+          titleColor = '#f87171'; icon = '⚠️'
+          title = `${dias} día${dias!==1?'s':''} para vencer el plan`
+          sub = 'Renueva hoy para evitar interrupciones.'
+        } else if (alerta) {
+          bg = 'rgba(251,191,36,0.10)'; border = 'rgba(251,191,36,0.4)'
+          titleColor = '#fbbf24'; icon = '⏰'
+          title = `${dias} días para vencer el plan`
+          sub = 'Renueva pronto para continuar sin interrupciones.'
+        } else {
+          bg = 'rgba(34,197,94,0.08)'; border = 'rgba(34,197,94,0.3)'
+          titleColor = '#4ade80'; icon = '✅'
+          title = `Plan activo — ${dias} días restantes`
+          sub = suscripcion.plan_nombre || null
+          return (
+            <div style={{
+              margin:'12px 16px 0', padding:'10px 14px', borderRadius:12,
+              background:bg, border:`1px solid ${border}`,
+              display:'flex', alignItems:'center', gap:10,
+            }}>
+              <span style={{ fontSize:16 }}>{icon}</span>
+              <span style={{ fontSize:12, fontWeight:700, color:titleColor }}>{title}</span>
+              {sub && <span style={{ fontSize:11, color:'var(--text-3)', marginLeft:4 }}>{sub}</span>}
+            </div>
+          )
+        }
+
+        return (
+          <div style={{
+            margin:'12px 16px 0', padding:'14px 16px', borderRadius:14,
+            background:bg, border:`1px solid ${border}`,
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+              <span style={{ fontSize:18 }}>{icon}</span>
+              <div>
+                <div style={{ fontSize:13, fontWeight:800, color:titleColor }}>{title}</div>
+                <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{sub}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', marginBottom:6 }}>
+              Métodos de pago:
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {metodos.map(m => (
+                <div key={m.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  background:'var(--card)', borderRadius:8, padding:'7px 10px', gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:m.color }}>{m.label}</span>
+                    <span style={{ fontSize:11, color:'var(--text-2)' }}>{m.value}</span>
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(m.value.replace(/\D/g,'') || m.value); showToast(`${m.label} copiado ✓`) }}
+                    style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:6, cursor:'pointer',
+                      border:`1px solid ${m.color}40`, background:`${m.color}15`, color:m.color }}>
+                    Copiar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Alerta cumpleaños ────────────────────────────── */}
       {cumpleaneros.length > 0 && (

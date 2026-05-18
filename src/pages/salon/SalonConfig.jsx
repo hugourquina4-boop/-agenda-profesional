@@ -42,7 +42,7 @@ function Campo({ label, children }) {
 }
 
 export default function SalonConfig() {
-  const { tenant, recargar } = useTenant()
+  const { tenant, recargar, suscripcion } = useTenant()
   const [form,   setForm]   = useState(null)
   const [saving, setSaving] = useState(false)
   const [toast,  setToast]  = useState(null)
@@ -691,6 +691,97 @@ export default function SalonConfig() {
                 background:'rgba(0,0,0,0.15)',
               }}>
                 Para cambiar de plan o renovar, contacta al administrador de Salón Pro.
+              </div>
+            </div>
+          )
+        })()}
+      </Seccion>
+
+      {/* ── Suscripción y pagos ──────────────────────────── */}
+      <Seccion titulo="Suscripción y pagos">
+        {(() => {
+          const dias = suscripcion?.dias_restantes ?? null
+          const limite = suscripcion?.fecha_limite
+          const planNombre = suscripcion?.plan_nombre || tenant?.plan || null
+          const vencido = dias !== null && dias <= 0
+          const limiteDate = limite ? new Date(limite + 'T00:00:00') : null
+          const diasColor = dias === null ? 'var(--text-3)' : dias <= 2 ? '#f87171' : dias <= 5 ? '#fbbf24' : '#4ade80'
+          const metodos = [
+            { label:'Nequi',       value:'3155734848',                       color:'#a855f7', icon:'📱' },
+            { label:'Transfiya',   value:'3155734848',                       color:'#3b82f6', icon:'💸' },
+            { label:'Bancolombia', value:'Transferencia al 315 573 4848',    color:'#f59e0b', icon:'🏦' },
+          ]
+          return (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {/* Estado actual */}
+              <div style={{ padding:'14px', borderRadius:14, background:'var(--card)',
+                border:`1px solid ${vencido ? '#ef444440' : 'var(--border)'}` }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'var(--text)', marginBottom:8 }}>
+                  Estado actual
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {planNombre && (
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:12, color:'var(--text-3)' }}>Plan</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text)', textTransform:'capitalize' }}>{planNombre}</span>
+                    </div>
+                  )}
+                  {limiteDate && (
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:12, color:'var(--text-3)' }}>Vigente hasta</span>
+                      <span style={{ fontSize:12, fontWeight:700, color: vencido ? '#f87171' : 'var(--text)' }}>
+                        {limiteDate.toLocaleDateString('es-CO', { day:'numeric', month:'long', year:'numeric' })}
+                      </span>
+                    </div>
+                  )}
+                  {dias !== null && (
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:12, color:'var(--text-3)' }}>Días restantes</span>
+                      <span style={{ fontSize:13, fontWeight:800, color:diasColor }}>
+                        {vencido ? `Vencido hace ${Math.abs(dias)} día${Math.abs(dias)!==1?'s':''}` : `${dias} día${dias!==1?'s':''}`}
+                      </span>
+                    </div>
+                  )}
+                  {!suscripcion && (
+                    <p style={{ fontSize:11, color:'var(--text-3)', margin:0 }}>
+                      Sin suscripción activa registrada.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Métodos de pago */}
+              <div style={{ padding:'14px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'var(--text)', marginBottom:10 }}>
+                  Medios de pago para renovación
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {metodos.map(m => (
+                    <div key={m.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'10px 12px', borderRadius:10,
+                      background:`${m.color}08`, border:`1px solid ${m.color}25` }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontSize:18 }}>{m.icon}</span>
+                        <div>
+                          <div style={{ fontSize:12, fontWeight:800, color:m.color }}>{m.label}</div>
+                          <div style={{ fontSize:11, color:'var(--text-2)' }}>{m.value}</div>
+                        </div>
+                      </div>
+                      <button type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(m.value.replace(/\D/g,'') || m.value)
+                          showToast(`${m.label} copiado ✓`)
+                        }}
+                        style={{ fontSize:11, fontWeight:700, padding:'5px 10px', borderRadius:8, cursor:'pointer',
+                          border:`1px solid ${m.color}40`, background:`${m.color}15`, color:m.color }}>
+                        Copiar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize:10, color:'var(--text-3)', marginTop:8, marginBottom:0 }}>
+                  Después de tu pago, el administrador activará tu plan. Si tienes dudas, escríbenos.
+                </p>
               </div>
             </div>
           )
