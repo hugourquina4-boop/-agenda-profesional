@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
@@ -80,6 +80,10 @@ export default function SalonAgenda() {
   const [guardandoNota,    setGuardandoNota]    = useState(false)
   const [anticoInput,      setAnticoInput]      = useState('')
   const [guardandoAnticipo,setGuardandoAnticipo]= useState(false)
+
+  // Drag & drop en VistaDia
+  const draggingRef = useRef(null)          // estado de drag sin re-render
+  const [ghostPos,  setGhostPos]  = useState(null) // posición visual del ghost
 
   useEffect(() => {
     if (!tenant) return
@@ -430,6 +434,20 @@ export default function SalonAgenda() {
               </div>
             )}
 
+            {/* Ghost de drag */}
+            {ghostPos && (
+              <div style={{
+                position:'absolute', pointerEvents:'none', zIndex:20,
+                top: ghostPos.top,
+                left: 56 + ghostPos.profIdx * COL_W + 3,
+                width: COL_W - 6, height: ghostPos.height,
+                borderRadius:8,
+                border:`2px dashed ${ghostPos.color}`,
+                background:`${ghostPos.color}18`,
+                boxShadow:`0 4px 20px ${ghostPos.color}30`,
+              }} />
+            )}
+
             {/* Bloques de citas */}
             {PROFS.map((prof, pi) => {
               const profKey   = prof.id || prof.nombre
@@ -445,20 +463,59 @@ export default function SalonAgenda() {
                 const tags = c.clientes_agenda?.tags || []
                 const isStar = tags.includes('star') || tags.includes('vip')
                 if (top < 0 || top > TOTAL_H) return null
+                const isDragged = ghostPos && draggingRef.current?.citaId === c.id
                 return (
-                  <div key={c.id} onClick={() => setSelCita(c)} style={{
+                  <div key={c.id} style={{
                     position:'absolute',
                     top, left: 56 + pi * COL_W + 3,
                     width: COL_W - 6, height: height - 2,
-                    borderRadius:8, cursor:'pointer',
+                    borderRadius:8,
+                    cursor: cancelada || c.estado === 'completada' ? 'pointer' : 'grab',
                     background: cancelada ? 'rgba(113,113,122,0.10)' : `${profClr}18`,
                     border:`1.5px solid ${cancelada ? '#71717a44' : profClr + '60'}`,
                     borderLeft:`3px solid ${cancelada ? '#71717a' : profClr}`,
                     padding:'4px 7px', overflow:'hidden',
                     boxShadow:`0 1px 4px ${profClr}20`,
-                    opacity: cancelada ? 0.6 : 1,
-                  }}>
-                    {/* Dot de estado o candado si tiene pago */}
+                    opacity: isDragged ? 0.2 : cancelada ? 0.6 : 1,
+                    userSelect:'none', touchAction:'none',
+                  }}
+                  onPointerDown={e => {
+                    if (cancelada || c.estado === 'completada') return
+                    e.currentTarget.setPointerCapture(e.pointerId)
+                    draggingRef.current = { citaId:c.id, profIdx:pi, origTop:top, curTop:top, curProfIdx:pi, height:height-2, startY:e.clientY, startX:e.clientX, moved:false, cita:c }
+                  }}
+                  onPointerMove={e => {
+                    const dr = draggingRef.current
+                    if (!dr || dr.citaId !== c.id) return
+                    const dY = e.clientY - dr.startY
+                    const dX = e.clientX - dr.startX
+                    if (!dr.moved && Math.abs(dY) < 6 && Math.abs(dX) < 6) return
+                    const snapped = Math.round((dr.origTop + dY) / SLOT_H) * SLOT_H
+                    const curTop = Math.max(0, Math.min(TOTAL_H - dr.height, snapped))
+                    const curProfIdx = Math.max(0, Math.min(PROFS.length - 1, dr.profIdx + Math.round(dX / COL_W)))
+                    draggingRef.current = { ...dr, curTop, curProfIdx, moved:true }
+                    setGhostPos({ top:curTop, profIdx:curProfIdx, height:dr.height, color:profClr })
+                  }}
+                  onPointerUp={async e => {
+                    const dr = draggingRef.current
+                    if (!dr || dr.citaId !== c.id) return
+                    e.currentTarget.releasePointerCapture(e.pointerId)
+                    draggingRef.current = null
+                    setGhostPos(null)
+                    if (!dr.moved) { setSelCita(c); return }
+                    const minsFromStart = (dr.curTop / SLOT_H) * 30
+                    const totalMins = H_START * 60 + minsFromStart
+                    const pad = n => String(Math.floor(n)).padStart(2,'0')
+                    const newStart = `${selDay}T${pad(totalMins/60)}:${pad(totalMins%60)}:00`
+                    const durMin = c.servicios?.duracion_min || 60
+                    const endMins = totalMins + durMin
+                    const newEnd = `${selDay}T${pad(endMins/60)}:${pad(endMins%60)}:00`
+                    const updates = { fecha_inicio:newStart, fecha_fin:newEnd }
+                    if (dr.curProfIdx !== dr.profIdx) updates.profesional_id = PROFS[dr.curProfIdx].id
+                    await supabase.from('citas').update(updates).eq('id', c.id)
+                    cargarMes()
+                  }}
+                  >
                     <div style={{ position:'absolute', top:5, right:5,
                       width:7, height:7, borderRadius:'50%', background:estColor }} />
                     {c.estado === 'completada' && (

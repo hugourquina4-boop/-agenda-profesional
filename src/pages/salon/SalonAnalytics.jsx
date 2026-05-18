@@ -153,6 +153,57 @@ export default function SalonAnalytics() {
     if (tabA === 'finanzas' && tenant && gastosHist.length === 0) cargarFinanzas()
   }, [tabA, tenant])
 
+  // Ventas por método y servicio
+  const [ventasMetodo,   setVentasMetodo]   = useState([])
+  const [ventasServicio, setVentasServicio] = useState([])
+  const [ventasProf,     setVentasProf]     = useState([])
+  const [ventasRango,    setVentasRango]    = useState({ desde: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10), hasta: new Date().toISOString().slice(0,10) })
+  const [loadingV,       setLoadingV]       = useState(false)
+
+  async function cargarVentas() {
+    if (!tenant) return
+    setLoadingV(true)
+    try {
+      const [{ data: pagosData }, { data: citasData }] = await Promise.all([
+        supabase.from('pagos').select('monto,metodo,estado,created_at')
+          .eq('tenant_id', tenant.id).eq('estado','pagado')
+          .gte('created_at', ventasRango.desde + 'T00:00:00')
+          .lte('created_at', ventasRango.hasta + 'T23:59:59'),
+        supabase.from('citas').select('servicios(nombre,precio),profesionales(nombre),estado')
+          .eq('tenant_id', tenant.id).eq('estado','completada')
+          .gte('fecha_inicio', ventasRango.desde + 'T00:00:00')
+          .lte('fecha_inicio', ventasRango.hasta + 'T23:59:59'),
+      ])
+      // Por método de pago
+      const metodoMap = {}
+      ;(pagosData || []).forEach(p => {
+        const m = p.metodo || 'otro'
+        metodoMap[m] = (metodoMap[m] || 0) + Number(p.monto)
+      })
+      setVentasMetodo(Object.entries(metodoMap).map(([metodo,total]) => ({metodo,total})).sort((a,b) => b.total-a.total))
+      // Por servicio
+      const svcMap = {}
+      ;(citasData || []).forEach(c => {
+        const n = c.servicios?.nombre || 'Sin nombre'; const p = c.servicios?.precio || 0
+        if (!svcMap[n]) svcMap[n] = { nombre:n, count:0, total:0 }
+        svcMap[n].count++; svcMap[n].total += p
+      })
+      setVentasServicio(Object.values(svcMap).sort((a,b) => b.total-a.total).slice(0,10))
+      // Por profesional
+      const profMap = {}
+      ;(citasData || []).forEach(c => {
+        const n = c.profesionales?.nombre || 'Sin asignar'; const p = c.servicios?.precio || 0
+        if (!profMap[n]) profMap[n] = { nombre:n, count:0, total:0 }
+        profMap[n].count++; profMap[n].total += p
+      })
+      setVentasProf(Object.values(profMap).sort((a,b) => b.total-a.total))
+    } finally { setLoadingV(false) }
+  }
+
+  useEffect(() => {
+    if (tabA === 'ventas' && tenant) cargarVentas()
+  }, [tabA, tenant, ventasRango])
+
   // Informe citas
   const hoy = new Date().toISOString().slice(0,10)
   const primeroDeMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
@@ -358,7 +409,7 @@ export default function SalonAnalytics() {
 
       {/* ── Tabs ── */}
       <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', overflowY:'clip', scrollbarWidth:'none' }}>
-        {[['resumen','Resumen'],['citas','Citas'],['finanzas','Finanzas']].map(([t,label]) => (
+        {[['resumen','Resumen'],['ventas','Ventas'],['citas','Citas'],['finanzas','Finanzas']].map(([t,label]) => (
           <button key={t} onClick={() => setTabA(t)} style={{
             flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
             fontWeight:700, fontSize:13, fontFamily:'Outfit',
@@ -368,6 +419,158 @@ export default function SalonAnalytics() {
           }}>{label}</button>
         ))}
       </div>
+
+      {/* ── Tab: Ventas ─────────────────────────────────────── */}
+      {tabA === 'ventas' && (
+        <div style={{ padding:'16px' }}>
+          {/* Selector de fechas */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
+            <div>
+              <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, display:'block', marginBottom:5, textTransform:'uppercase' }}>Desde</label>
+              <input className="sp-input" type="date" value={ventasRango.desde}
+                onChange={e => setVentasRango(r => ({...r, desde:e.target.value}))} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5, display:'block', marginBottom:5, textTransform:'uppercase' }}>Hasta</label>
+              <input className="sp-input" type="date" value={ventasRango.hasta}
+                onChange={e => setVentasRango(r => ({...r, hasta:e.target.value}))} />
+            </div>
+          </div>
+          {/* Chips período rápido */}
+          <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
+            {[
+              { label:'Hoy', desde:new Date().toISOString().slice(0,10), hasta:new Date().toISOString().slice(0,10) },
+              { label:'Esta semana', desde:(() => { const d=new Date(); d.setDate(d.getDate()-d.getDay()+1); return d.toISOString().slice(0,10) })(), hasta:new Date().toISOString().slice(0,10) },
+              { label:'Este mes', desde:new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10), hasta:new Date().toISOString().slice(0,10) },
+              { label:'Mes anterior', desde:new Date(new Date().getFullYear(),new Date().getMonth()-1,1).toISOString().slice(0,10), hasta:new Date(new Date().getFullYear(),new Date().getMonth(),0).toISOString().slice(0,10) },
+            ].map(p => {
+              const active = ventasRango.desde===p.desde && ventasRango.hasta===p.hasta
+              return (
+                <button key={p.label} onClick={() => setVentasRango({desde:p.desde,hasta:p.hasta})} style={{
+                  padding:'5px 12px', borderRadius:16, fontSize:11, fontWeight:700, cursor:'pointer',
+                  border:`1.5px solid ${active ? col : 'var(--border)'}`,
+                  background: active ? `${col}18` : 'var(--card)',
+                  color: active ? col : 'var(--text-3)',
+                }}>{p.label}</button>
+              )
+            })}
+          </div>
+
+          {loadingV ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
+              <div className="sp-spinner" style={{ borderTopColor:col }} />
+            </div>
+          ) : (() => {
+            const totalVentas = ventasMetodo.reduce((s,m) => s+m.total, 0)
+            const maxSvc = Math.max(...ventasServicio.map(s => s.total), 1)
+            const maxProf = Math.max(...ventasProf.map(p => p.total), 1)
+            const METODO_CLR = { efectivo:'#22c55e', nequi:'#a855f7', daviplata:'#f59e0b', tarjeta:'#3b82f6', transferencia:'#06b6d4', otro:'#6b7280' }
+            return (
+              <>
+                {/* KPI total */}
+                <div style={{ padding:'18px 20px', borderRadius:16, marginBottom:16,
+                  background:`linear-gradient(135deg,${col}20,${col}08)`,
+                  boxShadow:`0 4px 24px ${col}15`,
+                }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:6 }}>Total cobrado en período</div>
+                  <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:32, color:col, lineHeight:1 }}>
+                    {fmtCOP(totalVentas)}
+                  </div>
+                  <div style={{ fontSize:12, color:'var(--text-3)', marginTop:6 }}>
+                    {ventasServicio.reduce((s,v) => s+v.count, 0)} citas completadas
+                  </div>
+                </div>
+
+                {/* Métodos de pago */}
+                {ventasMetodo.length > 0 && (
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', marginBottom:16, boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>Métodos de pago</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                      {ventasMetodo.map(m => {
+                        const pct = totalVentas > 0 ? Math.round(m.total/totalVentas*100) : 0
+                        const clr = METODO_CLR[m.metodo] || '#6b7280'
+                        return (
+                          <div key={m.metodo}>
+                            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                              <span style={{ fontSize:12, fontWeight:700, color:'var(--text)', textTransform:'capitalize' }}>{m.metodo}</span>
+                              <span style={{ fontSize:12, fontWeight:800, color:clr }}>{fmtCOP(m.total)} <span style={{ fontWeight:500, color:'var(--text-3)' }}>({pct}%)</span></span>
+                            </div>
+                            <div style={{ height:6, borderRadius:4, background:'rgba(255,255,255,0.07)' }}>
+                              <div style={{ height:'100%', borderRadius:4, background:clr, width:`${pct}%`, transition:'width 0.4s' }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top servicios */}
+                {ventasServicio.length > 0 && (
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', marginBottom:16, boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>Top servicios</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                      {ventasServicio.map((s, i) => {
+                        const pct = Math.round(s.total/maxSvc*100)
+                        const clr = PROF_COLORS[i % PROF_COLORS.length]
+                        return (
+                          <div key={s.nombre}>
+                            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                              <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'60%' }}>{s.nombre}</span>
+                              <span style={{ fontSize:12, fontWeight:800, color:clr, flexShrink:0 }}>{fmtCOP(s.total)} <span style={{ fontWeight:500, color:'var(--text-3)', fontSize:10 }}>×{s.count}</span></span>
+                            </div>
+                            <div style={{ height:5, borderRadius:3, background:'rgba(255,255,255,0.07)' }}>
+                              <div style={{ height:'100%', borderRadius:3, background:clr, width:`${pct}%`, transition:'width 0.4s' }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Por profesional */}
+                {ventasProf.length > 0 && (
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text-2)', marginBottom:14 }}>Por profesional</div>
+                    {ventasProf.map((p, i) => {
+                      const clr = PROF_COLORS[i % PROF_COLORS.length]
+                      const pct = Math.round(p.total/maxProf*100)
+                      return (
+                        <div key={p.nombre} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                          <div style={{ width:34, height:34, borderRadius:10, background:`${clr}20`,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            fontWeight:800, fontSize:14, color:clr, flexShrink:0 }}>
+                            {p.nombre[0]}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                              <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{p.nombre.split(' ')[0]}</span>
+                              <span style={{ fontSize:13, fontWeight:800, color:clr }}>{fmtCOP(p.total)}</span>
+                            </div>
+                            <div style={{ height:5, borderRadius:3, background:'rgba(255,255,255,0.07)' }}>
+                              <div style={{ height:'100%', borderRadius:3, background:clr, width:`${pct}%`, transition:'width 0.4s' }} />
+                            </div>
+                            <div style={{ fontSize:10, color:'var(--text-3)', marginTop:2 }}>{p.count} cita{p.count!==1?'s':''}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {totalVentas === 0 && ventasServicio.length === 0 && (
+                  <div className="sp-empty">
+                    <span className="sp-empty-icon">📊</span>
+                    <p className="sp-empty-title">Sin datos en este período</p>
+                    <p className="sp-empty-sub">Selecciona otro rango de fechas</p>
+                  </div>
+                )}
+              </>
+            )
+          })()}
+        </div>
+      )}
 
       {/* ── Tab: Informe Citas ─────────────────────────────── */}
       {tabA === 'citas' && (
