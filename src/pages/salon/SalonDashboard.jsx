@@ -159,6 +159,7 @@ export default function SalonDashboard({ onNavigate }) {
   const [toast,          setToast]          = useState(null)
   const [analyticsData,  setAnalyticsData]  = useState(isDemo ? DEMO_ANALYTICS : null)
   const [tendencia14,    setTendencia14]    = useState(null)
+  const [listaEsperaHoy, setListaEsperaHoy] = useState(isDemo ? 2 : 0)
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -181,7 +182,7 @@ export default function SalonDashboard({ onNavigate }) {
       })()
 
       const hace14iso = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -224,6 +225,11 @@ export default function SalonDashboard({ onNavigate }) {
           .eq('estado', 'pagado')
           .gte('created_at', `${hace14iso}T00:00:00`)
           .lte('created_at', `${fecha}T23:59:59`),
+        supabase.from('lista_espera')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id)
+          .eq('activo', true)
+          .eq('fecha_preferida', fecha),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -249,6 +255,7 @@ export default function SalonDashboard({ onNavigate }) {
         })),
       })
       setCumpleaneros(cumplRes?.data || [])
+      setListaEsperaHoy(esperaRes?.count || 0)
 
       // Analytics del mes
       const citasMes = analyticsMesRes.data || []
@@ -708,6 +715,27 @@ export default function SalonDashboard({ onNavigate }) {
         </div>
 
       </div>
+
+      {/* ── Lista de espera del día ─────────────────────── */}
+      {listaEsperaHoy > 0 && (
+        <button onClick={() => onNavigate('agenda')} style={{
+          display:'flex', alignItems:'center', gap:10,
+          margin:'0 16px 14px', padding:'12px 16px', borderRadius:14, cursor:'pointer',
+          background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.35)',
+          width:'calc(100% - 32px)', textAlign:'left',
+        }}>
+          <span style={{ fontSize:20, flexShrink:0 }}>⏳</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#fbbf24' }}>
+              {listaEsperaHoy} en lista de espera hoy
+            </div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+              Toca para ver la agenda y asignar turnos
+            </div>
+          </div>
+          <Ico d="M9 5l7 7-7 7" size={15} style={{ color:'#fbbf24', flexShrink:0 }} />
+        </button>
+      )}
 
       {/* ── Resumen del mes ─────────────────────────────── */}
       {(ingresosMes > 0 || gastosMes > 0) && (

@@ -15,6 +15,7 @@ const PERIODOS = [
   { key:'hoy',    label:'Hoy' },
   { key:'semana', label:'Semana' },
   { key:'mes',    label:'Mes' },
+  { key:'rango',  label:'Rango' },
 ]
 
 const METODOS = [
@@ -72,6 +73,8 @@ export default function SalonCaja() {
   const col = tenant?.color_primario || '#f43f5e'
 
   const [periodo,      setPeriodo]      = useState('hoy')
+  const [rangoDesde,   setRangoDesde]   = useState('')
+  const [rangoHasta,   setRangoHasta]   = useState('')
   const [vista,        setVista]        = useState('cobrar')
   const [pendientes,   setPendientes]   = useState([])
   const [historial,    setHistorial]    = useState([])
@@ -130,7 +133,8 @@ export default function SalonCaja() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `caja-${periodo}-${new Date().toISOString().slice(0,10)}.csv`
+    const label = periodo === 'rango' ? `${rangoDesde}_${rangoHasta}` : periodo
+    a.download = `caja-${label}-${new Date().toISOString().slice(0,10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -188,8 +192,11 @@ export default function SalonCaja() {
 
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
+    if (periodo === 'rango' && (!rangoDesde || !rangoHasta)) { setLoading(false); return }
     setLoading(true)
-    const { desde, hasta } = rango(periodo)
+    const { desde, hasta } = periodo === 'rango'
+      ? { desde: rangoDesde, hasta: rangoHasta }
+      : rango(periodo)
 
     const [citasRes, pagosRes, egresoRes] = await Promise.all([
       supabase.from('citas')
@@ -232,7 +239,7 @@ export default function SalonCaja() {
     setTotalCobrado(conPago.reduce((s, c) => s + Number(c.pago.monto || 0), 0))
     setTotalEgresos(egresosData.reduce((s, g) => s + Number(g.monto || 0), 0))
     setLoading(false)
-  }, [tenant, periodo])
+  }, [tenant, periodo, rangoDesde, rangoHasta])
 
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { setPaginaHist(20); setBusqueda('') }, [periodo])
@@ -358,7 +365,7 @@ export default function SalonCaja() {
       )}
 
       {/* Selector período */}
-      <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+      <div style={{ display:'flex', gap:8, marginBottom: periodo === 'rango' ? 10 : 16 }}>
         {PERIODOS.map(p => (
           <button key={p.key} onClick={() => setPeriodo(p.key)} style={{
             flex:1, padding:'10px 0', borderRadius:12, cursor:'pointer', border:'none',
@@ -368,6 +375,15 @@ export default function SalonCaja() {
           }}>{p.label}</button>
         ))}
       </div>
+      {periodo === 'rango' && (
+        <div style={{ display:'flex', gap:8, marginBottom:16, alignItems:'center' }}>
+          <input type="date" value={rangoDesde} onChange={e => setRangoDesde(e.target.value)}
+            className="sp-input" style={{ flex:1, fontSize:13, padding:'9px 12px' }} />
+          <span style={{ color:'var(--text-3)', fontSize:13, flexShrink:0 }}>→</span>
+          <input type="date" value={rangoHasta} onChange={e => setRangoHasta(e.target.value)}
+            className="sp-input" style={{ flex:1, fontSize:13, padding:'9px 12px' }} />
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>

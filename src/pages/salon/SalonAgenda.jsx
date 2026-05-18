@@ -82,6 +82,8 @@ export default function SalonAgenda() {
   const [guardandoNota,    setGuardandoNota]    = useState(false)
   const [anticoInput,      setAnticoInput]      = useState('')
   const [guardandoAnticipo,setGuardandoAnticipo]= useState(false)
+  const [dupMode,          setDupMode]          = useState(false)
+  const [dupFecha,         setDupFecha]         = useState('')
 
   // Drag & drop en VistaDia
   const draggingRef = useRef(null)          // estado de drag sin re-render
@@ -110,7 +112,7 @@ export default function SalonAgenda() {
     try {
       const { data } = await supabase
         .from('citas')
-        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, clientes_agenda(nombre,telefono,tags), servicios(nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
+        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
         .eq('tenant_id', tenant.id)
         .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
         .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
@@ -126,7 +128,7 @@ export default function SalonAgenda() {
   useEffect(() => { cargarMes() }, [cargarMes])
 
   useEffect(() => {
-    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); return }
+    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); setDupMode(false); setDupFecha(''); return }
     setNota(selCita.notas || '')
     setAnticoInput('')
     setLoadPago(true)
@@ -175,6 +177,30 @@ export default function SalonAgenda() {
     await supabase.from('citas').update({ notas: nota.trim() || null }).eq('id', selCita.id)
     setSelCita(c => ({ ...c, notas: nota.trim() || null }))
     setGuardandoNota(false)
+  }
+
+  async function duplicarCita() {
+    if (!selCita || !dupFecha) return
+    setActualizando(true)
+    const horaIni = selCita.fecha_inicio.substring(10) // "T09:00:00"
+    const horaFin = selCita.fecha_fin.substring(10)
+    const { error } = await supabase.from('citas').insert({
+      tenant_id:      tenant.id,
+      profesional_id: selCita.profesional_id,
+      servicio_id:    selCita.servicio_id,
+      servicios_ids:  selCita.servicios_ids,
+      cliente_id:     selCita.cliente_id,
+      fecha_inicio:   `${dupFecha}${horaIni}`,
+      fecha_fin:      `${dupFecha}${horaFin}`,
+      estado:         'pendiente',
+      precio_cobrado: selCita.precio_cobrado,
+      sede_id:        selCita.sede_id,
+    })
+    setActualizando(false)
+    if (!error) {
+      setDupMode(false); setSelCita(null)
+      cargarMes()
+    }
   }
 
   async function registrarAnticipo() {
@@ -978,6 +1004,42 @@ export default function SalonAgenda() {
               </div>
             ) : (
               <div style={{ marginBottom:16 }} />
+            )}
+
+            {/* Duplicar cita */}
+            {!dupMode ? (
+              <button onClick={() => setDupMode(true)} style={{
+                width:'100%', padding:'12px', borderRadius:13, cursor:'pointer', marginBottom:16,
+                background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.22)',
+                color:'#818cf8', fontWeight:700, fontSize:13, fontFamily:'Plus Jakarta Sans',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+              }}>
+                <Ico d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" size={15} />
+                Duplicar a otra fecha
+              </button>
+            ) : (
+              <div style={{ marginBottom:16, padding:'14px 16px', borderRadius:13,
+                background:'rgba(99,102,241,0.07)', border:'1px solid rgba(99,102,241,0.22)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#818cf8', marginBottom:10 }}>
+                  Duplicar cita — elige fecha destino
+                </div>
+                <input type="date" value={dupFecha} onChange={e => setDupFecha(e.target.value)}
+                  className="sp-input" style={{ marginBottom:10, fontSize:13 }} />
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={duplicarCita} disabled={!dupFecha || actualizando} style={{
+                    flex:1, padding:'11px', borderRadius:11, border:'none', cursor:'pointer',
+                    background:'linear-gradient(135deg,#6366f1,#4f46e5)', color:'#fff',
+                    fontWeight:700, fontSize:13, opacity: (!dupFecha || actualizando) ? 0.6 : 1,
+                  }}>
+                    {actualizando ? '…' : 'Confirmar'}
+                  </button>
+                  <button onClick={() => { setDupMode(false); setDupFecha('') }} style={{
+                    padding:'11px 16px', borderRadius:11, border:'none', cursor:'pointer',
+                    background:'var(--card)', color:'var(--text-3)', fontWeight:700, fontSize:13,
+                    boxShadow:'0 1px 4px rgba(0,0,0,0.1)',
+                  }}>Cancelar</button>
+                </div>
+              </div>
             )}
 
             {/* ── Sección de pago ── */}

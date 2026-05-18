@@ -378,6 +378,15 @@ export default function SalonPortal() {
 
   async function crearReserva(wompiTransactionId = null) {
     setSaving(true); setError(null)
+    const { count } = await supabase.from('citas')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id).eq('profesional_id', profId)
+      .not('estado', 'in', '("cancelada","no_asistio")')
+      .lt('fecha_inicio', slot.fin).gt('fecha_fin', slot.inicio)
+    if (count > 0) {
+      setError('Este horario ya no está disponible. Por favor selecciona otro.')
+      setSaving(false); return
+    }
     let cliId
     if (telefono.trim()) {
       const { data: ex } = await supabase.from('clientes_agenda').select('id').eq('tenant_id', tenant.id).eq('telefono', telefono.trim()).maybeSingle()
