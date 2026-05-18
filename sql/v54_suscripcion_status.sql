@@ -1,17 +1,5 @@
 -- v54_suscripcion_status.sql
--- Permite que tenants lean su propia suscripción desde el frontend
--- para mostrar el conteo de días y bloquear cuando vence.
-
--- Suscripciones: cada tenant solo ve la suya
-ALTER TABLE suscripciones_negocio ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "suscripcion_tenant_select" ON suscripciones_negocio
-  FOR SELECT USING (
-    tenant_id IN (
-      SELECT tenant_id FROM usuarios_tenant
-      WHERE user_id = auth.uid() AND activo = true
-    )
-  );
-
-GRANT SELECT ON suscripciones_negocio TO authenticated;
--- INSERT/UPDATE/DELETE siguen siendo solo via service_role (superadmin.html / Edge Functions)
+-- NO APLICAR: la suscripción se lee directamente de tenants.fecha_vencimiento
+-- (actualizada por superadmin.html al registrar un pago vía salon_admin_registrar_pago).
+-- No existe tabla suscripciones_negocio ni planes_salon en este schema.
+-- El campo fecha_vencimiento en tenants fue añadido por v50_pagos_plataforma.sql.

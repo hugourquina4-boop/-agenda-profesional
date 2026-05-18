@@ -75,26 +75,19 @@ export function TenantProvider({ children }) {
     const { data: pResult } = await supabase.rpc('get_permisos_tenant', { p_tenant_id: tenantId })
     if (pResult && !pResult.error) pData = pResult
 
-    // Cargar estado de suscripción para mostrar días restantes y bloquear si vence
+    // Suscripción: usar fecha_vencimiento del tenant (actualizada por superadmin al registrar pago)
     let suscData = null
-    try {
-      const { data: s } = await supabase
-        .from('suscripciones_negocio')
-        .select('fecha_limite, estado')
-        .eq('tenant_id', tenantId)
-        .maybeSingle()
-      if (s) {
-        const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-        const limite = s.fecha_limite ? new Date(s.fecha_limite + 'T00:00:00') : null
-        const dias = limite ? Math.round((limite - hoy) / 86400000) : null
-        suscData = {
-          fecha_limite:  s.fecha_limite || null,
-          estado:        s.estado || 'trial',
-          plan_nombre:   t?.plan || null,
-          dias_restantes: dias,
-        }
+    if (t) {
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+      const limite = t.fecha_vencimiento ? new Date(t.fecha_vencimiento + 'T00:00:00') : null
+      const dias = limite ? Math.round((limite - hoy) / 86400000) : null
+      suscData = {
+        fecha_limite:   t.fecha_vencimiento || null,
+        estado:         t.activo ? 'activo' : 'suspendido',
+        plan_nombre:    t.plan || null,
+        dias_restantes: dias,
       }
-    } catch (_) { /* suscripcion opcional */ }
+    }
 
     localStorage.setItem(KEY_TENANT, tenantId)
     setTenant(t || null)
