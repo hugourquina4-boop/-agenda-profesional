@@ -187,7 +187,43 @@ export default function SalonCaja() {
       doc.setTextColor(34,197,94)
       doc.text(fmtCOPFull(c.pago.monto), 170, y); y += 7
     })
-    doc.save(`caja-${periodo}-${new Date().toISOString().slice(0,10)}.pdf`)
+
+    // Sección egresos
+    if (egresos.length > 0) {
+      y += 8
+      if (y > 250) { doc.addPage(); y = 20 }
+      doc.setFillColor(239,68,68)
+      doc.rect(10, y, 190, 8, 'F')
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255)
+      doc.text(`Egresos del período: ${fmtCOPFull(totalEgresos)}`, 14, y+5.5)
+      y += 14
+
+      const porCat = {}
+      egresos.forEach(g => { porCat[g.categoria] = (porCat[g.categoria]||0) + Number(g.monto) })
+      doc.setFont('helvetica','normal'); doc.setFontSize(9)
+      Object.entries(porCat).sort((a,b)=>b[1]-a[1]).forEach(([cat, tot], i) => {
+        if (y > 270) { doc.addPage(); y = 20 }
+        if (i % 2 === 0) { doc.setFillColor(254,242,242); doc.rect(10, y-4, 190, 7, 'F') }
+        doc.setTextColor(0,0,0); doc.text(cat, 14, y)
+        doc.setTextColor(239,68,68); doc.text(fmtCOPFull(tot), 170, y)
+        y += 7
+      })
+
+      y += 4
+      if (y < 270) {
+        doc.setDrawColor(239,68,68); doc.setLineWidth(0.2)
+        doc.line(10, y, 200, y)
+        y += 6
+        doc.setFont('helvetica','bold'); doc.setFontSize(10)
+        doc.setTextColor(0,0,0); doc.text('Saldo neto:', 14, y)
+        const saldoColor = totalCobrado - totalEgresos >= 0 ? [34,197,94] : [239,68,68]
+        doc.setTextColor(...saldoColor)
+        doc.text(fmtCOPFull(totalCobrado - totalEgresos), 170, y)
+      }
+    }
+
+    const label = periodo === 'rango' ? `${rangoDesde}_${rangoHasta}` : periodo
+    doc.save(`caja-${label}-${new Date().toISOString().slice(0,10)}.pdf`)
   }
 
   const cargar = useCallback(async () => {

@@ -11,7 +11,8 @@ function Ico({ d, size = 18 }) {
   )
 }
 
-const EMPTY = { nombre:'', direccion:'', ciudad:'', telefono:'' }
+const DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+const EMPTY = { nombre:'', direccion:'', ciudad:'', telefono:'', hora_apertura:'09:00', hora_cierre:'20:00', dias_activos:[1,2,3,4,5,6] }
 
 export default function SalonSedes() {
   const { tenant } = useTenant()
@@ -46,7 +47,7 @@ export default function SalonSedes() {
   useEffect(() => { cargar() }, [cargar])
 
   function abrirNueva() { setForm(EMPTY); setSheet('nueva') }
-  function abrirEditar(s) { setForm({ nombre:s.nombre, direccion:s.direccion||'', ciudad:s.ciudad||'', telefono:s.telefono||'' }); setSheet(s) }
+  function abrirEditar(s) { setForm({ nombre:s.nombre, direccion:s.direccion||'', ciudad:s.ciudad||'', telefono:s.telefono||'', hora_apertura:s.hora_apertura||'09:00', hora_cierre:s.hora_cierre||'20:00', dias_activos:s.dias_activos||[1,2,3,4,5,6] }); setSheet(s) }
 
   async function guardar(e) {
     e.preventDefault()
@@ -54,7 +55,9 @@ export default function SalonSedes() {
     setSaving(true)
     const payload = { tenant_id: tenant.id, nombre: form.nombre.trim(),
       direccion: form.direccion.trim() || null, ciudad: form.ciudad.trim() || null,
-      telefono: form.telefono.trim() || null }
+      telefono: form.telefono.trim() || null,
+      hora_apertura: form.hora_apertura, hora_cierre: form.hora_cierre,
+      dias_activos: form.dias_activos }
 
     if (sheet === 'nueva') {
       const { error } = await supabase.from('sedes').insert({ ...payload, principal: sedes.length === 0 })
@@ -187,6 +190,12 @@ export default function SalonSedes() {
                     )}
                     {s.telefono && (
                       <p style={{ fontSize:12, color:'var(--text-3)', margin:'1px 0 0' }}>{s.telefono}</p>
+                    )}
+                    {(s.hora_apertura || s.hora_cierre) && (
+                      <p style={{ fontSize:11, color:'var(--text-3)', margin:'3px 0 0' }}>
+                        🕐 {(s.hora_apertura||'').slice(0,5)} – {(s.hora_cierre||'').slice(0,5)}
+                        {s.dias_activos?.length > 0 && ` · ${s.dias_activos.map(i=>DIAS_SEMANA[i]).join(', ')}`}
+                      </p>
                     )}
                   </div>
                   {/* Acciones */}
@@ -346,6 +355,41 @@ export default function SalonSedes() {
                   <input {...inp} value={form.telefono}
                     onChange={e => setForm(f=>({...f,telefono:e.target.value}))}
                     placeholder="3001234567" />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, letterSpacing:0.5,
+                  color:'var(--text-3)', textTransform:'uppercase', display:'block', marginBottom:8 }}>
+                  Horario de atención
+                </label>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+                  <div>
+                    <label style={{ fontSize:10, color:'var(--text-3)', display:'block', marginBottom:4 }}>Apertura</label>
+                    <input {...inp} type="time" value={form.hora_apertura}
+                      onChange={e => setForm(f=>({...f, hora_apertura:e.target.value}))} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:10, color:'var(--text-3)', display:'block', marginBottom:4 }}>Cierre</label>
+                    <input {...inp} type="time" value={form.hora_cierre}
+                      onChange={e => setForm(f=>({...f, hora_cierre:e.target.value}))} />
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {DIAS_SEMANA.map((d, i) => {
+                    const activo = (form.dias_activos||[]).includes(i)
+                    return (
+                      <button type="button" key={i} onClick={() => {
+                        const curr = form.dias_activos || []
+                        setForm(f=>({...f, dias_activos: activo ? curr.filter(x=>x!==i) : [...curr,i].sort() }))
+                      }} style={{
+                        padding:'5px 10px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:700,
+                        border:'none',
+                        background: activo ? `${col}20` : 'var(--bg)',
+                        color: activo ? col : 'var(--text-3)',
+                      }}>{d}</button>
+                    )
+                  })}
                 </div>
               </div>
 

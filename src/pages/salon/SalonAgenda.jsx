@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 
@@ -84,6 +84,7 @@ export default function SalonAgenda() {
   const [guardandoAnticipo,setGuardandoAnticipo]= useState(false)
   const [dupMode,          setDupMode]          = useState(false)
   const [dupFecha,         setDupFecha]         = useState('')
+  const [busqAgenda,       setBusqAgenda]       = useState('')
 
   // Drag & drop en VistaDia
   const draggingRef = useRef(null)          // estado de drag sin re-render
@@ -260,6 +261,18 @@ export default function SalonAgenda() {
 
   const citasDia  = citasPorDia[selDay] || []
   const accionesCita = selCita ? (ACCIONES[selCita.estado] || []) : []
+
+  const citasBusqueda = useMemo(() => {
+    if (!busqAgenda.trim()) return []
+    const q = busqAgenda.toLowerCase()
+    return citas
+      .filter(c =>
+        (c.clientes_agenda?.nombre||'').toLowerCase().includes(q) ||
+        (c.servicios?.nombre||'').toLowerCase().includes(q) ||
+        (c.profesionales?.nombre||'').toLowerCase().includes(q)
+      )
+      .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
+  }, [citas, busqAgenda])
 
   // ── Helpers de navegación semana/día ─────────────────────────────────
   function shiftDia(n) {
@@ -635,7 +648,7 @@ export default function SalonAgenda() {
       </div>
 
       {/* ── Toggle Mes / Semana / Día ── */}
-      <div style={{ display:'flex', gap:4, margin:'0 16px 12px',
+      <div style={{ display:'flex', gap:4, margin:'0 16px 8px',
         background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
         {[['mes','Mes'],['semana','Sem'],['dia','Día']].map(([v,label]) => (
           <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia') { setFiltroProf(null); setFiltroSede(null) } }} style={{
@@ -646,6 +659,73 @@ export default function SalonAgenda() {
           }}>{label}</button>
         ))}
       </div>
+
+      {/* ── Búsqueda de citas ── */}
+      <div style={{ margin:'0 16px 12px', position:'relative' }}>
+        <div style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:'var(--text-3)' }}>
+          <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={15} />
+        </div>
+        <input
+          className="sp-input"
+          placeholder="Buscar cliente, servicio o profesional…"
+          value={busqAgenda}
+          onChange={e => setBusqAgenda(e.target.value)}
+          style={{ paddingLeft:34, fontSize:13 }}
+        />
+        {busqAgenda && (
+          <button onClick={() => setBusqAgenda('')} style={{
+            position:'absolute', right:10, top:'50%', transform:'translateY(-50%)',
+            background:'none', border:'none', cursor:'pointer', color:'var(--text-3)', fontSize:16, lineHeight:1, padding:2,
+          }}>×</button>
+        )}
+      </div>
+
+      {/* ── Resultados de búsqueda ── */}
+      {busqAgenda.trim() && (
+        <div style={{ padding:'0 16px' }}>
+          {citasBusqueda.length === 0 ? (
+            <div className="sp-empty">
+              <span className="sp-empty-icon">🔍</span>
+              <p className="sp-empty-title">Sin resultados</p>
+              <p className="sp-empty-sub">No hay citas que coincidan en el mes actual</p>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:2 }}>
+                {citasBusqueda.length} resultado{citasBusqueda.length !== 1 ? 's' : ''} en {MESES[viewDate.getMonth()]}
+              </p>
+              {citasBusqueda.map(c => (
+                <button key={c.id} onClick={() => setSelCita(c)} style={{
+                  display:'flex', alignItems:'center', gap:12, padding:'12px 14px',
+                  borderRadius:14, border:`1.5px solid ${ESTADO_COLOR[c.estado] || col}22`,
+                  background:'var(--card)', cursor:'pointer', textAlign:'left', width:'100%',
+                }}>
+                  <div style={{
+                    width:8, height:8, borderRadius:'50%', flexShrink:0,
+                    background: ESTADO_COLOR[c.estado] || col,
+                    boxShadow:`0 0 6px ${ESTADO_COLOR[c.estado] || col}60`,
+                  }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:13, color:'var(--text)', marginBottom:2 }}>
+                      {c.clientes_agenda?.nombre || '—'}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-3)' }}>
+                      {c.servicios?.nombre || '—'} · {c.profesionales?.nombre?.split(' ')[0] || '—'}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', flexShrink:0, textAlign:'right' }}>
+                    <div style={{ fontWeight:600 }}>{new Date(c.fecha_inicio+'Z').toLocaleDateString('es-CO',{day:'numeric',month:'short'})}</div>
+                    <div>{c.fecha_inicio.substring(11,16)}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Vistas (ocultas durante búsqueda) ── */}
+      {!busqAgenda.trim() && (<>
 
       {vistaAgenda === 'semana' && <VistaSemana />}
       {vistaAgenda === 'dia' && (<>
@@ -817,6 +897,7 @@ export default function SalonAgenda() {
         )}
       </div>
 
+      </>)}
       </>)}
 
       {/* ── Sheet detalle + cambio de estado ── */}
