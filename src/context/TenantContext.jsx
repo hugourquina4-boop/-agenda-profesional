@@ -20,6 +20,7 @@ export function TenantProvider({ children }) {
   const [profesionalId, setProfesionalId] = useState(null)
   const [todosTenants,  setTodosTenants]  = useState([])         // para superadmin
   const [permisos,      setPermisos]      = useState({})
+  const [suscripcion,   setSuscripcion]   = useState(null)       // { fecha_limite, estado, plan_nombre, dias_restantes }
   const [loading,       setLoading]       = useState(true)
   const [passwordRecovery, setPasswordRecovery] = useState(false)
 
@@ -74,11 +75,33 @@ export function TenantProvider({ children }) {
     const { data: pResult } = await supabase.rpc('get_permisos_tenant', { p_tenant_id: tenantId })
     if (pResult && !pResult.error) pData = pResult
 
+    // Cargar estado de suscripción para mostrar días restantes y bloquear si vence
+    let suscData = null
+    try {
+      const { data: s } = await supabase
+        .from('suscripciones_negocio')
+        .select('fecha_limite, estado')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      if (s) {
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+        const limite = s.fecha_limite ? new Date(s.fecha_limite + 'T00:00:00') : null
+        const dias = limite ? Math.round((limite - hoy) / 86400000) : null
+        suscData = {
+          fecha_limite:  s.fecha_limite || null,
+          estado:        s.estado || 'trial',
+          plan_nombre:   t?.plan || null,
+          dias_restantes: dias,
+        }
+      }
+    } catch (_) { /* suscripcion opcional */ }
+
     localStorage.setItem(KEY_TENANT, tenantId)
     setTenant(t || null)
     setRol(rolUsuario)
     setProfesionalId(profId)
     setPermisos(pData)
+    setSuscripcion(suscData)
   }
 
   // Selector de tenant para superadmin (o usuario con múltiples negocios)
@@ -93,7 +116,7 @@ export function TenantProvider({ children }) {
 
   function resetState() {
     setUser(null); setTenant(null); setRol(null)
-    setProfesionalId(null); setTodosTenants([]); setPermisos({})
+    setProfesionalId(null); setTodosTenants([]); setPermisos({}); setSuscripcion(null)
   }
 
   const recargarPermisos = useCallback(async () => {
@@ -129,6 +152,7 @@ export function TenantProvider({ children }) {
       user, tenant, rol, profesionalId,
       todosTenants, esSuperadmin, esProfesional,
       permisos, tieneAcceso, recargarPermisos,
+      suscripcion,
       loading, recargar: cargar, seleccionarTenant,
       passwordRecovery, setPasswordRecovery,
     }}>
