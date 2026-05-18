@@ -101,6 +101,9 @@ export default function Portal() {
   const [asiste, setAsiste] = useState('El mismo paciente')
   const [notas, setNotas]   = useState('')
 
+  const [paquetes,     setPaquetes]     = useState([])
+  const [paqueteSelId, setPaqueteSelId] = useState(null)
+
   const [saving, setSaving]         = useState(false)
   const [confirmada, setConfirmada] = useState(false)
   const [err, setErr]               = useState('')
@@ -124,6 +127,11 @@ export default function Portal() {
     ])
     const ps = p || []
     setProfs(ps); setServs(s || []); setHors(h || [])
+    const { data: paq } = await supabase
+      .from('paquetes_salon')
+      .select('id, nombre, precio_paquete, precio_normal, paquetes_servicios(servicio_id, orden)')
+      .eq('tenant_id', t.id).eq('visible_portal', true).order('precio_paquete')
+    setPaquetes(paq || [])
     setLoading(false)
     const esP = t?.vertical === 'peluqueria'
     if (!esP) {
@@ -688,6 +696,54 @@ export default function Portal() {
             </section>
           )}
 
+          {/* Paquetes / Combos */}
+          {paquetes.length > 0 && (
+            <>
+              <div className="mx-5 h-px" style={{ background: `${accent}20` }} />
+              <section className="px-5 pt-6 pb-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-4"
+                   style={{ color: `${accent}80` }}>
+                  Paquetes & Combos
+                </p>
+                <div className="space-y-3">
+                  {paquetes.map(paq => {
+                    const off = paq.precio_normal > 0
+                      ? Math.round((1 - paq.precio_paquete / paq.precio_normal) * 100)
+                      : 0
+                    return (
+                      <div key={paq.id} className="rounded-2xl p-4 relative overflow-hidden"
+                        style={{ backgroundColor:`${accent}10`, border:`1.5px solid ${accent}28` }}>
+                        {off > 0 && (
+                          <span className="absolute top-3 right-3 text-[10px] font-black px-2 py-0.5 rounded-full"
+                            style={{ background: accent, color:'#fff' }}>
+                            {off}% OFF
+                          </span>
+                        )}
+                        <p className="font-bold text-white text-sm pr-14">{paq.nombre}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="text-lg font-black" style={{ color: accent }}>
+                            {fmtPrecio(paq.precio_paquete)}
+                          </span>
+                          {paq.precio_normal > 0 && (
+                            <span className="text-sm text-white/35 line-through">
+                              {fmtPrecio(paq.precio_normal)}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => { setPaqueteSelId(paq.id); setStep(isPelu || profs.length > 1 ? 1 : 2) }}
+                          className="mt-3 w-full py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98]"
+                          style={{ background:`${accent}30`, color: accent }}>
+                          Reservar este paquete →
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            </>
+          )}
+
           {/* Divisor */}
           {horariosSalon.length > 0 && (
             <div className="mx-5 h-px" style={{ background: `${accent}20` }} />
@@ -835,12 +891,43 @@ export default function Portal() {
                 accent={accent}
               />
 
-              {servsP.length === 0 ? (
+              {/* Paquetes disponibles */}
+              {paquetes.length > 0 && (
+                <div className="mt-5">
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-3 px-1" style={{ color:`${accent}80` }}>Paquetes & Combos</p>
+                  <div className="space-y-2.5 mb-6">
+                    {paquetes.map(paq => {
+                      const off = paq.precio_normal > 0 ? Math.round((1 - paq.precio_paquete/paq.precio_normal)*100) : 0
+                      const firstSvcId = [...(paq.paquetes_servicios||[])].sort((a,b)=>a.orden-b.orden)[0]?.servicio_id
+                      const firstSvc = servs.find(s => s.id === firstSvcId)
+                      const sel = paqueteSelId === paq.id
+                      return (
+                        <button key={paq.id}
+                          onClick={() => { setPaqueteSelId(paq.id); seleccionarServicio(firstSvc || { id:firstSvcId||'', nombre:paq.nombre, precio:paq.precio_paquete, duracion_min:60, variantes_servicio:[] }) }}
+                          className="w-full text-left rounded-2xl border-2 p-4 transition-all active:scale-[0.99] relative"
+                          style={{ borderColor: sel ? accent : '#f1f5f9', backgroundColor: sel ? `${accent}08` : '#f8fafc' }}>
+                          {off > 0 && (
+                            <span className="absolute top-3 right-3 text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background:accent, color:'#fff' }}>{off}% OFF</span>
+                          )}
+                          <p className="font-bold text-slate-800 text-sm pr-12">{paq.nombre}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm font-black" style={{ color:accent }}>{fmtPrecio(paq.precio_paquete)}</span>
+                            {paq.precio_normal > 0 && <span className="text-xs text-slate-400 line-through">{fmtPrecio(paq.precio_normal)}</span>}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {servsP.length > 0 && <p className="text-[10px] font-black uppercase tracking-widest mb-3 px-1" style={{ color:`${accent}80` }}>Servicios individuales</p>}
+                </div>
+              )}
+
+              {servsP.length === 0 && paquetes.length === 0 ? (
                 <div className="py-10 text-center text-slate-400 text-sm mt-5">
                   Este profesional no tiene servicios disponibles
                 </div>
-              ) : (
-                <div className="mt-5 space-y-5">
+              ) : servsP.length === 0 ? null : (
+                <div className={paquetes.length > 0 ? 'space-y-5' : 'mt-5 space-y-5'}>
                   {Object.entries(servsGrupos).map(([cat, items]) => (
                     <div key={cat}>
                       {Object.keys(servsGrupos).length > 1 && (
