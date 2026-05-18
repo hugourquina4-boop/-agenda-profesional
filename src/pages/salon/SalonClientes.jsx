@@ -193,6 +193,72 @@ export default function SalonClientes() {
     URL.revokeObjectURL(url)
   }
 
+  async function exportarHistorialPDF() {
+    if (!sel || historial.length === 0) return
+    const { default: jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+    const [r, g, b] = col.length === 7
+      ? [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+      : [244, 63, 94]
+    const W = 210, M = 16
+    let y = 20
+
+    // Header
+    doc.setFillColor(r, g, b)
+    doc.roundedRect(M, y - 8, W - M*2, 22, 3, 3, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(14); doc.setFont(undefined, 'bold')
+    doc.text('Historial de Citas', M + 8, y + 2)
+    doc.setFontSize(9); doc.setFont(undefined, 'normal')
+    doc.text(tenant?.nombre || '', W - M - 2, y + 2, { align:'right' })
+    y += 22
+
+    // Client info
+    doc.setTextColor(60, 60, 60)
+    doc.setFontSize(13); doc.setFont(undefined, 'bold')
+    doc.text(sel.nombre, M, y + 6)
+    doc.setFontSize(9); doc.setFont(undefined, 'normal')
+    if (sel.telefono) doc.text(`Tel: ${sel.telefono}`, M, y + 12)
+    if (sel.email)    doc.text(`Email: ${sel.email}`, M + 60, y + 12)
+    doc.text(`Visitas: ${sel.num_visitas || historial.length}   Total: $${Number(sel.total_gastado || 0).toLocaleString('es-CO')}`, M, y + 18)
+    y += 26
+
+    // Table header
+    doc.setFillColor(r, g, b)
+    doc.rect(M, y, W - M*2, 8, 'F')
+    doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont(undefined, 'bold')
+    doc.text('Fecha',         M + 3, y + 5.5)
+    doc.text('Servicio',      M + 35, y + 5.5)
+    doc.text('Profesional',   M + 95, y + 5.5)
+    doc.text('Estado',        M + 130, y + 5.5)
+    doc.text('Cobrado',       M + 155, y + 5.5)
+    y += 9
+
+    const ESTADO_ES = { completada:'Completada', confirmada:'Confirmada', pendiente:'Pendiente', cancelada:'Cancelada', no_asistio:'No asistió' }
+    historial.forEach((c, i) => {
+      if (y > 270) { doc.addPage(); y = 20 }
+      if (i % 2 === 0) { doc.setFillColor(248, 248, 252); doc.rect(M, y, W - M*2, 8, 'F') }
+      doc.setTextColor(60, 60, 60); doc.setFontSize(8); doc.setFont(undefined, 'normal')
+      const fecha = new Date(c.fecha_inicio).toLocaleDateString('es-CO', { day:'numeric', month:'short', year:'2-digit' })
+      doc.text(fecha,                         M + 3, y + 5.5)
+      doc.text((c.servicios?.nombre || '—').slice(0, 30), M + 35, y + 5.5)
+      doc.text((c.profesionales?.nombre?.split(' ')[0] || '—').slice(0, 18), M + 95, y + 5.5)
+      doc.text(ESTADO_ES[c.estado] || c.estado, M + 130, y + 5.5)
+      if (c.precio_cobrado > 0) doc.text(`$${Number(c.precio_cobrado).toLocaleString('es-CO')}`, M + 155, y + 5.5)
+      y += 8
+    })
+
+    // Total
+    const totalHist = historial.reduce((s, c) => s + (Number(c.precio_cobrado) || 0), 0)
+    y += 4
+    doc.setFillColor(r, g, b)
+    doc.rect(M + 130, y, W - M - 130, 8, 'F')
+    doc.setTextColor(255,255,255); doc.setFont(undefined,'bold')
+    doc.text(`Total: $${totalHist.toLocaleString('es-CO')}`, M + 135, y + 5.5)
+
+    doc.save(`historial-${sel.nombre.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`)
+  }
+
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
@@ -1011,6 +1077,16 @@ export default function SalonClientes() {
               ) : historial.length === 0 ? (
                 <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>Sin citas anteriores</p>
               ) : (
+              <>
+                <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
+                  <button onClick={exportarHistorialPDF} style={{
+                    display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:9,
+                    background:`${col}12`, border:`1px solid ${col}35`,
+                    color:col, fontSize:11, fontWeight:700, cursor:'pointer',
+                  }}>
+                    ↓ PDF
+                  </button>
+                </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {historial.map(c => (
                     <div key={c.id} className="sp-tbl-row" style={{ padding:'11px 14px' }}>
@@ -1033,7 +1109,7 @@ export default function SalonClientes() {
                     </div>
                   ))}
                 </div>
-              )
+              </>)
             )}
 
             {tabCliente === 'fotos' && (

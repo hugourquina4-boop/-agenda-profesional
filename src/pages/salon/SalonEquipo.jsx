@@ -105,6 +105,7 @@ export default function SalonEquipo() {
   const col = tenant?.color_primario || '#f43f5e'
 
   const [profs,       setProfs]       = useState([])
+  const [profStats,   setProfStats]   = useState({})
   const [loading,     setLoading]     = useState(true)
   const [toast,       setToast]       = useState(null)
 
@@ -155,9 +156,30 @@ export default function SalonEquipo() {
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase.from('profesionales')
-      .select('*').eq('tenant_id', tenant.id).order('nombre')
-    setProfs(data || [])
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth() + 1
+    const inicio = `${y}-${String(m).padStart(2,'0')}-01`
+    const nextM = m === 12 ? 1 : m + 1
+    const nextY = m === 12 ? y + 1 : y
+    const fin = `${nextY}-${String(nextM).padStart(2,'0')}-01`
+    const [{ data: profsData }, { data: citasData }] = await Promise.all([
+      supabase.from('profesionales').select('*').eq('tenant_id', tenant.id).order('nombre'),
+      supabase.from('citas')
+        .select('profesional_id, precio_cobrado')
+        .eq('tenant_id', tenant.id)
+        .not('estado', 'in', '("cancelada","no_asistio")')
+        .gte('fecha_inicio', inicio)
+        .lt('fecha_inicio', fin),
+    ])
+    setProfs(profsData || [])
+    const stats = {}
+    ;(citasData || []).forEach(c => {
+      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0 }
+      stats[c.profesional_id].citas++
+      stats[c.profesional_id].ingresos += Number(c.precio_cobrado) || 0
+    })
+    setProfStats(stats)
     setLoading(false)
   }, [tenant])
 
@@ -558,6 +580,8 @@ export default function SalonEquipo() {
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {profs.map((p, i) => {
             const color = p.color || COLORS[i % COLORS.length]
+            const st = profStats[p.id]
+            const fmtK = n => n >= 1000000 ? `$${(n/1000000).toFixed(1)}M` : n >= 1000 ? `$${Math.round(n/1000)}K` : `$${Math.round(n)}`
             return (
               <div key={p.id} style={{
                 display:'flex', alignItems:'center', gap:12,
@@ -585,6 +609,12 @@ export default function SalonEquipo() {
                   </div>
                   {p.especialidad && (
                     <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>{p.especialidad}</div>
+                  )}
+                  {st && st.citas > 0 && (
+                    <div style={{ fontSize:11, color:color, marginTop:3, fontWeight:600 }}>
+                      {st.citas} cita{st.citas !== 1 ? 's' : ''}
+                      {st.ingresos > 0 ? ` · ${fmtK(st.ingresos)}` : ''} este mes
+                    </div>
                   )}
                 </div>
 

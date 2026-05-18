@@ -308,6 +308,13 @@ export default function SalonProveedores() {
     total: gastos.filter(g => g.categoria === c).reduce((s,g) => s + Number(g.monto), 0),
   })).filter(x => x.total > 0)
 
+  const gastosPorProv = provs.map(p => ({
+    id:    p.id,
+    total: gastos.filter(g => g.proveedor_id === p.id).reduce((s,g) => s + Number(g.monto), 0),
+    count: gastos.filter(g => g.proveedor_id === p.id).length,
+  })).filter(x => x.total > 0).sort((a, b) => b.total - a.total)
+  const maxGastoProv = gastosPorProv[0]?.total || 1
+
   // ── Navegación mes ──────────────────────────────────────────────────────
   function cambiarMes(delta) {
     setFiltroMes(p => {
@@ -555,6 +562,43 @@ export default function SalonProveedores() {
       {/* ── TAB PROVEEDORES ── */}
       {tab === 'proveedores' && (
         <div style={{ padding:'0 16px' }}>
+          {/* Mini dashboard acumulado del mes */}
+          {gastosPorProv.length > 0 && (
+            <div style={{
+              background:'var(--card)', borderRadius:14,
+              boxShadow:'0 2px 12px rgba(0,0,0,0.1)', padding:'14px 16px', marginBottom:14,
+            }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <span style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase' }}>
+                  Gastos por proveedor — {MESES[filtroMes.m - 1]} {filtroMes.y}
+                </span>
+                <span style={{ fontSize:13, fontWeight:800, color:col }}>
+                  ${totalMes.toLocaleString('es-CO')}
+                </span>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {gastosPorProv.map(gp => {
+                  const prov = provs.find(p => p.id === gp.id)
+                  const pct  = Math.round(gp.total / maxGastoProv * 100)
+                  return (
+                    <div key={gp.id}>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                        <span style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>
+                          {prov?.nombre || '—'}
+                        </span>
+                        <span style={{ fontSize:11, color:'var(--text-3)' }}>
+                          ${gp.total.toLocaleString('es-CO')} · {gp.count} gasto{gp.count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div style={{ height:6, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
+                        <div style={{ height:'100%', borderRadius:4, background:col, width:`${pct}%`, transition:'width 0.4s' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           {provs.length === 0 ? (
             <div style={{ textAlign:'center', padding:'48px 24px', color:'var(--text-3)', fontSize:14 }}>
               No hay proveedores registrados.

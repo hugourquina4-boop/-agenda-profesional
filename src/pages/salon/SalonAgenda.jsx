@@ -449,6 +449,16 @@ export default function SalonAgenda() {
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {p.nombre?.split(' ')[0]}
                 </div>
+                {(() => {
+                  const cnt = citasDia.filter(c => c.profesional_id === p.id).length
+                  return cnt > 0 ? (
+                    <div style={{
+                      fontSize:10, fontWeight:700, color:p.color || col,
+                      background:`${p.color || col}18`, borderRadius:10,
+                      padding:'1px 6px', marginTop:2, display:'inline-block',
+                    }}>{cnt}</div>
+                  ) : null
+                })()}
               </div>
             ))}
           </div>
