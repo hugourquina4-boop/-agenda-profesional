@@ -269,6 +269,28 @@ export default function SalonOrdenes() {
     ? clientes.filter(c => c.nombre.toLowerCase().includes(clienteQ.toLowerCase())).slice(0, 6)
     : []
 
+  // Filtros de la lista de órdenes
+  const [busqOrden,     setBusqOrden]     = useState('')
+  const [filtroProf,    setFiltroProf]    = useState('')
+  const [confirmElimAll, setConfirmElimAll] = useState(false)
+
+  const ordenesFiltradas = ordenes.filter(ord => {
+    const nombre = (ord.clientes_agenda?.nombre || ord.cliente_nombre || '').toLowerCase()
+    const matchQ = !busqOrden.trim() || nombre.includes(busqOrden.toLowerCase())
+    const matchP = !filtroProf || ord.profesional_id === filtroProf
+    return matchQ && matchP
+  })
+
+  async function eliminarTodas() {
+    await supabase.from('ordenes_espera')
+      .update({ estado:'cancelado' })
+      .eq('tenant_id', tenant.id)
+      .eq('estado','pendiente')
+    setConfirmElimAll(false)
+    showToast('Todas las órdenes canceladas')
+    cargar()
+  }
+
   return (
     <div style={{ padding:'0 16px 80px' }}>
       {toast && (
@@ -282,7 +304,8 @@ export default function SalonOrdenes() {
         </div>
       )}
 
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <div>
           <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)', marginBottom:2 }}>
             Órdenes en espera
@@ -291,14 +314,59 @@ export default function SalonOrdenes() {
             {loading ? '…' : `${ordenes.length} pendiente${ordenes.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button onClick={() => { resetNueva(); setNuevaOpen(true) }} style={{
-          padding:'10px 16px', borderRadius:12, border:'none', cursor:'pointer',
-          background:col, color:'#fff', fontWeight:700, fontSize:13, fontFamily:'Outfit',
-          display:'flex', alignItems:'center', gap:6,
-        }}>
-          <Ico d="M12 4v16m8-8H4" size={14} /> Nueva orden
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          {ordenes.length > 0 && !confirmElimAll && (
+            <button onClick={() => setConfirmElimAll(true)} style={{
+              padding:'10px 12px', borderRadius:12, border:'1px solid #ef444440',
+              background:'rgba(239,68,68,0.06)', color:'#f87171',
+              fontWeight:700, fontSize:12, cursor:'pointer',
+            }}>Cancelar todas</button>
+          )}
+          {confirmElimAll && (
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={eliminarTodas} style={{
+                padding:'10px 12px', borderRadius:12, border:'none', cursor:'pointer',
+                background:'#ef4444', color:'#fff', fontWeight:700, fontSize:12,
+              }}>Confirmar</button>
+              <button onClick={() => setConfirmElimAll(false)} style={{
+                padding:'10px 12px', borderRadius:12, border:'none', cursor:'pointer',
+                background:'var(--card)', color:'var(--text-2)', fontWeight:700, fontSize:12,
+              }}>No</button>
+            </div>
+          )}
+          <button onClick={() => { resetNueva(); setNuevaOpen(true) }} style={{
+            padding:'10px 16px', borderRadius:12, border:'none', cursor:'pointer',
+            background:col, color:'#fff', fontWeight:700, fontSize:13, fontFamily:'Outfit',
+            display:'flex', alignItems:'center', gap:6,
+          }}>
+            <Ico d="M12 4v16m8-8H4" size={14} /> Nueva
+          </button>
+        </div>
       </div>
+
+      {/* Buscador + filtro prof */}
+      {!loading && ordenes.length > 0 && (
+        <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+          <div style={{ flex:1, position:'relative' }}>
+            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)', pointerEvents:'none' }}>
+              <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={15} />
+            </span>
+            <input value={busqOrden} onChange={e => setBusqOrden(e.target.value)}
+              placeholder="Buscar cliente…"
+              style={{ width:'100%', padding:'9px 10px 9px 32px', borderRadius:10,
+                border:'1px solid var(--border)', background:'var(--card)',
+                color:'var(--text)', fontSize:13, outline:'none', boxSizing:'border-box' }} />
+          </div>
+          {profesionales.length > 1 && (
+            <select value={filtroProf} onChange={e => setFiltroProf(e.target.value)}
+              style={{ padding:'9px 10px', borderRadius:10, border:'1px solid var(--border)',
+                background:'var(--card)', color:'var(--text)', fontSize:13, outline:'none', cursor:'pointer' }}>
+              <option value="">Todos</option>
+              {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre.split(' ')[0]}</option>)}
+            </select>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -310,9 +378,15 @@ export default function SalonOrdenes() {
           <p className="sp-empty-title">Sin órdenes pendientes</p>
           <p className="sp-empty-sub">Crea una orden cuando un cliente llegue sin cita previa</p>
         </div>
+      ) : ordenesFiltradas.length === 0 ? (
+        <div className="sp-empty">
+          <span className="sp-empty-icon">🔍</span>
+          <p className="sp-empty-title">Sin resultados</p>
+          <p className="sp-empty-sub">Intenta con otro nombre o quita el filtro</p>
+        </div>
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:12 }}>
-          {ordenes.map(ord => {
+          {ordenesFiltradas.map(ord => {
             const profNombre = ord.profesionales?.nombre || '—'
             const clienteNombre = ord.clientes_agenda?.nombre || ord.cliente_nombre || 'Sin nombre'
             const items = Array.isArray(ord.items) ? ord.items : []
