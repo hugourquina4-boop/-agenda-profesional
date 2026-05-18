@@ -77,6 +77,16 @@ export default function SalonProveedores() {
   const [loading,    setLoading]    = useState(true)
   const [toast,      setToast]      = useState(null)
 
+  // Pedidos
+  const [pedidos,       setPedidos]       = useState([])
+  const [loadingPed,    setLoadingPed]    = useState(false)
+  const [sheetPedido,   setSheetPedido]   = useState(false)
+  const [editPedido,    setEditPedido]    = useState(null)
+  const [formPedido,    setFormPedido]    = useState({ proveedor_id:'', numero:'', fecha_pedido: new Date().toISOString().slice(0,10), fecha_entrega:'', notas:'' })
+  const [pedItems,      setPedItems]      = useState([{ descripcion:'', cantidad:'1', unidad:'', precio_unit:'' }])
+  const [savingPed,     setSavingPed]     = useState(false)
+  const [detallePed,    setDetallePed]    = useState(null) // pedido abierto para avanzar estado
+
   // Filtro mes gastos
   const hoyDate = new Date()
   const [filtroMes, setFiltroMes] = useState({
@@ -94,6 +104,84 @@ export default function SalonProveedores() {
   const [saving,     setSaving]     = useState(false)
 
   function toast_(msg, ok = true) { _showToast(msg, ok, setToast) }
+
+  const cargarPedidos = useCallback(async () => {
+    if (!tenant?.id) return
+    setLoadingPed(true)
+    const { data } = await supabase
+      .from('pedidos_proveedor')
+      .select('*, proveedores(nombre)')
+      .eq('tenant_id', tenant.id)
+      .neq('estado', 'cancelado')
+      .order('created_at', { ascending: false })
+    setPedidos(data || [])
+    setLoadingPed(false)
+  }, [tenant?.id])
+
+  useEffect(() => { if (tab === 'pedidos') cargarPedidos() }, [cargarPedidos, tab])
+
+  function abrirNuevoPedido() {
+    setEditPedido(null)
+    setFormPedido({ proveedor_id:'', numero:'', fecha_pedido: new Date().toISOString().slice(0,10), fecha_entrega:'', notas:'' })
+    setPedItems([{ descripcion:'', cantidad:'1', unidad:'', precio_unit:'' }])
+    setSheetPedido(true)
+  }
+
+  async function guardarPedido() {
+    if (!formPedido.fecha_pedido) { toast_('Fecha requerida', false); return }
+    setSavingPed(true)
+    try {
+      const totalEst = pedItems.reduce((s,i) => s + (Number(i.cantidad||0)*Number(i.precio_unit||0)), 0)
+      const payload = {
+        tenant_id:    tenant.id,
+        proveedor_id: formPedido.proveedor_id || null,
+        numero:       formPedido.numero || null,
+        fecha_pedido: formPedido.fecha_pedido,
+        fecha_entrega:formPedido.fecha_entrega || null,
+        notas:        formPedido.notas || null,
+        total_estimado: totalEst,
+        estado: editPedido?.estado || 'abierto',
+      }
+      let pedidoId = editPedido?.id
+      if (editPedido) {
+        await supabase.from('pedidos_proveedor').update(payload).eq('id', editPedido.id)
+      } else {
+        const { data } = await supabase.from('pedidos_proveedor').insert(payload).select('id').single()
+        pedidoId = data?.id
+      }
+      if (pedidoId) {
+        await supabase.from('pedidos_proveedor_items').delete().eq('pedido_id', pedidoId)
+        const items = pedItems.filter(i => i.descripcion.trim())
+          .map(i => ({ pedido_id:pedidoId, tenant_id:tenant.id, descripcion:i.descripcion, cantidad:Number(i.cantidad)||1, unidad:i.unidad||null, precio_unit:Number(i.precio_unit)||0 }))
+        if (items.length > 0) await supabase.from('pedidos_proveedor_items').insert(items)
+      }
+      toast_('Pedido guardado ✓')
+      setSheetPedido(false)
+      cargarPedidos()
+    } catch(e) {
+      toast_('Error al guardar', false)
+    } finally {
+      setSavingPed(false)
+    }
+  }
+
+  async function avanzarEstado(ped) {
+    const FLUJO = { abierto:'cotizaciones', cotizaciones:'aceptado', aceptado:'entregado', entregado:'pagado' }
+    const next = FLUJO[ped.estado]
+    if (!next) return
+    await supabase.from('pedidos_proveedor').update({ estado: next }).eq('id', ped.id)
+    toast_(`Estado: ${next}`)
+    setDetallePed(null)
+    cargarPedidos()
+  }
+
+  async function cancelarPedido(id) {
+    if (!window.confirm('¿Cancelar este pedido?')) return
+    await supabase.from('pedidos_proveedor').update({ estado:'cancelado' }).eq('id', id)
+    toast_('Pedido cancelado')
+    setDetallePed(null)
+    cargarPedidos()
+  }
 
   const cargarProvs = useCallback(async () => {
     if (!tenant?.id) return
@@ -257,23 +345,37 @@ export default function SalonProveedores() {
               Gestiona proveedores y controla gastos
             </p>
           </div>
-          <button
-            onClick={tab === 'gastos' ? abrirNuevoGasto : abrirNuevoProv}
-            style={{
+          {tab !== 'pedidos' && (
+            <button
+              onClick={tab === 'gastos' ? abrirNuevoGasto : abrirNuevoProv}
+              style={{
+                display:'flex', alignItems:'center', gap:6,
+                padding:'9px 16px', borderRadius:12,
+                background:`linear-gradient(135deg,${col},${col}bb)`,
+                border:'none', color:'#fff', fontWeight:700, fontSize:13,
+                cursor:'pointer', flexShrink:0,
+              }}>
+              <Ico d="M12 4v16m8-8H4" size={15} />
+              {tab === 'gastos' ? 'Gasto' : 'Proveedor'}
+            </button>
+          )}
+          {tab === 'pedidos' && (
+            <button onClick={abrirNuevoPedido} style={{
               display:'flex', alignItems:'center', gap:6,
               padding:'9px 16px', borderRadius:12,
               background:`linear-gradient(135deg,${col},${col}bb)`,
               border:'none', color:'#fff', fontWeight:700, fontSize:13,
               cursor:'pointer', flexShrink:0,
             }}>
-            <Ico d="M12 4v16m8-8H4" size={15} />
-            {tab === 'gastos' ? 'Gasto' : 'Proveedor'}
-          </button>
+              <Ico d="M12 4v16m8-8H4" size={15} />
+              Pedido
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
         <div style={{ display:'flex', gap:4, marginBottom:16 }}>
-          {[['gastos','Gastos'],['proveedores','Proveedores']].map(([k,l]) => (
+          {[['gastos','Gastos'],['pedidos','Pedidos'],['proveedores','Proveedores']].map(([k,l]) => (
             <button key={k} onClick={() => setTab(k)} style={{
               padding:'8px 18px', borderRadius:10, border:'none', cursor:'pointer',
               fontWeight:700, fontSize:13,
@@ -513,6 +615,174 @@ export default function SalonProveedores() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── TAB PEDIDOS ── */}
+      {tab === 'pedidos' && (() => {
+        const ESTADOS = { abierto:'#6b7280', cotizaciones:'#f59e0b', aceptado:'#3b82f6', entregado:'#a855f7', pagado:'#22c55e' }
+        const ESTADOS_LABELS = { abierto:'Abierto', cotizaciones:'Cotizaciones', aceptado:'Aceptado', entregado:'Entregado', pagado:'Pagado' }
+        const FLUJO_BTN = { abierto:'Pedir cotiz.', cotizaciones:'Aceptar', aceptado:'Marcar entregado', entregado:'Marcar pagado' }
+
+        if (loadingPed) return (
+          <div style={{ display:'flex', justifyContent:'center', padding:'48px 0' }}>
+            <div className="sp-spinner" style={{ borderTopColor:col }} />
+          </div>
+        )
+
+        if (pedidos.length === 0) return (
+          <div style={{ textAlign:'center', padding:'48px 24px', color:'var(--text-3)', fontSize:14 }}>
+            No hay pedidos activos.
+            <br /><br />
+            <button onClick={abrirNuevoPedido} style={{
+              padding:'10px 20px', borderRadius:12, border:`1.5px dashed ${col}60`,
+              background:'transparent', color:col, fontWeight:700, fontSize:13, cursor:'pointer',
+            }}>
+              + Crear primer pedido
+            </button>
+          </div>
+        )
+
+        return (
+          <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10 }}>
+            {pedidos.map(ped => {
+              const estadoColor = ESTADOS[ped.estado] || '#6b7280'
+              const btnLabel = FLUJO_BTN[ped.estado]
+              const provNombre = ped.proveedores?.nombre || 'Sin proveedor'
+              return (
+                <div key={ped.id} style={{ borderRadius:16, overflow:'hidden', boxShadow:'0 2px 14px rgba(0,0,0,0.12)' }}>
+                  {/* Header */}
+                  <div style={{ padding:'12px 14px', background:`linear-gradient(135deg,${estadoColor}18,var(--card))`,
+                    display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{provNombre}</span>
+                        {ped.numero && <span style={{ fontSize:11, color:'var(--text-3)' }}>#{ped.numero}</span>}
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                        {fmtFecha(ped.fecha_pedido)}{ped.fecha_entrega ? ` → ${fmtFecha(ped.fecha_entrega)}` : ''}
+                      </div>
+                    </div>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:20,
+                      background:`${estadoColor}18`, color:estadoColor, border:`1px solid ${estadoColor}30`, flexShrink:0 }}>
+                      {ESTADOS_LABELS[ped.estado] || ped.estado}
+                    </span>
+                  </div>
+
+                  {/* Footer con total + botones */}
+                  <div style={{ padding:'10px 14px', background:'var(--card)',
+                    display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ flex:1 }}>
+                      {ped.total_estimado > 0 && (
+                        <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:14, color:estadoColor }}>
+                          {fmtCOP(ped.total_real || ped.total_estimado)}
+                        </span>
+                      )}
+                    </div>
+                    {ped.estado !== 'pagado' && (
+                      <button onClick={() => cancelarPedido(ped.id)} style={{
+                        padding:'6px 10px', borderRadius:8, border:'1px solid rgba(239,68,68,0.25)',
+                        background:'rgba(239,68,68,0.07)', color:'#f87171', fontSize:11, fontWeight:700, cursor:'pointer',
+                      }}>Cancelar</button>
+                    )}
+                    {btnLabel && (
+                      <button onClick={() => avanzarEstado(ped)} style={{
+                        padding:'7px 14px', borderRadius:9, border:'none', cursor:'pointer',
+                        background:estadoColor, color:'#fff', fontSize:12, fontWeight:700,
+                      }}>{btnLabel}</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* ── SHEET Nuevo Pedido ── */}
+      {sheetPedido && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setSheetPedido(false)} />
+          <div className="sp-sheet" style={{ maxHeight:'90dvh', overflowY:'auto' }}>
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">Nuevo pedido</p>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+              {/* Proveedor */}
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>PROVEEDOR</label>
+                <select className="sp-input" value={formPedido.proveedor_id}
+                  onChange={e => setFormPedido(f => ({ ...f, proveedor_id: e.target.value }))}>
+                  <option value="">Sin proveedor</option>
+                  {provs.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+              </div>
+              {/* Número + Fecha */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}># REFERENCIA</label>
+                  <input className="sp-input" placeholder="OC-001" value={formPedido.numero}
+                    onChange={e => setFormPedido(f => ({ ...f, numero: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>ENTREGA EST.</label>
+                  <input className="sp-input" type="date" value={formPedido.fecha_entrega}
+                    onChange={e => setFormPedido(f => ({ ...f, fecha_entrega: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Ítems */}
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>ÍTEMS</label>
+                {pedItems.map((item, idx) => (
+                  <div key={idx} style={{ display:'grid', gridTemplateColumns:'1fr 60px 80px 24px', gap:6, marginBottom:8, alignItems:'center' }}>
+                    <input className="sp-input" placeholder="Descripción" value={item.descripcion}
+                      onChange={e => setPedItems(arr => arr.map((a,i) => i===idx ? {...a, descripcion:e.target.value} : a))}
+                      style={{ fontSize:13 }} />
+                    <input className="sp-input" type="number" placeholder="Cant." value={item.cantidad}
+                      onChange={e => setPedItems(arr => arr.map((a,i) => i===idx ? {...a, cantidad:e.target.value} : a))}
+                      style={{ fontSize:13, textAlign:'center' }} />
+                    <input className="sp-input" type="number" placeholder="Precio" value={item.precio_unit}
+                      onChange={e => setPedItems(arr => arr.map((a,i) => i===idx ? {...a, precio_unit:e.target.value} : a))}
+                      style={{ fontSize:13 }} />
+                    <button onClick={() => setPedItems(arr => arr.length > 1 ? arr.filter((_,i) => i!==idx) : arr)}
+                      style={{ background:'none', border:'none', color:'#f87171', fontSize:18, cursor:'pointer', padding:0 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={() => setPedItems(arr => [...arr, { descripcion:'', cantidad:'1', unidad:'', precio_unit:'' }])}
+                  style={{ fontSize:12, color:col, fontWeight:700, background:'none', border:`1px dashed ${col}60`,
+                    borderRadius:8, padding:'6px 14px', cursor:'pointer', width:'100%' }}>
+                  + Ítem
+                </button>
+              </div>
+
+              {/* Total estimado */}
+              {pedItems.some(i => i.precio_unit) && (
+                <div style={{ textAlign:'right', fontSize:14, fontWeight:800, fontFamily:'Outfit', color:col }}>
+                  Total: {fmtCOP(pedItems.reduce((s,i) => s + (Number(i.cantidad||0)*Number(i.precio_unit||0)), 0))}
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>NOTAS</label>
+                <textarea className="sp-input" rows={2} placeholder="Condiciones, instrucciones…"
+                  value={formPedido.notas} onChange={e => setFormPedido(f => ({ ...f, notas: e.target.value }))}
+                  style={{ resize:'none' }} />
+              </div>
+            </div>
+
+            <button disabled={savingPed} onClick={guardarPedido} style={{
+              width:'100%', padding:'15px', borderRadius:14, border:'none', cursor:'pointer',
+              background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+              fontWeight:700, fontSize:15, opacity: savingPed ? 0.7 : 1,
+            }}>
+              {savingPed ? 'Guardando…' : 'Crear pedido'}
+            </button>
+            <button onClick={() => setSheetPedido(false)} style={{
+              marginTop:8, width:'100%', padding:'12px', borderRadius:12,
+              background:'var(--card)', border:'none', color:'var(--text-3)', fontWeight:600, fontSize:13, cursor:'pointer',
+            }}>Cancelar</button>
+          </div>
+        </>
       )}
 
       {/* ── SHEET Proveedor ── */}
