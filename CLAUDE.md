@@ -337,8 +337,11 @@ v49_proveedores_gastos.sql        ✅ APLICADO
 v50_pagos_plataforma.sql          ✅ APLICADO (2026-05-16)
 v53_profesional_servicios.sql     ✅ APLICADO (2026-05-17)
 v54_suscripcion_status.sql        ✅ NO REQUIERE SQL (solo comentario)
-v55_anticipo_citas.sql            📋 PENDIENTE — columna anticipo NUMERIC en citas (Bloque A)
-v56_descuentos_pagos.sql          📋 PENDIENTE — columnas descuento + tipo_descuento en pagos (Bloque A)
+v55_anticipo_citas.sql            ✅ APLICADO (2026-05-17) — columna anticipo NUMERIC en citas
+v56_descuentos_pagos.sql          ✅ APLICADO (2026-05-17) — columnas descuento + tipo_descuento en pagos
+v57_propina_pagos_lineas.sql      ✅ APLICADO (2026-05-17) — propina en pagos + tabla pagos_lineas
+v58_servicio_insumos.sql          ✅ APLICADO (2026-05-17) — tabla servicio_insumos
+v59_fixes_portal_anticipos.sql    ✅ APLICADO (2026-05-18) — RLS anticipos unificado + ps_anon_select portal
 ```
 
 ---
