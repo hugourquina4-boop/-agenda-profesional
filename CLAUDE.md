@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 9)
-> **Versión actual en producción: v1.3-dev** (commit b79a4bd)
+> Actualizado: 2026-05-18 (sesión 10)
+> **Versión actual en producción: v1.4-dev** (commit 16b20e2)
 
 ---
 
@@ -349,6 +349,10 @@ v59_fixes_portal_anticipos.sql    ✅ APLICADO (2026-05-18) — RLS anticipos un
 v60_pedidos_proveedor.sql         ✅ APLICADO (2026-05-18) — pedidos_proveedor + pedidos_proveedor_items
 v61_paquetes_salon.sql            ✅ APLICADO (2026-05-18) — paquetes_salon + paquetes_servicios
 v62_prestamos_cliente.sql         ✅ APLICADO (2026-05-18) — prestamos_cliente (préstamos/abonos por cliente)
+v63_fix_rls_anticipos.sql         ✅ APLICADO (2026-05-18) — RLS = ANY() para anticipos_profesional, comisiones, prestamos_cliente
+v64_recordatorios_cron.sql        📋 PENDIENTE aplicar — pg_cron para 3 edge functions
+v65_self_service_trial.sql        📋 PENDIENTE aplicar — salon_self_service_registrar SECURITY DEFINER
+v66_plantillas_mensajeria.sql     📋 PENDIENTE aplicar — tabla plantillas_mensajeria + RLS
 ```
 
 ---
@@ -387,14 +391,45 @@ v62_prestamos_cliente.sql         ✅ APLICADO (2026-05-18) — prestamos_client
 | logo192.png + logo512.png (iOS homescreen) | ✅ |
 | Playfair Display añadida para wordmark | ✅ |
 
-### Bloque D — Próximo sprint
+### ✅ Bloque D — Cambios sesión 10 (2026-05-18)
+
+| Feature | Archivos | Estado |
+| ------- | -------- | ------ |
+| Dashboard: cobro rápido con toggle Anticipo | SalonDashboard.jsx | ✅ |
+| Mensajería: última visita real + filtro por servicio + conteos | SalonMensajeria.jsx | ✅ |
+| Clientes: badge "Debe $X" cuando saldo_prestamos > 0 | SalonClientes.jsx | ✅ |
+| Órdenes: subtítulo "walk-in sin cita previa" | SalonOrdenes.jsx | ✅ |
+| v63 RLS fix: = ANY() en anticipos/comisiones/préstamos | v63_fix_rls_anticipos.sql | ✅ |
+
+### ✅ Bloque E — Completado sesión 10 (cont.)
+
+| Feature | Archivos | Estado |
+| ------- | -------- | ------ |
+| Drag & drop citas en VistaDia (hora + profesional) | SalonAgenda.jsx | ✅ |
+| Analytics tab Ventas: por método/servicio/profesional + rango fecha | SalonAnalytics.jsx | ✅ |
+| v64 pg_cron recordatorios automáticos | sql/v64_recordatorios_cron.sql | ✅ creado — pendiente aplicar en Supabase |
+
+### ✅ Bloque F — Completado sesión 10
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Portal público paquetes con % OFF | sin SQL nuevo | ✅ Portal.jsx + paquetes_salon.visible_portal |
+| Self-service trial 14 días | v65 | ✅ SalonRegistroPublico.jsx + /salon-registro + CTA en Login |
+
+### ✅ Bloque G — Completado sesión 10 (cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Plantillas WA editables | v66 | ✅ SalonMensajeria: edit mode inline, fallback TEMPLATES hardcoded |
+
+### Bloque H — Próximo sprint
 
 | Feature | SQL necesario | Notas |
 | ------- | ------------- | ----- |
-| Descuento automático de stock al completar cita | Edge Function o trigger | Descontar insumos de `servicio_insumos` del stock en `productos_salon` |
-| Portal público muestra paquetes | sin SQL nuevo | Listar `paquetes_salon` con visible_portal=true en SalonPortal |
-| Programa de puntos / fidelización | nueva tabla `movimientos_puntos` | Acumular puntos por visita, canjear en próxima cita |
-| Recordatorio automático 24h/1h | Supabase cron activo | Activar `notificacion-recordatorio` edge function + pg_cron |
+| Activar recordatorios (deploy edge functions + pg_cron) | v64 (listo) | `npx supabase functions deploy notificacion-recordatorio cumpleanos-clientes resumen-diario` |
+| Onboarding guiado post-registro | sin SQL | Steps checklist: agregar servicio → añadir profesional → configurar horario → 3 steps con % completado |
+| Multi-sede | nueva tabla `sedes` | Desbloquea clientes con >1 local |
+| Descuento automático de stock al completar cita | trigger/function | Descontar `servicio_insumos` del stock |
 
 ---
 
