@@ -200,7 +200,10 @@ export default function SalonClientes() {
       .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags')
       .eq('tenant_id', tenant.id)
       .order('nombre')
-    if (busq.trim()) q.ilike('nombre', `%${busq}%`)
+    if (busq.trim()) {
+      const s = busq.trim().replace(/[%_]/g, '\\$&')
+      q.or(`nombre.ilike.%${s}%,telefono.ilike.%${s}%,email.ilike.%${s}%`)
+    }
     const [{ data }, { data: prestData }] = await Promise.all([
       q.limit(100),
       supabase.from('prestamos_cliente').select('cliente_id, tipo, monto').eq('tenant_id', tenant.id),

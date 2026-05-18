@@ -716,6 +716,45 @@ export default function SalonDashboard({ onNavigate }) {
 
       </div>
 
+      {/* ── Ocupación por profesional hoy ───────────────── */}
+      {!isDemo && equipo.length > 1 && Object.keys(profMinutos).length > 0 && (
+        <div style={{ margin:'0 16px 14px' }}>
+          <div className="sp-kpi-card" style={{ padding:'12px 14px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5,
+              textTransform:'uppercase', marginBottom:10 }}>
+              Carga del equipo hoy
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+              {equipo.filter(p => profMinutos[p.id] != null).map(p => {
+                const min = profMinutos[p.id] || 0
+                const pct = Math.min(100, Math.round(min / 480 * 100))
+                const barColor = pct >= 80 ? '#f87171' : pct >= 50 ? col : '#4ade80'
+                return (
+                  <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:80, fontSize:11, fontWeight:600, color:'var(--text-2)',
+                      whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flexShrink:0 }}>
+                      {p.nombre?.split(' ')[0]}
+                    </div>
+                    <div style={{ flex:1, height:7, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
+                      <div style={{
+                        height:'100%', borderRadius:4,
+                        width:`${pct}%`,
+                        background: barColor,
+                        transition:'width 0.5s',
+                      }} />
+                    </div>
+                    <div style={{ width:34, fontSize:11, fontWeight:700, color:'var(--text-3)',
+                      textAlign:'right', flexShrink:0 }}>
+                      {pct}%
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Lista de espera del día ─────────────────────── */}
       {listaEsperaHoy > 0 && (
         <button onClick={() => onNavigate('agenda')} style={{

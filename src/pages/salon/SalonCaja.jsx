@@ -139,6 +139,29 @@ export default function SalonCaja() {
     URL.revokeObjectURL(url)
   }
 
+  function descargarEgresosCSV() {
+    const BOM = '﻿'
+    const headers = ['Fecha','Concepto','Categoría','Proveedor','Monto']
+    const rows = egresos.map(g => [
+      fmtFecha(g.fecha),
+      g.concepto || '',
+      g.categoria || '',
+      g.proveedores?.nombre || '',
+      Number(g.monto),
+    ])
+    const csv = BOM + [headers, ...rows]
+      .map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
+      .join('\r\n')
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const label = periodo === 'rango' ? `${rangoDesde}_${rangoHasta}` : periodo
+    a.download = `egresos-${label}-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function descargarPDF() {
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
@@ -666,13 +689,21 @@ export default function SalonCaja() {
           {/* ── Tab: Egresos ── */}
           {vista === 'egresos' && (
             <>
-              <button onClick={() => setModalEgreso(true)} style={{
-                width:'100%', padding:'12px', borderRadius:14, border:`1.5px dashed #ef444450`,
-                background:'rgba(239,68,68,0.05)', color:'#f87171', fontWeight:700, fontSize:13,
-                cursor:'pointer', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-              }}>
-                <Ico d="M20 12H4M12 4v16" size={16} /> Registrar egreso
-              </button>
+              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                <button onClick={() => setModalEgreso(true)} style={{
+                  flex:1, padding:'12px', borderRadius:14, border:`1.5px dashed #ef444450`,
+                  background:'rgba(239,68,68,0.05)', color:'#f87171', fontWeight:700, fontSize:13,
+                  cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                }}>
+                  <Ico d="M20 12H4M12 4v16" size={16} /> Registrar egreso
+                </button>
+                {egresos.length > 0 && (
+                  <button onClick={descargarEgresosCSV} style={{
+                    padding:'12px 14px', borderRadius:14, border:'none', cursor:'pointer',
+                    background:'rgba(34,197,94,0.12)', color:'#4ade80', fontWeight:700, fontSize:12, flexShrink:0,
+                  }}>↓ CSV</button>
+                )}
+              </div>
 
               {egresos.length === 0 ? (
                 <div className="sp-empty">
