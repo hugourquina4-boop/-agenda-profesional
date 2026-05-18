@@ -22,6 +22,7 @@ function fmtPct(n) { return n != null ? `${n}%` : '—' }
 
 const PROF_COLORS = ['#f43f5e','#a855f7','#3b82f6','#22c55e','#f59e0b','#06b6d4','#ec4899']
 const MES_LABELS  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const COSTOS_CATS = new Set(['Insumos','Productos','Materiales','Compras','Costo productos','Producto'])
 
 /* ── Demo data ─────────────────────────────────────────────────────── */
 const DEMO_KPI = {
@@ -119,6 +120,11 @@ export default function SalonAnalytics() {
   const [gastosCat,  setGastosCat]  = useState([])
   const [loadingF,   setLoadingF]   = useState(false)
 
+  // Gerencial
+  const [gerPeriodo, setGerPeriodo] = useState('mes')
+  const [gerData,    setGerData]    = useState(null)
+  const [loadingGer, setLoadingGer] = useState(false)
+
   async function cargarFinanzas() {
     if (!tenant || loadingF) return
     setLoadingF(true)
@@ -152,6 +158,102 @@ export default function SalonAnalytics() {
   useEffect(() => {
     if (tabA === 'finanzas' && tenant && gastosHist.length === 0) cargarFinanzas()
   }, [tabA, tenant])
+
+  function gerDates(p) {
+    const n = new Date(), y = n.getFullYear(), m = n.getMonth()
+    const todayISO = n.toISOString().slice(0,10)
+    const fmt = (yr, mo, d) => `${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+    if (p === 'semana') {
+      const dow = (n.getDay() + 6) % 7
+      const mon = new Date(n); mon.setDate(n.getDate() - dow)
+      return { desde: mon.toISOString().slice(0,10), hasta: todayISO, label: 'Esta semana' }
+    }
+    if (p === 'mes_ant') {
+      const pm = m === 0 ? 11 : m - 1, py = m === 0 ? y - 1 : y
+      return { desde: fmt(py, pm, 1), hasta: new Date(y, m, 0).toISOString().slice(0,10), label: `${MES_LABELS[pm]} ${py}` }
+    }
+    if (p === 'bimestre') {
+      const pm = m === 0 ? 11 : m - 1, py = m === 0 ? y - 1 : y
+      return { desde: fmt(py, pm, 1), hasta: todayISO, label: `${MES_LABELS[pm]}–${MES_LABELS[m]} ${y}` }
+    }
+    if (p === 'trimestre') {
+      const pm = ((m - 2) % 12 + 12) % 12, py = m < 2 ? y - 1 : y
+      return { desde: fmt(py, pm, 1), hasta: todayISO, label: `Trim. ${MES_LABELS[pm]}–${MES_LABELS[m]} ${y}` }
+    }
+    return { desde: fmt(y, m, 1), hasta: todayISO, label: `${MES_LABELS[m]} ${y}` }
+  }
+
+  async function cargarGerencial(p) {
+    if (!tenant) return
+    setLoadingGer(true)
+    setGerData(null)
+    const { desde, hasta, label } = gerDates(p || gerPeriodo)
+    try {
+      const [{ data: pagosD }, { data: citasD }, { data: gastosD }, { data: anticiposD }, { data: inventD }] = await Promise.all([
+        supabase.from('pagos').select('monto').eq('tenant_id', tenant.id).eq('estado','pagado')
+          .gte('created_at', desde + 'T00:00:00').lte('created_at', hasta + 'T23:59:59'),
+        supabase.from('citas').select('precio_cobrado, servicios(nombre, categoria, precio)')
+          .eq('tenant_id', tenant.id).eq('estado','completada')
+          .gte('fecha_inicio', desde + 'T00:00:00').lte('fecha_inicio', hasta + 'T23:59:59'),
+        supabase.from('gastos').select('monto, categoria, concepto')
+          .eq('tenant_id', tenant.id).gte('fecha', desde).lte('fecha', hasta),
+        supabase.from('anticipos_profesional').select('monto, tipo')
+          .eq('tenant_id', tenant.id).gte('created_at', desde + 'T00:00:00').lte('created_at', hasta + 'T23:59:59'),
+        supabase.from('productos_salon').select('stock, precio_costo')
+          .eq('tenant_id', tenant.id).eq('activo', true),
+      ])
+      const pagosTot = (pagosD||[]).reduce((s,p) => s + Number(p.monto), 0)
+      const citasTot = (citasD||[]).reduce((s,c) => s + Number(c.precio_cobrado || c.servicios?.precio || 0), 0)
+      const totalIngresos = pagosTot > 0 ? pagosTot : citasTot
+
+      const catMap = {}
+      ;(citasD||[]).forEach(c => {
+        const cat = c.servicios?.categoria || 'Servicios'
+        const val = Number(c.precio_cobrado || c.servicios?.precio || 0)
+        if (!catMap[cat]) catMap[cat] = { count:0, total:0 }
+        catMap[cat].count++; catMap[cat].total += val
+      })
+      const ingPorCat = Object.entries(catMap).map(([cat,v]) => ({ cat, ...v })).sort((a,b) => b.total-a.total)
+
+      const gastosArr = gastosD || []
+      const costosArr = gastosArr.filter(g => COSTOS_CATS.has(g.categoria))
+      const operArr   = gastosArr.filter(g => !COSTOS_CATS.has(g.categoria))
+      const totalCostosD = costosArr.reduce((s,g) => s + Number(g.monto), 0)
+
+      const nominaAnt = (anticiposD||[]).filter(a => a.tipo === 'anticipo').reduce((s,a) => s + Number(a.monto), 0)
+      const gastosOpMap = {}
+      operArr.forEach(g => { const c = g.categoria || 'Otros'; gastosOpMap[c] = (gastosOpMap[c]||0) + Number(g.monto) })
+      if (nominaAnt > 0 && !gastosOpMap['Nómina']) gastosOpMap['Nómina'] = nominaAnt
+      const gastosOpArr = Object.entries(gastosOpMap).map(([cat,total]) => ({ cat, total })).sort((a,b) => b.total-a.total)
+      const totalGastosOp = gastosOpArr.reduce((s,g) => s + g.total, 0)
+
+      const utilBruta  = totalIngresos - totalCostosD
+      const margenB    = totalIngresos > 0 ? Math.round(utilBruta / totalIngresos * 1000) / 10 : 0
+      const utilOper   = utilBruta - totalGastosOp
+      const margenN    = totalIngresos > 0 ? Math.round(utilOper / totalIngresos * 1000) / 10 : 0
+      const ivaGen     = Math.round(totalIngresos * 0.19)
+      const ivaDes     = Math.round(totalCostosD * 0.19)
+      const peBreak    = utilBruta > 0 && totalIngresos > 0 ? Math.round(totalGastosOp / (utilBruta / totalIngresos)) : 0
+      const valorInv   = (inventD||[]).reduce((s,p) => s + Number(p.stock||0) * Number(p.precio_costo||0), 0)
+
+      setGerData({
+        periodo: { desde, hasta, label },
+        numCitas: (citasD||[]).length,
+        ingresos: { total: totalIngresos, porCat: ingPorCat },
+        costos: { total: totalCostosD, detalle: costosArr },
+        utilidadBruta: utilBruta, margenBruto: margenB,
+        gastosOp: { total: totalGastosOp, detalle: gastosOpArr },
+        utilidadOper: utilOper, margenNeto: margenN,
+        iva: { generado: ivaGen, descontable: ivaDes, aPagar: Math.max(0, ivaGen - ivaDes) },
+        kpis: { margenBruto: margenB, peBreak, ticketProm: (citasD||[]).length > 0 ? Math.round(totalIngresos / (citasD||[]).length) : 0, valorInv, numCitas: (citasD||[]).length },
+      })
+    } catch(e) { console.error('[Gerencial]', e) }
+    finally { setLoadingGer(false) }
+  }
+
+  useEffect(() => {
+    if (tabA === 'gerencial' && tenant) cargarGerencial(gerPeriodo)
+  }, [tabA, tenant, gerPeriodo])
 
   // Ventas por método y servicio
   const [ventasMetodo,   setVentasMetodo]   = useState([])
@@ -388,6 +490,130 @@ export default function SalonAnalytics() {
     doc.save(`analytics-${mesLabel.replace(' ','-')}.pdf`)
   }
 
+  async function exportarPDFGerencial(data) {
+    const d = data || gerData
+    if (!d) return
+    const { default: jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const W = 210, M = 14
+    let y = 0
+    const fmtN = n => n >= 0 ? `$${Math.round(n).toLocaleString('es-CO')}` : `($${Math.round(Math.abs(n)).toLocaleString('es-CO')})`
+    const pctOf = n => d.ingresos.total > 0 ? `${Math.round(n/d.ingresos.total*100)}%` : '—'
+
+    // ── Header ──
+    doc.setFillColor(r,g,b); doc.rect(0,0,W,34,'F')
+    doc.setTextColor(255,255,255)
+    doc.setFontSize(14); doc.setFont('helvetica','bold')
+    doc.text('INFORME DE GESTIÓN FINANCIERA', M, 13)
+    doc.setFontSize(9); doc.setFont('helvetica','normal')
+    doc.text(tenant?.nombre || 'Salón', M, 21)
+    doc.text(`Período: ${d.periodo.label}`, W-M, 21, { align:'right' })
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, W-M, 28, { align:'right' })
+    y = 44
+
+    function secHdr(title) {
+      doc.setFillColor(r,g,b); doc.rect(M, y-5, W-M*2, 8, 'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold')
+      doc.text(title, M+3, y+0.5); y += 9
+    }
+    function plRow(label, amount, pctStr, bold, indent) {
+      if (y > 272) { doc.addPage(); y = 20 }
+      if (bold) { doc.setFillColor(245,245,250); doc.rect(M,y-3,W-M*2,7,'F') }
+      doc.setFont('helvetica', bold ? 'bold' : 'normal')
+      doc.setTextColor(40,40,40); doc.setFontSize(bold ? 9 : 8)
+      doc.text(label, M+(indent?6:2), y+1)
+      doc.text(fmtN(amount), W-M-20, y+1, { align:'right' })
+      if (pctStr) { doc.setTextColor(130,130,130); doc.setFontSize(7); doc.text(pctStr, W-M-2, y+1, { align:'right' }) }
+      y += 7
+    }
+
+    // ── Estado de Resultados ──
+    secHdr('ESTADO DE RESULTADOS')
+    doc.setTextColor(r,g,b); doc.setFontSize(7); doc.setFont('helvetica','bold')
+    doc.text('INGRESOS OPERACIONALES', M+2, y+1); y += 6
+    if (d.ingresos.porCat.length > 0) d.ingresos.porCat.forEach(c => plRow(c.cat, c.total, pctOf(c.total), false, true))
+    else plRow('Servicios', d.ingresos.total, '100%', false, true)
+    plRow('TOTAL INGRESOS', d.ingresos.total, '100%', true)
+    y += 2
+
+    if (d.costos.total > 0) {
+      doc.setTextColor(200,40,40); doc.setFontSize(7); doc.setFont('helvetica','bold')
+      doc.text('COSTO DE VENTAS', M+2, y+1); y += 6
+      const catC = {}
+      d.costos.detalle.forEach(g => { catC[g.categoria||'Insumos'] = (catC[g.categoria||'Insumos']||0)+Number(g.monto) })
+      Object.entries(catC).forEach(([c,t]) => plRow(c,-t,pctOf(t),false,true))
+      plRow('TOTAL COSTO VENTAS', -d.costos.total, pctOf(d.costos.total), true)
+      y += 2
+    }
+
+    // Utilidad Bruta destacada
+    const ubColor = d.utilidadBruta >= 0 ? [220,255,220] : [255,220,220]
+    doc.setFillColor(...ubColor); doc.rect(M,y-3,W-M*2,9,'F')
+    doc.setFont('helvetica','bold'); doc.setTextColor(d.utilidadBruta >= 0 ? 20 : 180, d.utilidadBruta >= 0 ? 120 : 20, 20); doc.setFontSize(10)
+    doc.text('UTILIDAD BRUTA', M+2, y+2.5); doc.text(fmtN(d.utilidadBruta), W-M-20, y+2.5, { align:'right' })
+    doc.setFontSize(8); doc.setTextColor(80,80,80); doc.text(`${d.margenBruto}%`, W-M-2, y+2.5, { align:'right' })
+    y += 12
+
+    if (d.gastosOp.total > 0) {
+      doc.setTextColor(160,100,0); doc.setFontSize(7); doc.setFont('helvetica','bold')
+      doc.text('GASTOS OPERACIONALES', M+2, y+1); y += 6
+      d.gastosOp.detalle.forEach(g => plRow(g.cat,-g.total,pctOf(g.total),false,true))
+      plRow('TOTAL GASTOS OPER.', -d.gastosOp.total, pctOf(d.gastosOp.total), true)
+      y += 2
+    }
+
+    // Utilidad Operativa
+    doc.setFillColor(r,g,b); doc.rect(M,y-3,W-M*2,10,'F')
+    doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255); doc.setFontSize(11)
+    doc.text('UTILIDAD OPERATIVA', M+2, y+3); doc.text(fmtN(d.utilidadOper), W-M-20, y+3, { align:'right' })
+    doc.setFontSize(8); doc.text(`${d.margenNeto}%`, W-M-2, y+3, { align:'right' })
+    y += 16
+
+    // ── Tablero Gerencial ──
+    if (y > 220) { doc.addPage(); y = 20 }
+    secHdr('TABLERO GERENCIAL — INDICADORES CLAVE')
+    const kpis = [
+      ['Margen Bruto',      `${d.kpis.margenBruto}%`],
+      ['Margen Neto',       `${d.margenNeto}%`],
+      ['Punto de Equilibrio', fmtN(d.kpis.peBreak)],
+      ['Ticket Promedio',   fmtCOP(d.kpis.ticketProm)],
+      ['Citas del Período', String(d.kpis.numCitas)],
+      ['Valor Inventario',  fmtCOP(d.kpis.valorInv)],
+    ]
+    const bgKpi = [[220,255,220],[220,255,220],[235,235,255],[200,230,255],[245,245,245],[240,220,255]]
+    kpis.forEach(([lbl,val], i) => {
+      const xPos = i%2 === 0 ? M : M+93
+      if (i%2 === 0) {
+        doc.setFillColor(...(bgKpi[i]||[245,245,245])); doc.rect(M,y-2,88,13,'F')
+        doc.setFillColor(...(bgKpi[i+1]||[245,245,245])); doc.rect(M+93,y-2,88,13,'F')
+      }
+      doc.setTextColor(100,100,100); doc.setFontSize(7); doc.setFont('helvetica','normal')
+      doc.text(lbl.toUpperCase(), xPos+3, y+3)
+      doc.setTextColor(20,20,20); doc.setFontSize(10); doc.setFont('helvetica','bold')
+      doc.text(val, xPos+3, y+9.5)
+      if (i%2 === 1) y += 15
+    })
+    y += 18
+
+    // ── IVA Estimado ──
+    if (y > 240) { doc.addPage(); y = 20 }
+    secHdr('IVA ESTIMADO (19%) — SOLO ORIENTATIVO')
+    plRow(`IVA Generado (ingresos $${Math.round(d.ingresos.total).toLocaleString('es-CO')} × 19%)`, d.iva.generado, pctOf(d.iva.generado))
+    plRow(`IVA Descontable (costos $${Math.round(d.costos.total).toLocaleString('es-CO')} × 19%)`, -d.iva.descontable, pctOf(d.iva.descontable))
+    plRow('IVA A PAGAR (ESTIMADO)', d.iva.aPagar, null, true)
+    y += 6
+
+    // Nota legal
+    doc.setFillColor(255,250,220); doc.rect(M,y,W-M*2,16,'F')
+    doc.setTextColor(100,80,0); doc.setFontSize(7); doc.setFont('helvetica','italic')
+    doc.text('* Informe generado automáticamente por Salón Pro. Basado en datos registrados en la plataforma.', M+3, y+5)
+    doc.text('* El cálculo de IVA es una estimación. Consulte a su contador para la declaración oficial ante la DIAN.', M+3, y+10)
+    doc.text('* Este documento no reemplaza los estados financieros oficiales preparados por un contador público.', M+3, y+15)
+
+    doc.save(`informe-gerencial-${d.periodo.label.replace(/[\s–\/]/g,'-').toLowerCase()}.pdf`)
+  }
+
   if (loading) return (
     <div style={{ display:'flex', justifyContent:'center', padding:'60px 0' }}>
       <div className="sp-spinner" style={{ borderTopColor:col }} />
@@ -409,7 +635,7 @@ export default function SalonAnalytics() {
 
       {/* ── Tabs ── */}
       <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', overflowY:'clip', scrollbarWidth:'none' }}>
-        {[['resumen','Resumen'],['ventas','Ventas'],['citas','Citas'],['finanzas','Finanzas']].map(([t,label]) => (
+        {[['resumen','Resumen'],['ventas','Ventas'],['citas','Citas'],['finanzas','Finanzas'],['gerencial','Gerencial']].map(([t,label]) => (
           <button key={t} onClick={() => setTabA(t)} style={{
             flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
             fontWeight:700, fontSize:13, fontFamily:'Outfit',
@@ -826,6 +1052,204 @@ export default function SalonAnalytics() {
           })()}
         </div>
       )}
+
+      {/* ── Tab: Gerencial ──────────────────────────────── */}
+      {tabA === 'gerencial' && (() => {
+        const GER_PERIODOS = [
+          { k:'semana',   l:'Semana' },
+          { k:'mes',      l:'Este mes' },
+          { k:'mes_ant',  l:'Mes ant.' },
+          { k:'bimestre', l:'Bimestre' },
+          { k:'trimestre',l:'Trimestre' },
+        ]
+
+        function LineaPL({ label, valor, pctVal, bold, color, indent, separator }) {
+          const clr = color || (valor < 0 ? '#f87171' : 'var(--text-2)')
+          return (
+            <div style={{
+              display:'flex', alignItems:'baseline',
+              padding: `${bold ? 5 : 3}px 0`,
+              borderTop: separator ? '1px solid var(--border)' : 'none',
+              marginTop: separator ? 3 : 0,
+            }}>
+              <span style={{
+                flex:1, fontSize: bold ? 13 : 12,
+                fontWeight: bold ? 800 : 500,
+                color: bold ? 'var(--text)' : 'var(--text-2)',
+                paddingLeft: indent ? 14 : 0,
+              }}>{label}</span>
+              <span style={{ fontSize: bold ? 13 : 12, fontWeight: bold ? 800 : 600, color: clr, minWidth:100, textAlign:'right' }}>
+                {valor >= 0 ? `$${Math.round(valor).toLocaleString('es-CO')}` : `($${Math.round(Math.abs(valor)).toLocaleString('es-CO')})`}
+              </span>
+              {pctVal !== undefined && (
+                <span style={{ fontSize:10, color:'var(--text-3)', minWidth:38, textAlign:'right', marginLeft:6 }}>
+                  {pctVal}
+                </span>
+              )}
+            </div>
+          )
+        }
+
+        return (
+          <div style={{ padding:'16px' }}>
+            {/* Chips período */}
+            <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto', scrollbarWidth:'none' }}>
+              {GER_PERIODOS.map(({ k, l }) => (
+                <button key={k} onClick={() => setGerPeriodo(k)} style={{
+                  flexShrink:0, padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:700,
+                  cursor:'pointer', border:`1.5px solid ${gerPeriodo===k ? col : 'var(--border)'}`,
+                  background: gerPeriodo===k ? `${col}18` : 'var(--card)',
+                  color: gerPeriodo===k ? col : 'var(--text-3)',
+                }}>{l}</button>
+              ))}
+            </div>
+
+            {loadingGer ? (
+              <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
+                <div className="sp-spinner" style={{ borderTopColor:col }} />
+              </div>
+            ) : !gerData ? (
+              <div className="sp-empty">
+                <span className="sp-empty-icon">📊</span>
+                <p className="sp-empty-title">Sin datos</p>
+                <p className="sp-empty-sub">Registra citas y gastos para ver el informe</p>
+              </div>
+            ) : (() => {
+              const d = gerData
+              const pctOf = n => d.ingresos.total > 0 ? `${Math.round(n/d.ingresos.total*100)}%` : '—'
+
+              return (
+                <>
+                  {/* Header + PDF */}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                    <div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>Informe Financiero</div>
+                      <div style={{ fontSize:12, color:'var(--text-3)' }}>{d.periodo.label}</div>
+                    </div>
+                    <button onClick={() => exportarPDFGerencial(d)} style={{
+                      display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:12,
+                      background:col, border:'none', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer',
+                    }}>
+                      <Ico d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" size={13} />
+                      ↓ PDF
+                    </button>
+                  </div>
+
+                  {/* Estado de Resultados */}
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px 18px', marginBottom:14, boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
+                      <span style={{ fontSize:11, fontWeight:800, color:'var(--text-3)', letterSpacing:0.6, textTransform:'uppercase' }}>Estado de Resultados</span>
+                      <span style={{ fontSize:10, color:'var(--text-3)' }}>% ing.</span>
+                    </div>
+
+                    {/* Ingresos */}
+                    <div style={{ fontSize:10, fontWeight:800, color:col, letterSpacing:0.5, textTransform:'uppercase', marginBottom:4 }}>Ingresos Operacionales</div>
+                    {d.ingresos.porCat.length > 0
+                      ? d.ingresos.porCat.map(c => <LineaPL key={c.cat} label={c.cat} valor={c.total} pctVal={pctOf(c.total)} indent />)
+                      : <LineaPL label="Servicios" valor={d.ingresos.total} pctVal="100%" indent />
+                    }
+                    <LineaPL label="TOTAL INGRESOS" valor={d.ingresos.total} pctVal="100%" bold color={col} separator />
+
+                    {/* Costos directos */}
+                    {d.costos.total > 0 && (() => {
+                      const catC = {}
+                      d.costos.detalle.forEach(g => { catC[g.categoria||'Insumos'] = (catC[g.categoria||'Insumos']||0)+Number(g.monto) })
+                      return (
+                        <div style={{ marginTop:10 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#f87171', letterSpacing:0.5, textTransform:'uppercase', marginBottom:4 }}>Costo de Ventas</div>
+                          {Object.entries(catC).map(([c,t]) => <LineaPL key={c} label={c} valor={-t} pctVal={pctOf(t)} indent />)}
+                          <LineaPL label="TOTAL COSTOS" valor={-d.costos.total} pctVal={pctOf(d.costos.total)} bold color="#f87171" separator />
+                        </div>
+                      )
+                    })()}
+
+                    {/* Utilidad Bruta */}
+                    <div style={{
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'9px 12px', borderRadius:10, marginTop:8,
+                      background: d.utilidadBruta >= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
+                    }}>
+                      <span style={{ fontSize:14, fontWeight:800, color:'var(--text)' }}>UTILIDAD BRUTA</span>
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:16, fontWeight:900, color: d.utilidadBruta >= 0 ? '#4ade80' : '#f87171', fontFamily:'Outfit' }}>
+                          ${Math.round(Math.abs(d.utilidadBruta)).toLocaleString('es-CO')}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-3)' }}>margen {d.margenBruto}%</div>
+                      </div>
+                    </div>
+
+                    {/* Gastos operacionales */}
+                    {d.gastosOp.total > 0 && (
+                      <div style={{ marginTop:12 }}>
+                        <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', letterSpacing:0.5, textTransform:'uppercase', marginBottom:4 }}>Gastos Operacionales</div>
+                        {d.gastosOp.detalle.map(g => <LineaPL key={g.cat} label={g.cat} valor={-g.total} pctVal={pctOf(g.total)} indent />)}
+                        <LineaPL label="TOTAL GASTOS OPER." valor={-d.gastosOp.total} pctVal={pctOf(d.gastosOp.total)} bold color="#f59e0b" separator />
+                      </div>
+                    )}
+
+                    {/* Utilidad Operativa */}
+                    <div style={{
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'10px 12px', borderRadius:10, marginTop:8,
+                      background: `linear-gradient(135deg,${col}22,${col}08)`,
+                      border:`1px solid ${col}30`,
+                    }}>
+                      <span style={{ fontSize:14, fontWeight:800, color:'var(--text)' }}>UTILIDAD OPERATIVA</span>
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:18, fontWeight:900, color: d.utilidadOper >= 0 ? col : '#f87171', fontFamily:'Outfit' }}>
+                          ${Math.round(Math.abs(d.utilidadOper)).toLocaleString('es-CO')}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-3)' }}>margen neto {d.margenNeto}%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tablero Gerencial */}
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', marginBottom:14, boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'var(--text-3)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:12 }}>
+                      Tablero Gerencial
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                      {[
+                        { label:'Margen Bruto', value:`${d.kpis.margenBruto}%`, color: d.kpis.margenBruto >= 50 ? '#4ade80' : d.kpis.margenBruto >= 30 ? '#f59e0b' : '#f87171', sub:'Meta ≥50%' },
+                        { label:'Margen Neto',  value:`${d.margenNeto}%`,        color: d.margenNeto >= 20 ? '#4ade80' : d.margenNeto >= 10 ? '#f59e0b' : '#f87171', sub:'Meta ≥20%' },
+                        { label:'Pto. Equilibrio', value:fmtCOP(d.kpis.peBreak), color:'#a855f7', sub:'ingresos mínimos' },
+                        { label:'Ticket Prom.',    value:fmtCOP(d.kpis.ticketProm), color:col, sub:`${d.kpis.numCitas} citas` },
+                        { label:'Val. Inventario', value:fmtCOP(d.kpis.valorInv), color:'#06b6d4', sub:'a costo' },
+                        { label:'Retención',       value:`${retention?.retention_rate || 0}%`, color:'#ec4899', sub:'clientes' },
+                      ].map(k => (
+                        <div key={k.label} style={{
+                          padding:'10px', borderRadius:12,
+                          background:`${k.color}12`,
+                          border:`1px solid ${k.color}28`,
+                        }}>
+                          <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:15, color:k.color, lineHeight:1.1 }}>{k.value}</div>
+                          <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700, marginTop:3, letterSpacing:0.3 }}>{k.label.toUpperCase()}</div>
+                          <div style={{ fontSize:9, color:'var(--text-3)', marginTop:1 }}>{k.sub}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* IVA Estimado */}
+                  <div style={{ background:'var(--card)', borderRadius:16, padding:'16px', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                      <span style={{ fontSize:11, fontWeight:800, color:'var(--text-3)', letterSpacing:0.6, textTransform:'uppercase' }}>IVA Estimado 19%</span>
+                      <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8, background:'rgba(245,158,11,0.15)', color:'#fbbf24', fontWeight:700 }}>ESTIMADO</span>
+                    </div>
+                    <LineaPL label="IVA Generado (ventas × 19%)" valor={d.iva.generado} pctVal={pctOf(d.iva.generado)} />
+                    <LineaPL label="IVA Descontable (costos × 19%)" valor={-d.iva.descontable} pctVal={pctOf(d.iva.descontable)} />
+                    <LineaPL label="IVA A PAGAR" valor={d.iva.aPagar} bold color={d.iva.aPagar > 0 ? '#f87171' : '#4ade80'} separator />
+                    <p style={{ fontSize:10, color:'var(--text-3)', marginTop:8, lineHeight:1.6, fontStyle:'italic' }}>
+                      Cálculo orientativo. Consulte a su contador para la declaración oficial ante la DIAN. Los servicios de peluquería pueden estar excluidos o exentos según régimen tributario.
+                    </p>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )
+      })()}
 
       {tabA === 'resumen' && (<>
 
