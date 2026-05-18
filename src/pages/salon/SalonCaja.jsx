@@ -81,7 +81,12 @@ export default function SalonCaja() {
   const [metodo,       setMetodo]       = useState('efectivo')
   const [referencia,   setReferencia]   = useState('')
   const [descuento,    setDescuento]    = useState('')
-  const [tipoDesc,     setTipoDesc]     = useState(null) // null | 'descuento' | 'cortesia'
+  const [tipoDesc,     setTipoDesc]     = useState(null)   // null | 'descuento' | 'cortesia'
+  const [lineas,       setLineas]       = useState([])      // [{producto_id,nombre,cantidad,precio_unitario}]
+  const [propina,      setPropina]      = useState('')
+  const [prodsDisp,    setProdsDisp]    = useState([])
+  const [busqProd,     setBusqProd]     = useState('')
+  const [showProdPick, setShowProdPick] = useState(false)
   const [saving,       setSaving]       = useState(false)
   const [toast,        setToast]        = useState(null)
   const [confirmAnular, setConfirmAnular] = useState(null)
@@ -209,6 +214,17 @@ export default function SalonCaja() {
     setReferencia('')
     setDescuento('')
     setTipoDesc(null)
+    setLineas([])
+    setPropina('')
+    setBusqProd('')
+    setShowProdPick(false)
+    if (tenant) {
+      supabase.from('productos_salon')
+        .select('id,nombre,categoria,precio_venta,stock')
+        .eq('tenant_id', tenant.id).eq('activo', true).gt('stock', 0)
+        .order('nombre')
+        .then(({ data }) => setProdsDisp(data || []))
+    }
   }
 
   async function anularPago(pago) {
@@ -225,22 +241,39 @@ export default function SalonCaja() {
     try {
       const base = parseFloat(monto) || 0
       const desc = tipoDesc === 'descuento' ? (parseFloat(descuento) || 0) : 0
-      const montoFinal = tipoDesc === 'cortesia' ? 0 : Math.max(0, base - desc)
+      const montoServicio = tipoDesc === 'cortesia' ? 0 : Math.max(0, base - desc)
+      const propinaN = parseFloat(propina) || 0
       const { data: pago, error: errIns } = await supabase.from('pagos')
         .insert({
-          tenant_id:     tenant.id,
-          cita_id:       modalCita.id,
-          monto:         montoFinal,
+          tenant_id:      tenant.id,
+          cita_id:        modalCita.id,
+          monto:          montoServicio,
           metodo,
-          referencia:    referencia || null,
-          estado:        'pendiente',
-          descuento:     tipoDesc === 'cortesia' ? base : desc,
+          referencia:     referencia || null,
+          estado:         'pendiente',
+          descuento:      tipoDesc === 'cortesia' ? base : desc,
           tipo_descuento: tipoDesc || null,
+          propina:        propinaN,
         })
         .select('id').single()
       if (errIns) throw errIns
       const { error: errUpd } = await supabase.from('pagos').update({ estado:'pagado' }).eq('id', pago.id)
       if (errUpd) throw errUpd
+      // Guardar líneas de productos + reducir stock
+      if (lineas.length > 0) {
+        await supabase.from('pagos_lineas').insert(
+          lineas.map(l => ({
+            tenant_id: tenant.id, pago_id: pago.id,
+            producto_id: l.producto_id, nombre: l.nombre,
+            cantidad: l.cantidad, precio_unitario: l.precio_unitario,
+          }))
+        )
+        for (const l of lineas) {
+          const p = prodsDisp.find(x => x.id === l.producto_id)
+          if (p) await supabase.from('productos_salon')
+            .update({ stock: Math.max(0, p.stock - l.cantidad) }).eq('id', l.producto_id)
+        }
+      }
       showToast('Cobro registrado ✓')
       setModalCita(null)
       cargar()
@@ -609,6 +642,52 @@ export default function SalonCaja() {
                     className="sp-input" style={{ paddingLeft:28 }} placeholder="0" autoFocus />
                 </div>
               </div>
+              {/* ── Productos (opcional) ── */}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5 }}>
+                    PRODUCTOS <span style={{ fontWeight:400 }}>(opcional)</span>
+                  </label>
+                  <button type="button" onClick={() => setShowProdPick(true)} style={{
+                    fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:8,
+                    background:`${col}18`, color:col, border:'none', cursor:'pointer',
+                  }}>+ Agregar</button>
+                </div>
+                {lineas.map((l, i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0', borderBottom:'1px solid var(--border)' }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.nombre}</div>
+                      <div style={{ fontSize:11, color:'var(--text-3)' }}>${l.precio_unitario.toLocaleString('es-CO')} c/u</div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                      <button type="button" onClick={() => {
+                        if (l.cantidad <= 1) setLineas(p => p.filter((_,j) => j !== i))
+                        else setLineas(p => p.map((x,j) => j===i ? {...x, cantidad:x.cantidad-1} : x))
+                      }} style={{ width:24,height:24,borderRadius:5,border:'none',background:'var(--card)',color:'var(--text)',cursor:'pointer',fontWeight:800,fontSize:15,display:'flex',alignItems:'center',justifyContent:'center' }}>−</button>
+                      <span style={{ fontSize:13,fontWeight:700,color:'var(--text)',minWidth:18,textAlign:'center' }}>{l.cantidad}</span>
+                      <button type="button" onClick={() => setLineas(p => p.map((x,j) => j===i ? {...x, cantidad:x.cantidad+1} : x))}
+                        style={{ width:24,height:24,borderRadius:5,border:'none',background:'var(--card)',color:'var(--text)',cursor:'pointer',fontWeight:800,fontSize:15,display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
+                    </div>
+                    <span style={{ fontSize:13,fontWeight:700,color:col,minWidth:60,textAlign:'right' }}>
+                      ${(l.cantidad*l.precio_unitario).toLocaleString('es-CO')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Propina ── */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>
+                  PROPINA <span style={{ fontWeight:400 }}>(opcional)</span>
+                </label>
+                <div style={{ position:'relative' }}>
+                  <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-3)', fontWeight:700, fontSize:14, pointerEvents:'none' }}>$</span>
+                  <input type="number" min="0" step="1000" value={propina}
+                    onChange={e => setPropina(e.target.value)}
+                    className="sp-input" style={{ paddingLeft:28 }} placeholder="0" />
+                </div>
+              </div>
+
               <div>
                 <label style={{ fontSize:12, fontWeight:600, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>MÉTODO DE PAGO</label>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
@@ -659,24 +738,31 @@ export default function SalonCaja() {
                   </div>
                 )}
               </div>
-              {tipoDesc && (
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-                  padding:'12px 16px', borderRadius:12, background:`${col}10`, border:`1px solid ${col}20` }}>
-                  <span style={{ fontSize:13, color:'var(--text-3)', fontWeight:600 }}>Total a cobrar</span>
-                  <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:col }}>
-                    {fmtCOPFull(tipoDesc === 'cortesia' ? 0 : Math.max(0, (parseFloat(monto)||0) - (parseFloat(descuento)||0)))}
-                  </span>
-                </div>
-              )}
-              <button type="submit" disabled={saving || !monto} style={{
-                marginTop:4, padding:'16px', borderRadius:16, border:'none', cursor:'pointer',
-                background: saving || !monto ? 'var(--border)' : col,
-                color: saving || !monto ? 'var(--text-3)' : '#fff',
-                fontFamily:'Outfit', fontWeight:800, fontSize:16, transition:'all 0.2s',
-              }}>
-                {saving ? 'Guardando…' :
-                  `Cobrar ${fmtCOPFull(tipoDesc === 'cortesia' ? 0 : Math.max(0, (parseFloat(monto)||0) - (parseFloat(descuento)||0)))}`}
-              </button>
+              {(() => {
+                const _svc   = tipoDesc === 'cortesia' ? 0 : Math.max(0, (parseFloat(monto)||0) - (tipoDesc === 'descuento' ? (parseFloat(descuento)||0) : 0))
+                const _prods = lineas.reduce((s, l) => s + l.cantidad * l.precio_unitario, 0)
+                const _prop  = parseFloat(propina) || 0
+                const _total = _svc + _prods + _prop
+                return (
+                  <>
+                    {(tipoDesc || lineas.length > 0 || _prop > 0) && (
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                        padding:'12px 16px', borderRadius:12, background:`${col}10`, border:`1px solid ${col}20` }}>
+                        <span style={{ fontSize:13, color:'var(--text-3)', fontWeight:600 }}>Total a cobrar</span>
+                        <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:col }}>{fmtCOPFull(_total)}</span>
+                      </div>
+                    )}
+                    <button type="submit" disabled={saving || !monto} style={{
+                      marginTop:4, padding:'16px', borderRadius:16, border:'none', cursor:'pointer',
+                      background: saving || !monto ? 'var(--border)' : col,
+                      color: saving || !monto ? 'var(--text-3)' : '#fff',
+                      fontFamily:'Outfit', fontWeight:800, fontSize:16, transition:'all 0.2s',
+                    }}>
+                      {saving ? 'Guardando…' : `Cobrar ${fmtCOPFull(_total)}`}
+                    </button>
+                  </>
+                )
+              })()}
             </form>
           </div>
         </div>
@@ -736,6 +822,50 @@ export default function SalonCaja() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Picker de productos ── */}
+      {showProdPick && (
+        <div style={{ position:'fixed', inset:0, zIndex:150, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', display:'flex', alignItems:'flex-end' }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowProdPick(false); setBusqProd('') } }}>
+          <div style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'var(--bg)', borderRadius:'24px 24px 0 0', padding:'20px 20px 32px', maxHeight:'70dvh', overflowY:'auto' }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:'var(--border)', margin:'0 auto 16px' }} />
+            <input
+              value={busqProd} onChange={e => setBusqProd(e.target.value)}
+              placeholder="Buscar producto…" autoFocus
+              style={{ width:'100%', padding:'10px 14px', borderRadius:12, border:'1px solid var(--border)',
+                background:'var(--card)', color:'var(--text)', fontSize:13, outline:'none', boxSizing:'border-box', marginBottom:12 }}
+            />
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {(busqProd
+                ? prodsDisp.filter(p => p.nombre.toLowerCase().includes(busqProd.toLowerCase()))
+                : prodsDisp
+              ).map(p => (
+                <button key={p.id} type="button" onClick={() => {
+                  const idx = lineas.findIndex(l => l.producto_id === p.id)
+                  if (idx >= 0) setLineas(prev => prev.map((l, i) => i === idx ? {...l, cantidad: l.cantidad + 1} : l))
+                  else setLineas(prev => [...prev, { producto_id: p.id, nombre: p.nombre, cantidad: 1, precio_unitario: p.precio_venta || 0 }])
+                  setShowProdPick(false); setBusqProd('')
+                }} style={{
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'12px 14px', borderRadius:12, border:'none', cursor:'pointer',
+                  background:'var(--card)', textAlign:'left', gap:10,
+                }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.nombre}</div>
+                    <div style={{ fontSize:11, color:'var(--text-3)' }}>{p.categoria || ''} · Stock: {p.stock}</div>
+                  </div>
+                  <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:14, color:col, flexShrink:0 }}>
+                    ${(p.precio_venta || 0).toLocaleString('es-CO')}
+                  </span>
+                </button>
+              ))}
+              {prodsDisp.length === 0 && (
+                <p style={{ textAlign:'center', color:'var(--text-3)', fontSize:13, padding:20 }}>Sin productos con stock disponible</p>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -33,6 +33,7 @@ export default function SalonServicios() {
   const [sel,          setSel]          = useState(null)
   const [tab,          setTab]          = useState('detalles')
   const [form,         setForm]         = useState({})
+  const [insumos,      setInsumos]      = useState({}) // { producto_id: cantidad }
   const [saving,       setSaving]       = useState(false)
   const [toast,        setToast]        = useState(null)
   const [nuevo,        setNuevo]        = useState(false)
@@ -59,6 +60,18 @@ export default function SalonServicios() {
   }, [tenant])
 
   useEffect(() => { cargar() }, [cargar])
+
+  useEffect(() => {
+    if (!sel?.id || nuevo || !tenant) { setInsumos({}); return }
+    supabase.from('servicio_insumos')
+      .select('producto_id, cantidad')
+      .eq('servicio_id', sel.id).eq('tenant_id', tenant.id)
+      .then(({ data }) => {
+        const map = {}
+        ;(data || []).forEach(r => { map[r.producto_id] = r.cantidad })
+        setInsumos(map)
+      })
+  }, [sel?.id, nuevo, tenant])
 
   const porCategoria = {}
   servicios.forEach(s => {
@@ -109,10 +122,13 @@ export default function SalonServicios() {
   }
 
   function toggleProducto(id) {
-    setForm(f => {
-      const ids = f.productos_ids || []
-      return { ...f, productos_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
-    })
+    const ids = form.productos_ids || []
+    const isAdding = !ids.includes(id)
+    setForm(f => ({ ...f, productos_ids: isAdding ? [...ids, id] : ids.filter(x => x !== id) }))
+    setInsumos(prev => isAdding
+      ? { ...prev, [id]: prev[id] || 1 }
+      : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== id))
+    )
   }
 
   async function guardar() {
@@ -132,11 +148,20 @@ export default function SalonServicios() {
       profesionales_ids:  form.profesionales_ids?.length ? form.profesionales_ids : null,
       productos_ids:      form.productos_ids?.length ? form.productos_ids : null,
     }
-    const { error } = nuevo
-      ? await supabase.from('servicios').insert({ ...payload, tenant_id: tenant.id })
-      : await supabase.from('servicios').update(payload).eq('id', sel.id).eq('tenant_id', tenant.id)
+    const { data: savedData, error } = nuevo
+      ? await supabase.from('servicios').insert({ ...payload, tenant_id: tenant.id }).select('id').single()
+      : await supabase.from('servicios').update(payload).eq('id', sel.id).eq('tenant_id', tenant.id).select('id').single()
     setSaving(false)
     if (error) { showToast(error.message, false); return }
+    const servicioId = savedData?.id
+    if (servicioId) {
+      await supabase.from('servicio_insumos').delete()
+        .eq('servicio_id', servicioId).eq('tenant_id', tenant.id)
+      const rows = Object.entries(insumos)
+        .filter(([, cant]) => Number(cant) > 0)
+        .map(([producto_id, cantidad]) => ({ tenant_id: tenant.id, servicio_id: servicioId, producto_id, cantidad: Number(cantidad) }))
+      if (rows.length > 0) await supabase.from('servicio_insumos').insert(rows)
+    }
     showToast(nuevo ? 'Servicio creado' : 'Guardado')
     cerrarSheet()
     cargar()
@@ -503,46 +528,65 @@ export default function SalonServicios() {
             {tab === 'productos' && (
               <div>
                 <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:14, lineHeight:1.5 }}>
-                  Productos del inventario que se consumen al realizar este servicio (para control de stock).
+                  Productos que se consumen al realizar este servicio. El stock se descontará al cobrar.
                 </p>
                 {productos.length === 0 ? (
                   <div style={{ textAlign:'center', color:'var(--text-3)', padding:'24px 0', fontSize:13 }}>
                     No hay productos activos en el inventario. Agrégalos desde el módulo Inventario.
                   </div>
                 ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {productos.map(p => {
                       const activo = (form.productos_ids || []).includes(p.id)
+                      const qty = insumos[p.id] || 1
                       return (
-                        <button key={p.id} onClick={() => toggleProducto(p.id)} style={{
-                          display:'flex', alignItems:'center', gap:12,
-                          padding:'11px 14px', borderRadius:12, width:'100%', textAlign:'left',
-                          background: activo ? `${col}10` : 'rgba(255,255,255,0.025)',
-                          border:'none', cursor:'pointer', transition:'background 0.12s',
+                        <div key={p.id} style={{
+                          borderRadius:12, overflow:'hidden',
+                          border:`1.5px solid ${activo ? col : 'var(--border)'}`,
+                          background: activo ? `${col}08` : 'transparent',
+                          transition:'all 0.12s',
                         }}>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontWeight:700, fontSize:13, color: activo ? 'var(--text)' : 'var(--text-2)' }}>{p.nombre}</div>
-                            {p.categoria && <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{p.categoria}</div>}
-                          </div>
-                          <div style={{
-                            width:20, height:20, borderRadius:5, flexShrink:0,
-                            background: activo ? col : 'rgba(255,255,255,0.07)',
-                            display:'flex', alignItems:'center', justifyContent:'center',
+                          <button onClick={() => toggleProducto(p.id)} style={{
+                            display:'flex', alignItems:'center', gap:12,
+                            padding:'11px 14px', width:'100%', textAlign:'left',
+                            background:'none', border:'none', cursor:'pointer',
                           }}>
-                            {activo && (
-                              <svg width={11} height={11} viewBox="0 0 24 24" fill="none"
-                                stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontWeight:700, fontSize:13, color: activo ? 'var(--text)' : 'var(--text-2)' }}>{p.nombre}</div>
+                              {p.categoria && <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{p.categoria}</div>}
+                            </div>
+                            <div style={{
+                              width:20, height:20, borderRadius:5, flexShrink:0,
+                              background: activo ? col : 'rgba(255,255,255,0.07)',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                            }}>
+                              {activo && (
+                                <svg width={11} height={11} viewBox="0 0 24 24" fill="none"
+                                  stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                          {activo && (
+                            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 14px 11px' }}>
+                              <span style={{ fontSize:11, color:'var(--text-3)', flex:1 }}>Cantidad a consumir</span>
+                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <button type="button" onClick={() => setInsumos(prev => ({...prev, [p.id]: Math.max(0.5, Number((prev[p.id]||1)) - 0.5)}))
+                                } style={{ width:26,height:26,borderRadius:6,border:'none',background:'var(--card)',color:'var(--text)',cursor:'pointer',fontWeight:800,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center' }}>−</button>
+                                <span style={{ fontSize:14,fontWeight:800,color:col,minWidth:28,textAlign:'center' }}>{qty}</span>
+                                <button type="button" onClick={() => setInsumos(prev => ({...prev, [p.id]: Number((prev[p.id]||1)) + 0.5}))}
+                                  style={{ width:26,height:26,borderRadius:6,border:'none',background:'var(--card)',color:'var(--text)',cursor:'pointer',fontWeight:800,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
                 )}
                 {form.productos_ids?.length > 0 && (
-                  <button onClick={() => setForm(f => ({...f, productos_ids:[]}))}
+                  <button onClick={() => { setForm(f => ({...f, productos_ids:[]})); setInsumos({}) }}
                     style={{ marginTop:10, fontSize:12, color:'var(--text-3)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
                     Limpiar selección
                   </button>
