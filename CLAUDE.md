@@ -356,6 +356,7 @@ v66_plantillas_mensajeria.sql     ✅ APLICADO (2026-05-18) — tabla plantillas
 v67_sedes.sql                     ✅ APLICADO (2026-05-18) — tabla sedes + sede_id en profesionales y citas
 v68_trigger_stock.sql             ✅ APLICADO (2026-05-18) — trigger fn_descontar_insumos_cita activo
 v69_wompi_portal.sql              ✅ APLICADO (2026-05-18) — wompi_public_key + pagos_portal_activo en tenants
+v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_usuario_tenant SECURITY DEFINER
 ```
 
 ---
@@ -460,10 +461,8 @@ v69_wompi_portal.sql              ✅ APLICADO (2026-05-18) — wompi_public_key
 | ------- | --- | ------ |
 | Recordatorios WA desde cita (botón en popup agenda) | sin SQL | ✅ Ya existía desde sesión 8 (línea 831 SalonAgenda) |
 | Caja: descarga CSV (abre en Excel) del período filtrado | sin SQL | ✅ `descargarCSV()` + botón "↓ CSV" junto a PDF |
-| Accesos: desvincular usuario del negocio | v70 pendiente | ✅ RPC `desvincular_usuario_tenant` + UI con confirmación en panel expandido |
+| Accesos: desvincular usuario del negocio | v70 ✅ | ✅ RPC `desvincular_usuario_tenant` + UI con confirmación en panel expandido |
 | Dashboard: tendencia ingresos semana actual vs semana anterior | sin SQL | ✅ Gráfico de barras dobles (gris=anterior, col=actual) + % cambio + totales |
-
-**v70 pendiente de aplicar en Supabase:** `sql/v70_desvincular_usuario.sql`
 
 ## Bloque L — Próximo Sprint
 
