@@ -350,9 +350,11 @@ v60_pedidos_proveedor.sql         ✅ APLICADO (2026-05-18) — pedidos_proveedo
 v61_paquetes_salon.sql            ✅ APLICADO (2026-05-18) — paquetes_salon + paquetes_servicios
 v62_prestamos_cliente.sql         ✅ APLICADO (2026-05-18) — prestamos_cliente (préstamos/abonos por cliente)
 v63_fix_rls_anticipos.sql         ✅ APLICADO (2026-05-18) — RLS = ANY() para anticipos_profesional, comisiones, prestamos_cliente
-v64_recordatorios_cron.sql        📋 PENDIENTE aplicar — pg_cron para 3 edge functions
-v65_self_service_trial.sql        📋 PENDIENTE aplicar — salon_self_service_registrar SECURITY DEFINER
-v66_plantillas_mensajeria.sql     📋 PENDIENTE aplicar — tabla plantillas_mensajeria + RLS
+v64_recordatorios_cron.sql        ✅ APLICADO (2026-05-18) — pg_cron: recordatorio-citas + cumpleanos-clientes + resumen-diario-salon
+v65_self_service_trial.sql        ✅ APLICADO (2026-05-18) — salon_self_service_registrar SECURITY DEFINER grant anon
+v66_plantillas_mensajeria.sql     ✅ APLICADO (2026-05-18) — tabla plantillas_mensajeria + RLS tenant
+v67_sedes.sql                     ✅ APLICADO (2026-05-18) — tabla sedes + sede_id en profesionales y citas
+v68_trigger_stock.sql             📋 PENDIENTE aplicar — trigger descuento automático stock al completar cita
 ```
 
 ---
@@ -422,14 +424,22 @@ v66_plantillas_mensajeria.sql     📋 PENDIENTE aplicar — tabla plantillas_me
 | ------- | --- | ------ |
 | Plantillas WA editables | v66 | ✅ SalonMensajeria: edit mode inline, fallback TEMPLATES hardcoded |
 
-### Bloque H — Próximo sprint
+### ✅ Bloque H — Completado sesión 10
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Onboarding checklist 3 pasos con % completado | sin SQL | ✅ SalonDashboard — barra progreso dinámica |
+| Multi-sede | v67 ✅ | ✅ SalonSedes.jsx — CRUD + asignación profesionales |
+| Descuento automático de stock | v68 pendiente | ✅ trigger fn_descontar_insumos_cita + insumos_descontados |
+
+### Bloque I — Próximo sprint
 
 | Feature | SQL necesario | Notas |
 | ------- | ------------- | ----- |
-| Activar recordatorios (deploy edge functions + pg_cron) | v64 (listo) | `npx supabase functions deploy notificacion-recordatorio cumpleanos-clientes resumen-diario` |
-| Onboarding guiado post-registro | sin SQL | Steps checklist: agregar servicio → añadir profesional → configurar horario → 3 steps con % completado |
-| Multi-sede | nueva tabla `sedes` | Desbloquea clientes con >1 local |
-| Descuento automático de stock al completar cita | trigger/function | Descontar `servicio_insumos` del stock |
+| Agenda: filtro por sede | sin SQL | Pill selector de sede en VistaDia cuando hay >1 sede |
+| Portal: selector de sede antes del profesional | sin SQL | Paso 0 extra si tenant tiene >1 sede activa |
+| Notificación stock bajo en Dashboard | sin SQL | Expandir alerta stockAlertas con lista de productos |
+| Pagos en línea desde portal (Wompi/PSE) | Edge Function + v69 | Monetización directa para clientes del salón |
 
 ---
 
