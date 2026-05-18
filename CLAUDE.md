@@ -4,7 +4,7 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 11)
+> Actualizado: 2026-05-18 (sesión 13)
 > **Versión actual en producción: v1.4-dev** (commit 89272bf)
 
 ---
@@ -464,14 +464,23 @@ v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_
 | Accesos: desvincular usuario del negocio | v70 ✅ | ✅ RPC `desvincular_usuario_tenant` + UI con confirmación en panel expandido |
 | Dashboard: tendencia ingresos semana actual vs semana anterior | sin SQL | ✅ Gráfico de barras dobles (gris=anterior, col=actual) + % cambio + totales |
 
-## Bloque L — Próximo Sprint
+### ✅ Bloque L — COMPLETADO (sesión 13 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Portal: anti double-booking antes de confirmar | sin SQL | ✅ Overlap check en `crearReserva()` — cuenta citas solapadas antes de crear |
+| Caja: filtrar historial por rango de fechas personalizado | sin SQL | ✅ Pill "Rango" + 2 date inputs; `rangoDesde/rangoHasta` en cargar |
+| Dashboard: acceso rápido a lista de espera del día | sin SQL | ✅ Chip ámbar con count → navega a agenda; 11ª query en Promise.all |
+| Agenda: copiar/duplicar cita a otra fecha | sin SQL | ✅ Botón "Duplicar" en popup → date picker → insert con mismo prof/servicio/cliente |
+
+## Bloque M — Próximo Sprint
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Portal: check disponibilidad en tiempo real antes de confirmar (anti double-booking) | sin SQL | Alta |
-| Caja: filtrar historial por rango de fechas personalizado | sin SQL | Alta |
-| Dashboard: acceso rápido a lista de espera del día | sin SQL | Media |
-| Agenda: copiar/duplicar cita a otra fecha | sin SQL | Media |
+| Portal: confirmación por email al cliente tras reserva | Edge Function | Media |
+| Caja: desglose de egresos por categoría en PDF | sin SQL | Media |
+| Agenda: búsqueda de citas por nombre de cliente | sin SQL | Alta |
+| Clientes: fusionar duplicados (mismo nombre/teléfono) | sin SQL | Baja |
 | Config: gestión de múltiples sedes con horarios independientes | sin SQL | Media |
 
 ---
