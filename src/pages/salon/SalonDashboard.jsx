@@ -158,6 +158,7 @@ export default function SalonDashboard({ onNavigate }) {
   ] : [])
   const [toast,          setToast]          = useState(null)
   const [analyticsData,  setAnalyticsData]  = useState(isDemo ? DEMO_ANALYTICS : null)
+  const [tendencia14,    setTendencia14]    = useState(null)
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -179,7 +180,8 @@ export default function SalonDashboard({ onNavigate }) {
         const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10)
       })()
 
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes] = await Promise.all([
+      const hace14iso = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -216,6 +218,12 @@ export default function SalonDashboard({ onNavigate }) {
           .in('estado', ['completada','confirmada','pendiente'])
           .gte('fecha_inicio', `${mesInicio}T00:00:00`)
           .lte('fecha_inicio', `${mesFin}T23:59:59`),
+        supabase.from('pagos')
+          .select('monto, created_at')
+          .eq('tenant_id', tenant.id)
+          .eq('estado', 'pagado')
+          .gte('created_at', `${hace14iso}T00:00:00`)
+          .lte('created_at', `${fecha}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -260,6 +268,19 @@ export default function SalonDashboard({ onNavigate }) {
         topProf:      Object.entries(profCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([nombre,count])=>({nombre,count})),
         diasSemana,
       })
+
+      // Tendencia 14 días: semana anterior (0-6) + semana actual (7-13)
+      const pagos14Data = pagos14Res.data || []
+      const porDia14 = {}
+      pagos14Data.forEach(p => {
+        const d = p.created_at.slice(0, 10)
+        porDia14[d] = (porDia14[d] || 0) + Number(p.monto)
+      })
+      const hace14base = new Date(); hace14base.setDate(hace14base.getDate() - 13)
+      const dias14 = Array.from({ length: 14 }, (_, i) => {
+        const d = new Date(hace14base); d.setDate(hace14base.getDate() + i); return d.toISOString().slice(0, 10)
+      })
+      setTendencia14(dias14.map(d => porDia14[d] || 0))
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -712,6 +733,75 @@ export default function SalonDashboard({ onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* ── Tendencia ingresos: semana actual vs anterior ── */}
+      {tendencia14 && tendencia14.some(v => v > 0) && (() => {
+        const semAnt = tendencia14.slice(0, 7)
+        const semAct = tendencia14.slice(7)
+        const totAnt = semAnt.reduce((s, v) => s + v, 0)
+        const totAct = semAct.reduce((s, v) => s + v, 0)
+        const pctCambio = totAnt > 0 ? Math.round((totAct - totAnt) / totAnt * 100) : null
+        const maxVal = Math.max(...tendencia14, 1)
+        const dias = ['D','L','M','X','J','V','S']
+        const hoyD = new Date()
+        return (
+          <div style={{ margin:'10px 16px 0' }}>
+            <div className="sp-kpi-card" style={{ padding:'14px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:0.5 }}>
+                  Esta semana vs semana anterior
+                </div>
+                {pctCambio !== null && (
+                  <span style={{
+                    fontSize:11, fontWeight:800, padding:'3px 8px', borderRadius:6,
+                    background: pctCambio >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)',
+                    color: pctCambio >= 0 ? '#4ade80' : '#f87171',
+                  }}>
+                    {pctCambio >= 0 ? '+' : ''}{pctCambio}%
+                  </span>
+                )}
+              </div>
+              <div style={{ display:'flex', gap:4, alignItems:'flex-end', height:56 }}>
+                {[0,1,2,3,4,5,6].map(i => {
+                  const d = new Date(hoyD); d.setDate(hoyD.getDate() - (6 - i))
+                  const dow = d.getDay()
+                  const vAct = semAct[i] || 0
+                  const vAnt = semAnt[i] || 0
+                  return (
+                    <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                      <div style={{ width:'100%', display:'flex', gap:1, alignItems:'flex-end', height:40 }}>
+                        <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:40 }}>
+                          <div style={{ width:'100%', borderRadius:3,
+                            height:`${Math.max(vAnt > 0 ? 8 : 0, vAnt / maxVal * 100)}%`,
+                            background:'rgba(128,128,128,0.25)',
+                          }} />
+                        </div>
+                        <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:40 }}>
+                          <div style={{ width:'100%', borderRadius:3,
+                            height:`${Math.max(vAct > 0 ? 8 : 0, vAct / maxVal * 100)}%`,
+                            background: col,
+                          }} />
+                        </div>
+                      </div>
+                      <span style={{ fontSize:8, fontWeight:600, color:'var(--text-3)' }}>{dias[dow]}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ display:'flex', gap:14, marginTop:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <div style={{ width:10, height:10, borderRadius:2, background:'rgba(128,128,128,0.3)', flexShrink:0 }} />
+                  <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:600 }}>Ant. {fmtCOP(totAnt)}</span>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <div style={{ width:10, height:10, borderRadius:2, background:col, flexShrink:0 }} />
+                  <span style={{ fontSize:10, color:'var(--text-2)', fontWeight:700 }}>Actual {fmtCOP(totAct)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Analytics del mes ───────────────────────────── */}
       {analyticsData && (analyticsData.topServicios.length > 0 || analyticsData.topProf.length > 0) && (

@@ -76,6 +76,9 @@ export default function SalonAccesos() {
   const [resetSent,   setResetSent]   = useState(false)
   const [resetLoading,setResetLoading]= useState(false)
 
+  // Confirmación desvincular
+  const [confirmDesvincular, setConfirmDesvincular] = useState(null) // user_id
+
   const baseUrl     = typeof window !== 'undefined' ? window.location.origin : ''
   const linkAcceso  = tenant?.slug ? `${baseUrl}/salon` : null
 
@@ -153,6 +156,22 @@ export default function SalonAccesos() {
       .eq('user_id', userId).eq('tenant_id', tenant.id)
     setRolSheet(null)
     showToast('Rol actualizado')
+    cargar()
+  }
+
+  // ── Desvincular usuario del tenant ─────────────────────────
+  async function desvincular(userId) {
+    const { data, error } = await supabase.rpc('desvincular_usuario_tenant', {
+      p_user_id: userId,
+      p_tenant_id: tenant.id,
+    })
+    if (error || !data?.ok) {
+      showToast(data?.error === 'sin_permiso' ? 'Sin permiso para desvincular' : (data?.error || 'Error al desvincular'), false)
+      return
+    }
+    setConfirmDesvincular(null)
+    setExpandedUser(null)
+    showToast('Acceso removido del negocio')
     cargar()
   }
 
@@ -464,6 +483,34 @@ export default function SalonAccesos() {
                               </button>
                             )}
                           </div>
+
+                          {/* Desvincular del negocio */}
+                          {u.rol !== 'superadmin' && (
+                            confirmDesvincular === u.user_id ? (
+                              <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)' }}>
+                                <p style={{ fontSize:12, color:'#f87171', marginBottom:8, fontWeight:600 }}>
+                                  ¿Eliminar acceso de {nom} a este negocio? Se pierde permanentemente.
+                                </p>
+                                <div style={{ display:'flex', gap:6 }}>
+                                  <button onClick={() => desvincular(u.user_id)} style={{
+                                    flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer',
+                                    background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, fontSize:12,
+                                  }}>Confirmar</button>
+                                  <button onClick={() => setConfirmDesvincular(null)} style={{
+                                    flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer',
+                                    background:'var(--card)', color:'var(--text-2)', fontWeight:600, fontSize:12,
+                                  }}>Cancelar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button onClick={() => setConfirmDesvincular(u.user_id)} style={{
+                                width:'100%', marginTop:6, padding:'8px', borderRadius:9, border:'none', cursor:'pointer',
+                                background:'rgba(239,68,68,0.06)', color:'#f87171', fontWeight:600, fontSize:11,
+                              }}>
+                                🗑 Eliminar acceso de este negocio
+                              </button>
+                            )
+                          )}
                         </div>
                       )}
                     </div>

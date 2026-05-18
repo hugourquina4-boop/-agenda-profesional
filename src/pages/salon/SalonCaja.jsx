@@ -110,6 +110,31 @@ export default function SalonCaja() {
     setTimeout(() => setToast(null), 2800)
   }
 
+  function descargarCSV() {
+    const BOM = '﻿'
+    const headers = ['Fecha','Cliente','Servicio','Profesional','Método','Monto','Referencia','Estado']
+    const rows = histFiltrado.map(c => [
+      new Date(c.pago.created_at).toLocaleDateString('es-CO'),
+      c.clientes_agenda?.nombre || '',
+      c.servicios?.nombre || '',
+      c.profesionales?.nombre || '',
+      METODO_LABELS[c.pago.metodo] || c.pago.metodo,
+      Number(c.pago.monto),
+      c.pago.referencia || '',
+      c.pago.notas ? 'Anulado' : 'Pagado',
+    ])
+    const csv = BOM + [headers, ...rows]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `caja-${periodo}-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function descargarPDF() {
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
@@ -365,10 +390,16 @@ export default function SalonCaja() {
                 </div>
               </div>
               {historial.length > 0 && (
-                <button onClick={descargarPDF} style={{
-                  padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
-                  background:`${col}20`, color:col, fontWeight:700, fontSize:12, flexShrink:0,
-                }}>↓ PDF</button>
+                <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                  <button onClick={descargarPDF} style={{
+                    padding:'8px 11px', borderRadius:10, border:'none', cursor:'pointer',
+                    background:`${col}20`, color:col, fontWeight:700, fontSize:12,
+                  }}>↓ PDF</button>
+                  <button onClick={descargarCSV} style={{
+                    padding:'8px 11px', borderRadius:10, border:'none', cursor:'pointer',
+                    background:'rgba(34,197,94,0.12)', color:'#4ade80', fontWeight:700, fontSize:12,
+                  }}>↓ CSV</button>
+                </div>
               )}
             </div>
 
