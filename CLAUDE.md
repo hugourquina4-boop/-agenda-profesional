@@ -4,7 +4,7 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 13)
+> Actualizado: 2026-05-18 (sesión 14)
 > **Versión actual en producción: v1.4-dev** (commit 89272bf)
 
 ---
@@ -473,15 +473,23 @@ v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_
 | Dashboard: acceso rápido a lista de espera del día | sin SQL | ✅ Chip ámbar con count → navega a agenda; 11ª query en Promise.all |
 | Agenda: copiar/duplicar cita a otra fecha | sin SQL | ✅ Botón "Duplicar" en popup → date picker → insert con mismo prof/servicio/cliente |
 
-## Bloque M — Próximo Sprint
+### ✅ Bloque M — COMPLETADO (sesión 14 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Agenda: búsqueda de citas por cliente/servicio/profesional | sin SQL | ✅ Barra búsqueda encima del calendario; resultados en lista; limpiable con × |
+| Caja: desglose egresos por categoría en PDF | sin SQL | ✅ Sección egresos al final del PDF con tabla por categoría + saldo neto |
+| Sedes: horarios de atención por sede | v71 pendiente aplicar | ✅ hora_apertura/cierre/dias_activos en form + mostrados en card; v71 SQL listo |
+
+## Bloque N — Próximo Sprint
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Portal: confirmación por email al cliente tras reserva | Edge Function | Media |
-| Caja: desglose de egresos por categoría en PDF | sin SQL | Media |
-| Agenda: búsqueda de citas por nombre de cliente | sin SQL | Alta |
-| Clientes: fusionar duplicados (mismo nombre/teléfono) | sin SQL | Baja |
-| Config: gestión de múltiples sedes con horarios independientes | sin SQL | Media |
+| Agenda: nueva cita desde el popup de búsqueda (botón + en resultado) | sin SQL | Alta |
+| Caja: exportar egresos a CSV | sin SQL | Media |
+| Clientes: búsqueda global multi-campo en tiempo real | sin SQL | Alta |
+| Dashboard: gráfico de ocupación semanal (barras por profesional) | sin SQL | Media |
+| Portal: mostrar horario de sede en step 1 | sin SQL | Media |
 
 ---
 
