@@ -4,7 +4,7 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 14)
+> Actualizado: 2026-05-18 (sesión 15)
 > **Versión actual en producción: v1.4-dev** (commit 89272bf)
 
 ---
@@ -481,15 +481,23 @@ v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_
 | Caja: desglose egresos por categoría en PDF | sin SQL | ✅ Sección egresos al final del PDF con tabla por categoría + saldo neto |
 | Sedes: horarios de atención por sede | v71 pendiente aplicar | ✅ hora_apertura/cierre/dias_activos en form + mostrados en card; v71 SQL listo |
 
-## Bloque N — Próximo Sprint
+### ✅ Bloque N — COMPLETADO (sesión 15 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Clientes: búsqueda multi-campo (nombre + teléfono + email) | sin SQL | ✅ `.or()` Supabase con ilike en 3 columnas |
+| Dashboard: barras de carga por profesional hoy | sin SQL | ✅ Mini horizontal bars en card — verde/accent/rojo según % |
+| Caja: exportar egresos a CSV | sin SQL | ✅ `descargarEgresosCSV()` + botón "↓ CSV" en tab Egresos |
+
+## Bloque O — Próximo Sprint
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Agenda: nueva cita desde el popup de búsqueda (botón + en resultado) | sin SQL | Alta |
-| Caja: exportar egresos a CSV | sin SQL | Media |
-| Clientes: búsqueda global multi-campo en tiempo real | sin SQL | Alta |
-| Dashboard: gráfico de ocupación semanal (barras por profesional) | sin SQL | Media |
-| Portal: mostrar horario de sede en step 1 | sin SQL | Media |
+| Equipo: vista resumen de producción (citas + ingresos del mes) | sin SQL | Alta |
+| Agenda: contador de citas por profesional en VistaDia | sin SQL | Media |
+| Clientes: exportar historial de citas individual a PDF | sin SQL | Media |
+| Proveedores: dashboard de gastos acumulados por proveedor | sin SQL | Media |
+| v71: Aplicar SQL sedes horarios en Supabase | v71 pendiente | Alta |
 
 ---
 
