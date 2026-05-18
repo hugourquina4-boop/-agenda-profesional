@@ -297,6 +297,26 @@ export default function SalonDashboard({ onNavigate }) {
     }
   }
 
+  async function registrarAnticipo(cita, metodo, monto) {
+    if (isDemo) { showToast('Demo — conecta Supabase para guardar', '#f59e0b'); setCobrando(null); return }
+    const precio = cita.servicios?.precio || 0
+    if (!monto || monto <= 0) { showToast('Ingresa un monto válido', '#f59e0b'); return }
+    if (monto >= precio) { showToast('Para cobro completo usa "Cobro total"', '#f59e0b'); return }
+    try {
+      const { error: e1 } = await supabase.from('pagos')
+        .insert({ tenant_id: tenant.id, cita_id: cita.id, monto, metodo, estado: 'pagado' })
+      if (e1) throw e1
+      const { error: e2 } = await supabase.from('citas').update({ anticipo: monto }).eq('id', cita.id)
+      if (e2) throw e2
+      setCobrando(null)
+      showToast(`Anticipo de ${new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(monto)} registrado`)
+      cargar()
+    } catch (err) {
+      showToast('Error al registrar anticipo', '#ef4444')
+      console.error('[anticipo]', err)
+    }
+  }
+
   function enviarWA(cita) {
     const tel = cita.clientes?.telefono?.replace(/\D/g,'')
     if (!tel) return showToast('Sin teléfono registrado', '#f59e0b')
@@ -819,42 +839,47 @@ export default function SalonDashboard({ onNavigate }) {
                   <span className="sp-tl-dot" style={{ borderColor:profColor, background:`${profColor}22` }} />
                 </div>
 
-                <div className="sp-tl-card">
-                  <div className="sp-tl-card-accent" style={{ background:profColor }} />
-                  <div style={{ paddingLeft:8 }}>
+                <div className="sp-tl-card" style={{
+                  background:`linear-gradient(135deg, ${profColor}10 0%, var(--card) 55%)`,
+                  borderColor:`${profColor}28`,
+                }}>
+                  <div style={{ paddingLeft:2 }}>
                     <div className="sp-tl-top">
-                      <span className="sp-tl-client">{cita.clientes_agenda?.nombre||'Cliente'}</span>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                        <span className="sp-tl-client">{cita.clientes_agenda?.nombre||'Cliente'}</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{
+                            display:'inline-flex', alignItems:'center', gap:4,
+                            fontSize:11, fontWeight:700,
+                            padding:'2px 8px', borderRadius:20,
+                            background:`${profColor}20`, color:profColor,
+                          }}>
+                            <span style={{ width:6, height:6, borderRadius:'50%', background:profColor, flexShrink:0 }} />
+                            {cita.profesionales?.nombre?.split(' ')[0]||'—'}
+                          </span>
+                          {cita.servicios?.duracion_min && (
+                            <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:500 }}>
+                              {cita.servicios.duracion_min} min
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <span className="sp-tl-badge" style={{ background:est.bg, color:est.color }}>{est.label}</span>
                     </div>
-                    <p className="sp-tl-service">{cita.servicios?.nombre||'Servicio'}</p>
-                    <div className="sp-tl-meta">
-                      <span className="sp-tl-meta-item">
-                        <Ico d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" size={13} />
-                        {cita.profesionales?.nombre?.split(' ')[0]||'—'}
-                      </span>
-                      {cita.servicios?.duracion_min && (
-                        <span className="sp-tl-meta-item">
-                          <Ico d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" size={13} />
-                          {cita.servicios.duracion_min}min
-                        </span>
-                      )}
-                      {cita.servicios?.precio && (
-                        <span className="sp-tl-meta-item">
-                          <Ico d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={13} />
-                          {fmtCOP(cita.servicios.precio)}
-                        </span>
-                      )}
-                    </div>
+                    <p className="sp-tl-service" style={{ marginTop:6 }}>{cita.servicios?.nombre||'Servicio'}</p>
                     <div className="sp-tl-actions">
-                      <button className="sp-tl-action wa" onClick={()=>enviarWA(cita)}>
-                        <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={13} />
-                        WA
+                      <button className="sp-tl-action wa" onClick={()=>enviarWA(cita)} style={{ flex:'0 0 44px' }}>
+                        <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={15} />
                       </button>
                       {canDone && (
-                        <button className="sp-tl-action ok"
-                          onClick={() => setCobrando(cobrando?.citaId===cita.id ? null : { citaId:cita.id, metodo:'efectivo' })}>
+                        <button className="sp-tl-action ok" style={{
+                          flex:1,
+                          background:`linear-gradient(135deg, ${profColor}22, ${profColor}08)`,
+                          borderColor:`${profColor}35`, color:profColor, fontWeight:700,
+                        }}
+                          onClick={() => setCobrando(cobrando?.citaId===cita.id ? null : { citaId:cita.id, metodo:'efectivo', esAnticipo:false, montoAnticipo:'' })}>
                           <Ico d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={13} />
-                          {fmtCOP(cita.servicios?.precio||0)}
+                          Cobrar {fmtCOP(cita.servicios?.precio||0)}
                         </button>
                       )}
                     </div>
@@ -863,9 +888,35 @@ export default function SalonDashboard({ onNavigate }) {
                         marginTop:10, padding:'12px 14px', borderRadius:14,
                         background:`linear-gradient(135deg, ${col}10, ${col}05)`,
                         boxShadow:`0 4px 20px ${col}12`,
-                        display:'flex', flexDirection:'column', gap:10,
+                        display:'flex', flexDirection:'column', gap:8,
                       }}>
-                        <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:2 }}>
+                        {/* Tipo toggle */}
+                        <div style={{ display:'flex', gap:5 }}>
+                          {[{k:false,label:'Cobro total'},{k:true,label:'Anticipo'}].map(({k,label}) => (
+                            <button key={String(k)} onClick={() => setCobrando(c => ({...c, esAnticipo:k}))} style={{
+                              flex:1, padding:'7px 6px', borderRadius:9, fontSize:11, fontWeight:700,
+                              cursor:'pointer', border:'none', transition:'all 0.15s',
+                              background: cobrando.esAnticipo===k
+                                ? k ? 'linear-gradient(135deg,#f59e0bcc,#f59e0b88)' : `linear-gradient(135deg,${col}cc,${col}88)`
+                                : 'rgba(255,255,255,0.07)',
+                              color: cobrando.esAnticipo===k ? '#fff' : 'var(--text-3)',
+                            }}>{label}</button>
+                          ))}
+                        </div>
+                        {cobrando.esAnticipo && (
+                          <input
+                            type="number"
+                            placeholder={`Monto anticipo (servicio: ${fmtCOP(cita.servicios?.precio||0)})`}
+                            value={cobrando.montoAnticipo}
+                            onChange={e => setCobrando(c => ({...c, montoAnticipo:e.target.value}))}
+                            style={{
+                              width:'100%', padding:'8px 10px', borderRadius:9, fontSize:13,
+                              border:'1px solid rgba(255,255,255,0.12)', boxSizing:'border-box',
+                              background:'rgba(255,255,255,0.07)', color:'var(--text)', outline:'none',
+                            }}
+                          />
+                        )}
+                        <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase' }}>
                           Método de cobro
                         </div>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -893,12 +944,21 @@ export default function SalonDashboard({ onNavigate }) {
                             background:'rgba(255,255,255,0.06)', border:'none',
                             color:'var(--text-2)', fontSize:12, fontWeight:600,
                           }}>Sin cobro</button>
-                          <button onClick={() => registrarCobro(cita, cobrando.metodo)} style={{
+                          <button onClick={() => cobrando.esAnticipo
+                            ? registrarAnticipo(cita, cobrando.metodo, parseFloat(cobrando.montoAnticipo)||0)
+                            : registrarCobro(cita, cobrando.metodo)
+                          } style={{
                             flex:2, padding:'8px', borderRadius:9, cursor:'pointer',
-                            background:`linear-gradient(135deg, ${col}, ${col}cc)`,
+                            background: cobrando.esAnticipo
+                              ? 'linear-gradient(135deg,#f59e0b,#d97706)'
+                              : `linear-gradient(135deg, ${col}, ${col}cc)`,
                             border:'none', color:'#fff', fontWeight:700, fontSize:13,
-                            boxShadow:`0 4px 16px ${col}40`,
-                          }}>✓ Cobrar</button>
+                            boxShadow: cobrando.esAnticipo ? '0 4px 16px #f59e0b40' : `0 4px 16px ${col}40`,
+                          }}>
+                            {cobrando.esAnticipo
+                              ? `✓ Anticipo ${cobrando.montoAnticipo ? fmtCOP(parseFloat(cobrando.montoAnticipo)) : ''}`
+                              : '✓ Cobrar'}
+                          </button>
                         </div>
                       </div>
                     )}

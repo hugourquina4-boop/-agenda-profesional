@@ -310,8 +310,9 @@ export default function SalonOrdenes() {
           <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)', marginBottom:2 }}>
             Órdenes en espera
           </h2>
-          <p style={{ fontSize:13, color:'var(--text-3)' }}>
+          <p style={{ fontSize:12, color:'var(--text-3)', lineHeight:1.4 }}>
             {loading ? '…' : `${ordenes.length} pendiente${ordenes.length !== 1 ? 's' : ''}`}
+            {!loading && <span style={{ display:'block', marginTop:1 }}>Servicios walk-in sin cita previa</span>}
           </p>
         </div>
         <div style={{ display:'flex', gap:8 }}>

@@ -51,10 +51,10 @@ const TEMPLATES = [
 ]
 
 const FILTROS = [
-  { key: 'todos',       label: 'Todos'         },
-  { key: 'mayorista',   label: 'Mayorista'     },
-  { key: 'cumple',      label: 'Cumpleaños'    },
+  { key: 'todos',       label: 'Todos'          },
+  { key: 'cumple',      label: 'Cumpleaños'     },
   { key: 'sin_visita',  label: 'Sin visita 30d' },
+  { key: 'servicio',    label: 'Por servicio'   },
 ]
 
 function formatFecha(iso) {
@@ -87,24 +87,54 @@ export default function SalonMensajeria() {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [clientes,   setClientes]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [filtro,     setFiltro]     = useState('todos')
-  const [buscar,     setBuscar]     = useState('')
-  const [sheetOpen,  setSheetOpen]  = useState(false)
-  const [clienteSel, setClienteSel] = useState(null)
-  const [enviados,   setEnviados]   = useState({})
+  const [clientes,       setClientes]       = useState([])
+  const [servicios,      setServicios]      = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [filtro,         setFiltro]         = useState('todos')
+  const [filtroServicio, setFiltroServicio] = useState('')
+  const [buscar,         setBuscar]         = useState('')
+  const [sheetOpen,      setSheetOpen]      = useState(false)
+  const [clienteSel,     setClienteSel]     = useState(null)
+  const [enviados,       setEnviados]       = useState({})
 
   const cargar = useCallback(async () => {
     if (!tenant?.id) return
     setLoading(true)
-    const { data } = await supabase
-      .from('clientes_agenda')
-      .select('id, nombre, telefono, fecha_nacimiento, tipo_precio, notas')
-      .eq('tenant_id', tenant.id)
-      .eq('activo', true)
-      .order('nombre')
-    setClientes(data || [])
+    const [{ data: clientesData }, { data: citasData }] = await Promise.all([
+      supabase
+        .from('clientes_agenda')
+        .select('id, nombre, telefono, fecha_nacimiento, tipo_precio, notas')
+        .eq('tenant_id', tenant.id)
+        .eq('activo', true)
+        .order('nombre'),
+      supabase
+        .from('citas')
+        .select('cliente_id, fecha_inicio, servicios(nombre)')
+        .eq('tenant_id', tenant.id)
+        .eq('estado', 'completada')
+        .order('fecha_inicio', { ascending: false }),
+    ])
+    // Compute ultima_visita and servicios_usados per client
+    const ultimaVisita = {}
+    const svcsUsados = {}
+    ;(citasData || []).forEach(c => {
+      if (!c.cliente_id) return
+      if (!ultimaVisita[c.cliente_id]) ultimaVisita[c.cliente_id] = c.fecha_inicio
+      const sn = c.servicios?.nombre
+      if (sn) {
+        if (!svcsUsados[c.cliente_id]) svcsUsados[c.cliente_id] = new Set()
+        svcsUsados[c.cliente_id].add(sn)
+      }
+    })
+    const merged = (clientesData || []).map(c => ({
+      ...c,
+      ultima_visita:   ultimaVisita[c.id] || null,
+      servicios_usados: svcsUsados[c.id] ? [...svcsUsados[c.id]] : [],
+    }))
+    setClientes(merged)
+    const allSvcs = new Set()
+    merged.forEach(c => c.servicios_usados.forEach(s => allSvcs.add(s)))
+    setServicios([...allSvcs].sort())
     setLoading(false)
   }, [tenant?.id])
 
@@ -114,11 +144,22 @@ export default function SalonMensajeria() {
     const telefono = c.telefono?.replace(/\D/g, '') || ''
     if (!telefono) return false
     if (buscar && !c.nombre.toLowerCase().includes(buscar.toLowerCase())) return false
-    if (filtro === 'mayorista')  return c.tipo_precio === 'mayorista'
     if (filtro === 'cumple')     return isCumpleProximo(c.fecha_nacimiento)
     if (filtro === 'sin_visita') return sinVisita30d(c.ultima_visita)
+    if (filtro === 'servicio')   return filtroServicio ? c.servicios_usados.includes(filtroServicio) : true
     return true
   })
+
+  function contarFiltro(key) {
+    return clientes.filter(c => {
+      if (!c.telefono?.replace(/\D/g,'')) return false
+      if (key === 'todos')      return true
+      if (key === 'cumple')     return isCumpleProximo(c.fecha_nacimiento)
+      if (key === 'sin_visita') return sinVisita30d(c.ultima_visita)
+      if (key === 'servicio')   return filtroServicio ? c.servicios_usados.includes(filtroServicio) : true
+      return false
+    }).length
+  }
 
   function abrirSheet(cliente) {
     setClienteSel(cliente)
@@ -175,26 +216,58 @@ export default function SalonMensajeria() {
 
       {/* Filtros */}
       <div style={{
-        display: 'flex', gap: 8, padding: '0 16px 14px',
+        display: 'flex', gap: 8, padding: '0 16px 10px',
         overflowX: 'auto', overflowY: 'clip', scrollbarWidth: 'none',
       }}>
-        {FILTROS.map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFiltro(f.key)}
+        {FILTROS.map(f => {
+          const count = contarFiltro(f.key)
+          const active = filtro === f.key
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFiltro(f.key)}
+              style={{
+                flexShrink: 0, padding: '7px 12px', borderRadius: 20,
+                display: 'flex', alignItems: 'center', gap: 6,
+                border: `1.5px solid ${active ? col : 'var(--border)'}`,
+                background: active ? `${col}18` : 'var(--card)',
+                color: active ? col : 'var(--text-2)',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {f.label}
+              <span style={{
+                fontSize: 11, fontWeight: 700, minWidth: 18, textAlign: 'center',
+                padding: '1px 5px', borderRadius: 10,
+                background: active ? col : 'rgba(128,128,128,0.15)',
+                color: active ? '#fff' : 'var(--text-3)',
+              }}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Selector de servicio */}
+      {filtro === 'servicio' && (
+        <div style={{ padding: '0 16px 10px' }}>
+          <select
+            value={filtroServicio}
+            onChange={e => setFiltroServicio(e.target.value)}
             style={{
-              flexShrink: 0, padding: '7px 14px', borderRadius: 20,
-              border: `1.5px solid ${filtro === f.key ? col : 'var(--border)'}`,
-              background: filtro === f.key ? `${col}18` : 'var(--card)',
-              color: filtro === f.key ? col : 'var(--text-2)',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              transition: 'all 0.15s',
+              width: '100%', padding: '9px 12px', borderRadius: 11,
+              border: '1.5px solid var(--border)', background: 'var(--card)',
+              color: 'var(--text)', fontSize: 13, cursor: 'pointer', outline: 'none',
             }}
           >
-            {f.label}
-          </button>
-        ))}
-      </div>
+            <option value="">— Todos los servicios ({servicios.length} tipos) —</option>
+            {servicios.map(s => {
+              const n = clientes.filter(c => c.servicios_usados.includes(s) && c.telefono?.replace(/\D/g,'')).length
+              return <option key={s} value={s}>{s} ({n})</option>
+            })}
+          </select>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={{ padding: '0 16px 14px' }}>
@@ -262,6 +335,11 @@ export default function SalonMensajeria() {
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 1 }}>
                     {c.telefono}
+                    {c.ultima_visita && (
+                      <span style={{ marginLeft: 6 }}>
+                        · última visita {formatFecha(c.ultima_visita)}
+                      </span>
+                    )}
                   </div>
                 </div>
 

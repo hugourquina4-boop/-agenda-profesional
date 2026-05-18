@@ -201,8 +201,17 @@ export default function SalonClientes() {
       .eq('tenant_id', tenant.id)
       .order('nombre')
     if (busq.trim()) q.ilike('nombre', `%${busq}%`)
-    const { data } = await q.limit(100)
-    setClientes(data || [])
+    const [{ data }, { data: prestData }] = await Promise.all([
+      q.limit(100),
+      supabase.from('prestamos_cliente').select('cliente_id, tipo, monto').eq('tenant_id', tenant.id),
+    ])
+    // Compute saldo per client
+    const saldoMap = {}
+    ;(prestData || []).forEach(p => {
+      saldoMap[p.cliente_id] = (saldoMap[p.cliente_id] || 0) + (p.tipo === 'prestamo' ? p.monto : -p.monto)
+    })
+    const merged = (data || []).map(c => ({ ...c, saldo_prestamos: saldoMap[c.id] || 0 }))
+    setClientes(merged)
     setLoading(false)
   }, [tenant, busq])
 
@@ -739,6 +748,14 @@ export default function SalonClientes() {
                     <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
                       background:'rgba(245,158,11,0.15)', color:'#f59e0b' }}>
                       MAYOR
+                    </span>
+                  )}
+                  {c.saldo_prestamos > 0 && (
+                    <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
+                      background:'rgba(239,68,68,0.12)', color:'#f87171',
+                      whiteSpace:'nowrap',
+                    }}>
+                      Debe {fmtCOP(c.saldo_prestamos)}
                     </span>
                   )}
                   <SegBadge segmento={c.segmento} />
