@@ -96,6 +96,13 @@ export default function SalonClientes() {
   const [tabCliente,  setTabCliente]  = useState('historial')
   const [fotos,       setFotos]       = useState([])
   const [loadFotos,   setLoadFotos]   = useState(false)
+
+  // Préstamos
+  const [prestamos,     setPrestamos]     = useState([])
+  const [loadPrest,     setLoadPrest]     = useState(false)
+  const [sheetPrest,    setSheetPrest]    = useState(false)
+  const [formPrest,     setFormPrest]     = useState({ tipo:'prestamo', monto:'', concepto:'', fecha: new Date().toISOString().slice(0,10) })
+  const [savingPrest,   setSavingPrest]   = useState(false)
   const [subiendoFoto,setSubiendoFoto]= useState(false)
   const [tipoFoto,    setTipoFoto]    = useState('resultado')
   const fotoInputRef  = useRef(null)
@@ -322,6 +329,42 @@ export default function SalonClientes() {
     showToast('Foto eliminada')
   }
 
+  async function cargarPrestamos(clienteId) {
+    if (!tenant) return
+    setLoadPrest(true)
+    const { data } = await supabase.from('prestamos_cliente')
+      .select('*').eq('cliente_id', clienteId).eq('tenant_id', tenant.id)
+      .order('fecha', { ascending: false })
+    setPrestamos(data || [])
+    setLoadPrest(false)
+  }
+
+  async function guardarPrestamo() {
+    const m = parseFloat(formPrest.monto)
+    if (!m || m <= 0) { showToast('Monto inválido', false); return }
+    setSavingPrest(true)
+    const { error } = await supabase.from('prestamos_cliente').insert({
+      tenant_id: tenant.id,
+      cliente_id: sel.id,
+      tipo: formPrest.tipo,
+      monto: m,
+      concepto: formPrest.concepto || null,
+      fecha: formPrest.fecha,
+    })
+    setSavingPrest(false)
+    if (error) { showToast('Error al guardar', false); return }
+    setSheetPrest(false)
+    setFormPrest({ tipo:'prestamo', monto:'', concepto:'', fecha: new Date().toISOString().slice(0,10) })
+    showToast('Movimiento registrado ✓')
+    cargarPrestamos(sel.id)
+  }
+
+  async function eliminarPrestamo(id) {
+    await supabase.from('prestamos_cliente').delete().eq('id', id).eq('tenant_id', tenant.id)
+    showToast('Eliminado')
+    cargarPrestamos(sel.id)
+  }
+
   async function abrirCliente(cli) {
     setSel(cli)
     setTabCliente('historial')
@@ -329,6 +372,7 @@ export default function SalonClientes() {
     setEditNotas(false)
     setSaldo(null)
     setFotos([])
+    setPrestamos([])
     setLoadHist(true)
     const [{ data: hist }, { data: sp }] = await Promise.all([
       supabase.from('citas')
@@ -926,8 +970,11 @@ export default function SalonClientes() {
             {/* ── Tabs Historial / Fotos ── */}
             <div style={{ display:'flex', gap:4, marginBottom:14,
               background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
-              {[['historial','Historial'],['fotos','Fotos 📷']].map(([t, label]) => (
-                <button key={t} onClick={() => setTabCliente(t)} style={{
+              {[['historial','Historial'],['fotos','Fotos 📷'],['credito','Crédito']].map(([t, label]) => (
+                <button key={t} onClick={() => {
+                  setTabCliente(t)
+                  if (t === 'credito' && sel?.id) cargarPrestamos(sel.id)
+                }} style={{
                   flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
                   background: tabCliente === t ? col : 'transparent',
                   color: tabCliente === t ? '#fff' : 'var(--text-3)',
@@ -1026,6 +1073,123 @@ export default function SalonClientes() {
                 )}
               </>
             )}
+
+            {/* ── Tab Crédito ── */}
+            {tabCliente === 'credito' && (() => {
+              const totalPrest = prestamos.filter(p => p.tipo === 'prestamo').reduce((s,p) => s+Number(p.monto||0), 0)
+              const totalAbonos = prestamos.filter(p => p.tipo === 'abono').reduce((s,p) => s+Number(p.monto||0), 0)
+              const saldoPend = Math.max(0, totalPrest - totalAbonos)
+              return (
+                <>
+                  {/* Resumen */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+                    {[
+                      { label:'Préstamos', val:totalPrest, color:'#f87171' },
+                      { label:'Abonos', val:totalAbonos, color:'#22c55e' },
+                      { label:'Saldo', val:saldoPend, color: saldoPend > 0 ? '#f87171' : '#22c55e' },
+                    ].map(({ label, val, color }) => (
+                      <div key={label} style={{ padding:'10px', borderRadius:12,
+                        background:`linear-gradient(135deg,${color}14,transparent)`, textAlign:'center' }}>
+                        <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:15, color }}>
+                          ${val.toLocaleString('es-CO')}
+                        </div>
+                        <div style={{ fontSize:10, color:'var(--text-3)', marginTop:2 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button onClick={() => setSheetPrest(true)} style={{
+                    width:'100%', padding:'10px', borderRadius:12, border:`1.5px dashed ${col}60`,
+                    background:'transparent', color:col, fontWeight:700, fontSize:13, cursor:'pointer', marginBottom:14,
+                  }}>+ Registrar movimiento</button>
+
+                  {loadPrest ? (
+                    <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}>
+                      <div className="sp-spinner" style={{ borderTopColor:col }} />
+                    </div>
+                  ) : prestamos.length === 0 ? (
+                    <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>Sin movimientos</p>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {prestamos.map(p => {
+                        const isPrest = p.tipo === 'prestamo'
+                        const clr = isPrest ? '#f87171' : '#22c55e'
+                        return (
+                          <div key={p.id} className="sp-tbl-row" style={{ padding:'10px 14px' }}>
+                            <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6,
+                              background:`${clr}15`, color:clr, flexShrink:0, textTransform:'uppercase' }}>
+                              {isPrest ? 'Préstamo' : 'Abono'}
+                            </span>
+                            <div style={{ flex:1, minWidth:0, marginLeft:8 }}>
+                              <div style={{ fontSize:12, color:'var(--text)' }}>{p.concepto || '—'}</div>
+                              <div style={{ fontSize:10, color:'var(--text-3)' }}>{p.fecha}</div>
+                            </div>
+                            <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:13, color:clr }}>
+                              {isPrest ? '-' : '+'}${Number(p.monto).toLocaleString('es-CO')}
+                            </span>
+                            <button onClick={() => eliminarPrestamo(p.id)} style={{
+                              background:'none', border:'none', cursor:'pointer', color:'var(--text-3)',
+                              fontSize:18, padding:'0 4px', flexShrink:0,
+                            }}>×</button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Sheet nuevo movimiento */}
+                  {sheetPrest && (
+                    <>
+                      <div className="sp-sheet-overlay" onClick={() => setSheetPrest(false)} />
+                      <div className="sp-sheet">
+                        <div className="sp-sheet-handle" />
+                        <p className="sp-sheet-title">Registrar movimiento</p>
+                        <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+                          <div style={{ display:'flex', gap:6 }}>
+                            {[{ k:'prestamo', label:'Préstamo' }, { k:'abono', label:'Abono' }].map(opt => (
+                              <button key={opt.k} type="button" onClick={() => setFormPrest(f => ({...f, tipo:opt.k}))} style={{
+                                flex:1, padding:'8px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:13,
+                                border:`1.5px solid ${formPrest.tipo === opt.k ? col : 'var(--border)'}`,
+                                background: formPrest.tipo === opt.k ? `${col}14` : 'transparent',
+                                color: formPrest.tipo === opt.k ? col : 'var(--text-3)',
+                              }}>{opt.label}</button>
+                            ))}
+                          </div>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                            <div>
+                              <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>MONTO *</label>
+                              <input className="sp-input" type="number" min="0" placeholder="0"
+                                value={formPrest.monto} onChange={e => setFormPrest(f => ({...f, monto:e.target.value}))} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>FECHA</label>
+                              <input className="sp-input" type="date" value={formPrest.fecha}
+                                onChange={e => setFormPrest(f => ({...f, fecha:e.target.value}))} />
+                            </div>
+                          </div>
+                          <div>
+                            <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>CONCEPTO</label>
+                            <input className="sp-input" placeholder="Ej: Anticipo servicio, Abono cuota…"
+                              value={formPrest.concepto} onChange={e => setFormPrest(f => ({...f, concepto:e.target.value}))} />
+                          </div>
+                        </div>
+                        <button disabled={savingPrest} onClick={guardarPrestamo} style={{
+                          width:'100%', padding:'15px', borderRadius:14, border:'none', cursor:'pointer',
+                          background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+                          fontWeight:700, fontSize:15, opacity: savingPrest ? 0.7 : 1,
+                        }}>
+                          {savingPrest ? 'Guardando…' : 'Registrar'}
+                        </button>
+                        <button onClick={() => setSheetPrest(false)} style={{
+                          marginTop:8, width:'100%', padding:'12px', borderRadius:12,
+                          background:'var(--card)', border:'none', color:'var(--text-3)', fontWeight:600, fontSize:13, cursor:'pointer',
+                        }}>Cancelar</button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )
+            })()}
           </div>
         </>
       )}

@@ -33,12 +33,24 @@ export default function SalonServicios() {
   const [sel,          setSel]          = useState(null)
   const [tab,          setTab]          = useState('detalles')
   const [form,         setForm]         = useState({})
-  const [insumos,      setInsumos]      = useState({}) // { producto_id: cantidad }
+  const [insumos,      setInsumos]      = useState({})
   const [saving,       setSaving]       = useState(false)
   const [toast,        setToast]        = useState(null)
   const [nuevo,        setNuevo]        = useState(false)
   const [elimConfirm,  setElimConfirm]  = useState(false)
   const [elimTarget,   setElimTarget]   = useState(null)
+
+  // Vista principal: servicios | paquetes
+  const [vistaMain,    setVistaMain]    = useState('servicios')
+
+  // Paquetes
+  const [paquetes,     setPaquetes]     = useState([])
+  const [loadingPaq,   setLoadingPaq]   = useState(false)
+  const [sheetPaq,     setSheetPaq]     = useState(false)
+  const [editPaq,      setEditPaq]      = useState(null)
+  const [formPaq,      setFormPaq]      = useState({ nombre:'', descripcion:'', precio_paquete:'', visible_portal:true })
+  const [paqServs,     setPaqServs]     = useState([]) // servicio_ids seleccionados
+  const [savingPaq,    setSavingPaq]    = useState(false)
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
@@ -60,6 +72,85 @@ export default function SalonServicios() {
   }, [tenant])
 
   useEffect(() => { cargar() }, [cargar])
+
+  const cargarPaquetes = useCallback(async () => {
+    if (!tenant) return
+    setLoadingPaq(true)
+    const { data } = await supabase.from('paquetes_salon')
+      .select('*, paquetes_servicios(servicio_id)')
+      .eq('tenant_id', tenant.id).eq('activo', true).order('nombre')
+    setPaquetes(data || [])
+    setLoadingPaq(false)
+  }, [tenant])
+
+  useEffect(() => { if (vistaMain === 'paquetes') cargarPaquetes() }, [cargarPaquetes, vistaMain])
+
+  function abrirNuevoPaq() {
+    setEditPaq(null)
+    setFormPaq({ nombre:'', descripcion:'', precio_paquete:'', visible_portal:true })
+    setPaqServs([])
+    setSheetPaq(true)
+  }
+
+  function abrirEditPaq(paq) {
+    setEditPaq(paq)
+    setFormPaq({ nombre:paq.nombre, descripcion:paq.descripcion||'', precio_paquete:paq.precio_paquete||'', visible_portal:paq.visible_portal })
+    setPaqServs(paq.paquetes_servicios?.map(r => r.servicio_id) || [])
+    setSheetPaq(true)
+  }
+
+  async function guardarPaquete() {
+    if (!formPaq.nombre.trim()) { showToast('Nombre requerido', false); return }
+    setSavingPaq(true)
+    try {
+      const precioNormal = paqServs.reduce((s, sid) => {
+        const sv = servicios.find(x => x.id === sid)
+        return s + (sv?.precio || 0)
+      }, 0)
+      const duracionTotal = paqServs.reduce((s, sid) => {
+        const sv = servicios.find(x => x.id === sid)
+        return s + (sv?.duracion_min || 0)
+      }, 0)
+      const payload = {
+        tenant_id: tenant.id,
+        nombre: formPaq.nombre.trim(),
+        descripcion: formPaq.descripcion || null,
+        precio_normal: precioNormal,
+        precio_paquete: Number(formPaq.precio_paquete) || precioNormal,
+        duracion_min: duracionTotal,
+        visible_portal: formPaq.visible_portal,
+      }
+      let paqId = editPaq?.id
+      if (editPaq) {
+        await supabase.from('paquetes_salon').update(payload).eq('id', editPaq.id)
+      } else {
+        const { data } = await supabase.from('paquetes_salon').insert(payload).select('id').single()
+        paqId = data?.id
+      }
+      if (paqId) {
+        await supabase.from('paquetes_servicios').delete().eq('paquete_id', paqId)
+        if (paqServs.length > 0) {
+          await supabase.from('paquetes_servicios').insert(
+            paqServs.map((sid, i) => ({ paquete_id:paqId, servicio_id:sid, tenant_id:tenant.id, orden:i }))
+          )
+        }
+      }
+      showToast('Paquete guardado ✓')
+      setSheetPaq(false)
+      cargarPaquetes()
+    } catch(e) {
+      showToast('Error al guardar', false)
+    } finally {
+      setSavingPaq(false)
+    }
+  }
+
+  async function eliminarPaquete(id) {
+    if (!window.confirm('¿Eliminar este paquete?')) return
+    await supabase.from('paquetes_salon').update({ activo:false }).eq('id', id)
+    showToast('Paquete eliminado')
+    cargarPaquetes()
+  }
 
   useEffect(() => {
     if (!sel?.id || nuevo || !tenant) { setInsumos({}); return }
@@ -227,17 +318,199 @@ export default function SalonServicios() {
         </>
       )}
 
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-        <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:'var(--text)' }}>Servicios</h2>
-        <button onClick={abrirNuevo} style={{
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ display:'flex', gap:4, background:'var(--card)', borderRadius:12, padding:3,
+          boxShadow:'0 1px 6px rgba(0,0,0,0.1)' }}>
+          {[['servicios','Servicios'],['paquetes','Paquetes']].map(([v,l]) => (
+            <button key={v} onClick={() => setVistaMain(v)} style={{
+              padding:'7px 14px', borderRadius:9, border:'none', cursor:'pointer', fontWeight:700, fontSize:12,
+              background: vistaMain===v ? col : 'transparent',
+              color: vistaMain===v ? '#fff' : 'var(--text-3)',
+            }}>{l}</button>
+          ))}
+        </div>
+        <button onClick={vistaMain === 'servicios' ? abrirNuevo : abrirNuevoPaq} style={{
           display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:12,
           background:col, border:'none', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer',
         }}>
-          <Ico d="M12 4v16m8-8H4" size={15} /> Agregar
+          <Ico d="M12 4v16m8-8H4" size={15} /> {vistaMain === 'servicios' ? 'Agregar' : 'Paquete'}
         </button>
       </div>
 
-      {loading ? (
+      {/* ── VISTA PAQUETES ── */}
+      {vistaMain === 'paquetes' && (
+        loadingPaq ? (
+          <div style={{ display:'flex', justifyContent:'center', padding:'48px 0' }}>
+            <div className="sp-spinner" style={{ borderTopColor:col }} />
+          </div>
+        ) : paquetes.length === 0 ? (
+          <div className="sp-empty">
+            <span className="sp-empty-icon">🎁</span>
+            <p className="sp-empty-title">Sin paquetes</p>
+            <p className="sp-empty-sub">Crea combos de servicios con precio especial</p>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {paquetes.map(paq => {
+              const descuento = paq.precio_normal > 0
+                ? Math.round((1 - paq.precio_paquete / paq.precio_normal) * 100) : 0
+              const svcs = paq.paquetes_servicios?.map(r =>
+                servicios.find(s => s.id === r.servicio_id)?.nombre
+              ).filter(Boolean)
+              return (
+                <div key={paq.id} style={{
+                  borderRadius:16, overflow:'hidden', boxShadow:'0 2px 14px rgba(0,0,0,0.12)',
+                }}>
+                  <div style={{ padding:'14px 16px', background:`linear-gradient(135deg,${col}18,var(--card))`,
+                    display:'flex', alignItems:'flex-start', gap:12 }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:`${col}20`,
+                      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:col }}>
+                      <Ico d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" size={18} />
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        <span style={{ fontWeight:700, fontSize:15, color:'var(--text)' }}>{paq.nombre}</span>
+                        {descuento > 0 && (
+                          <span style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:5,
+                            background:'rgba(34,197,94,0.15)', color:'#22c55e' }}>{descuento}% OFF</span>
+                        )}
+                        {paq.visible_portal && (
+                          <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5,
+                            background:'rgba(59,130,246,0.12)', color:'#60a5fa' }}>Portal</span>
+                        )}
+                      </div>
+                      {svcs?.length > 0 && (
+                        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>{svcs.join(' · ')}</div>
+                      )}
+                      {paq.descripcion && (
+                        <div style={{ fontSize:12, color:'var(--text-3)', marginTop:4 }}>{paq.descripcion}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ padding:'10px 16px', background:'var(--card)', display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ flex:1 }}>
+                      <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color:col }}>
+                        ${Number(paq.precio_paquete).toLocaleString('es-CO')}
+                      </span>
+                      {paq.precio_normal > paq.precio_paquete && (
+                        <span style={{ fontSize:12, color:'var(--text-3)', textDecoration:'line-through', marginLeft:8 }}>
+                          ${Number(paq.precio_normal).toLocaleString('es-CO')}
+                        </span>
+                      )}
+                      {paq.duracion_min > 0 && (
+                        <span style={{ fontSize:11, color:'var(--text-3)', marginLeft:10 }}>{paq.duracion_min} min</span>
+                      )}
+                    </div>
+                    <button onClick={() => abrirEditPaq(paq)} style={{
+                      width:32, height:32, borderRadius:9, border:'none', background:'rgba(255,255,255,0.08)',
+                      cursor:'pointer', color:'var(--text-3)', display:'flex', alignItems:'center', justifyContent:'center',
+                    }}>
+                      <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
+                    </button>
+                    <button onClick={() => eliminarPaquete(paq.id)} style={{
+                      width:32, height:32, borderRadius:9, border:'1px solid rgba(239,68,68,0.2)',
+                      background:'rgba(239,68,68,0.06)', cursor:'pointer', color:'#f87171',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                    }}>
+                      <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
+
+      {/* ── SHEET Nuevo/Editar Paquete ── */}
+      {sheetPaq && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setSheetPaq(false)} />
+          <div className="sp-sheet" style={{ maxHeight:'92dvh', overflowY:'auto' }}>
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">{editPaq ? 'Editar paquete' : 'Nuevo paquete'}</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>NOMBRE *</label>
+                <input className="sp-input" placeholder="Ej: Día completo de relajación" value={formPaq.nombre}
+                  onChange={e => setFormPaq(f => ({...f, nombre:e.target.value}))} />
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>DESCRIPCIÓN</label>
+                <input className="sp-input" placeholder="Descripción breve…" value={formPaq.descripcion}
+                  onChange={e => setFormPaq(f => ({...f, descripcion:e.target.value}))} />
+              </div>
+              {/* Servicios incluidos */}
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:8 }}>SERVICIOS INCLUIDOS</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:200, overflowY:'auto' }}>
+                  {servicios.filter(s => s.activo).map(s => {
+                    const sel2 = paqServs.includes(s.id)
+                    return (
+                      <div key={s.id} onClick={() => setPaqServs(prev =>
+                        sel2 ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                      )} style={{
+                        display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:11,
+                        cursor:'pointer', border:`1.5px solid ${sel2 ? col : 'var(--border)'}`,
+                        background: sel2 ? `${col}10` : 'var(--bg)',
+                      }}>
+                        <div style={{ width:16, height:16, borderRadius:4, flexShrink:0,
+                          border:`2px solid ${sel2 ? col : 'var(--border)'}`, background: sel2 ? col : 'transparent',
+                          display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {sel2 && <Ico d="M5 13l4 4L19 7" size={9} />}
+                        </div>
+                        <span style={{ flex:1, fontSize:13, fontWeight:600, color:'var(--text)' }}>{s.nombre}</span>
+                        <span style={{ fontSize:12, color:'var(--text-3)' }}>${(s.precio||0).toLocaleString('es-CO')}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              {/* Precio */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>PRECIO NORMAL</label>
+                  <input className="sp-input" type="number" readOnly
+                    value={paqServs.reduce((s,sid) => s+(servicios.find(x=>x.id===sid)?.precio||0),0)}
+                    style={{ color:'var(--text-3)' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, display:'block', marginBottom:6 }}>PRECIO PAQUETE *</label>
+                  <input className="sp-input" type="number" placeholder="Precio con descuento" value={formPaq.precio_paquete}
+                    onChange={e => setFormPaq(f => ({...f, precio_paquete:e.target.value}))} />
+                </div>
+              </div>
+              {/* Visible portal */}
+              <div onClick={() => setFormPaq(f => ({...f, visible_portal:!f.visible_portal}))} style={{
+                display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:11,
+                cursor:'pointer', border:`1.5px solid ${formPaq.visible_portal ? col : 'var(--border)'}`,
+                background: formPaq.visible_portal ? `${col}10` : 'transparent',
+              }}>
+                <Ico d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" size={16} />
+                <span style={{ flex:1, fontSize:13, fontWeight:600, color:'var(--text)' }}>Visible en portal de reservas</span>
+                <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${formPaq.visible_portal ? col : 'var(--border)'}`,
+                  background: formPaq.visible_portal ? col : 'transparent',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {formPaq.visible_portal && <Ico d="M5 13l4 4L19 7" size={10} />}
+                </div>
+              </div>
+            </div>
+            <button disabled={savingPaq} onClick={guardarPaquete} style={{
+              width:'100%', padding:'15px', borderRadius:14, border:'none', cursor:'pointer',
+              background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+              fontWeight:700, fontSize:15, opacity: savingPaq ? 0.7 : 1,
+            }}>
+              {savingPaq ? 'Guardando…' : (editPaq ? 'Guardar cambios' : 'Crear paquete')}
+            </button>
+            <button onClick={() => setSheetPaq(false)} style={{
+              marginTop:8, width:'100%', padding:'12px', borderRadius:12,
+              background:'var(--card)', border:'none', color:'var(--text-3)', fontWeight:600, fontSize:13, cursor:'pointer',
+            }}>Cancelar</button>
+          </div>
+        </>
+      )}
+
+      {vistaMain === 'servicios' && (loading ? (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:66, borderRadius:14 }} />)}
         </div>
@@ -248,7 +521,7 @@ export default function SalonServicios() {
           <p className="sp-empty-sub">Agrega los servicios que ofrece tu salón</p>
         </div>
       ) : (
-        Object.entries(porCategoria).map(([cat, items]) => (
+        <>{Object.entries(porCategoria).map(([cat, items]) => (
           <div key={cat} style={{ marginBottom:20 }}>
             <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
               textTransform:'uppercase', marginBottom:8 }}>{cat}</p>
@@ -297,8 +570,8 @@ export default function SalonServicios() {
               ))}
             </div>
           </div>
-        ))
-      )}
+        ))}</>
+      ))}
 
       {/* ── Sheet edición multi-tab ── */}
       {sel && (
