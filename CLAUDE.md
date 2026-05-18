@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-16 (sesión 5)
-> **Versión actual en producción: v1.3-dev** (commit 798104d)
+> Actualizado: 2026-05-17 (sesión 6)
+> **Versión actual en producción: v1.3-dev** (commit 6003192)
 
 ---
 
@@ -131,6 +131,16 @@ v53_profesional_servicios.sql     ✅ tabla profesional_servicios (muchos-a-much
 | SQL v50 billing | sql/v50_pagos_plataforma.sql | tablas pagos_plataforma + RPCs salon_admin_registrar_pago/get_pagos ✅ APLICADO |
 | Dashboard preview mañana | SalonDashboard.jsx | Card "Mañana" con citas del día siguiente + botón "Ver agenda →" |
 | Cobro rápido inline en timeline | SalonDashboard.jsx | Botón muestra monto; click expande selector método + "Cobrar"/"Sin cobro" |
+
+### Bug fixes deployados — sesión 6 (2026-05-17)
+
+| Bug | Causa raíz | Fix |
+| --- | --- | --- |
+| Anticipos/deducciones no se guardan | `registrarAnticipo` no capturaba error de Supabase → cerraba form y mostraba "Registrado ✓" aunque fallara | Captura `{ error }` del insert, muestra toast de error y no cierra el form. `cargarAnticipos` corre en mount. |
+| Fotos de profesionales desaparecen al scroll en VistaDia | `overflowY:'clip'` + `overflowX:'auto'` rompen CSS `position:sticky` del header | Cambio a `overflow:'auto'` con `maxHeight: calc(100dvh - 210px)` → sticky funciona dentro del container |
+| Timeline agenda muy extensa en móvil | H_START=7 a H_END=21 fijo → 1232px siempre | Rango dinámico basado en horas de citas del día (±1h). SLOT_H reducido a 40px. |
+| Duración de citas incorrecta en grid (+5h extra) | `fecha_fin = new Date(inicio).toISOString()` convierte local→UTC, guarda sin 'Z'. Al leer, se interpreta como local → desfase de 5h (Colombia UTC-5) | En SalonNuevaCita: usar `getHours()/getMinutes()` local. En durPx: usar `duracion_min` del servicio como fuente canónica (ignora fecha_fin corrupta) |
+| Sin selector de rol al crear acceso para profesional | `{!creandoPara?.nombre && <ROL selector>}` lo ocultaba | Selector siempre visible, con descripción del rol activo |
 
 ### Pendientes operativos
 
