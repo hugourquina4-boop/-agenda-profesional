@@ -166,6 +166,7 @@ export default function SalonDashboard({ onNavigate }) {
     { nombre:'Andrea Ruiz',    total:95000  },
   ] : [])
   const [sinCobrar,      setSinCobrar]      = useState([])
+  const [portalHoy,      setPortalHoy]      = useState(0)
   const [proximos7,      setProximos7]      = useState([])
   const [showRecordManana, setShowRecordManana] = useState(false)
 
@@ -190,7 +191,7 @@ export default function SalonDashboard({ onNavigate }) {
       })()
 
       const hace14iso = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes, pagosHoyRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes, pagosHoyRes, portalHoyRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -249,6 +250,12 @@ export default function SalonDashboard({ onNavigate }) {
           .eq('tenant_id', tenant.id)
           .gte('created_at', `${fecha}T00:00:00`)
           .lte('created_at', `${fecha}T23:59:59`),
+        supabase.from('citas')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id)
+          .eq('fuente', 'portal')
+          .gte('fecha_inicio', `${fecha}T00:00:00`)
+          .lte('fecha_inicio', `${fecha}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -291,6 +298,7 @@ export default function SalonDashboard({ onNavigate }) {
       // Citas completadas sin cobrar hoy
       const citasIdsCobradas = new Set((pagosHoyRes.data || []).map(p => p.cita_id).filter(Boolean))
       setSinCobrar(citasList.filter(c => c.estado === 'completada' && !citasIdsCobradas.has(c.id)))
+      setPortalHoy(portalHoyRes.count || 0)
 
       // Analytics del mes
       const citasMes = analyticsMesRes.data || []
@@ -751,6 +759,12 @@ export default function SalonDashboard({ onNavigate }) {
             <span className="sp-hero-stat-val">{fmtCOP(ingresosHoy)}</span>
             <span className="sp-hero-stat-lbl">Ingresado</span>
           </div>
+          {portalHoy > 0 && (
+            <div className="sp-hero-stat">
+              <span className="sp-hero-stat-val">🌐 {portalHoy}</span>
+              <span className="sp-hero-stat-lbl">Portal</span>
+            </div>
+          )}
         </div>
       </div>
 

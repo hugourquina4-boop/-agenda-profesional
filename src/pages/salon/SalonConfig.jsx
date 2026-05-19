@@ -106,6 +106,7 @@ export default function SalonConfig() {
       duracion_slot_min:   tenant.config_vertical?.duracion_slot_min   || 30,
       anticipacion_horas:  tenant.config_vertical?.anticipacion_horas  || 2,
       politica_cancelacion:tenant.config_vertical?.politica_cancelacion|| '',
+      horas_cancelacion:   tenant.config_vertical?.horas_cancelacion   ?? 2,
       wompi_public_key:    tenant.wompi_public_key    || '',
       pagos_portal_activo: tenant.pagos_portal_activo ?? false,
       fotos_galeria:       (tenant.config_vertical?.fotos_galeria || []).concat(['','','','']).slice(0,4),
@@ -153,6 +154,7 @@ export default function SalonConfig() {
         duracion_slot_min:    Number(form.duracion_slot_min),
         anticipacion_horas:   Number(form.anticipacion_horas),
         politica_cancelacion: form.politica_cancelacion.trim() || null,
+        horas_cancelacion:    Number(form.horas_cancelacion) ?? 2,
         meta_ingresos_mes:    Number(form.meta_ingresos_mes) || 0,
         link_google_reviews:  form.link_google_reviews.trim() || null,
       },
@@ -393,6 +395,11 @@ export default function SalonConfig() {
             value={form.politica_cancelacion}
             onChange={e => set('politica_cancelacion', e.target.value)}
             style={{ resize:'none' }} />
+        </Campo>
+        <Campo label="Horas mínimas para cancelar por portal (0 = no se permite)">
+          <input className="sp-input" type="number" min="0" max="72"
+            value={form.horas_cancelacion}
+            onChange={e => set('horas_cancelacion', e.target.value)} />
         </Campo>
       </Seccion>
 

@@ -234,7 +234,7 @@ export default function SalonPortal() {
         .limit(1).maybeSingle()
       if (!cli) { setMisCitas([]); return }
       const { data: citas } = await supabase.from('citas')
-        .select('fecha_inicio, estado, servicios(nombre), profesionales(nombre)')
+        .select('id, fecha_inicio, estado, servicios(nombre), profesionales(nombre)')
         .eq('tenant_id', tenant.id).eq('cliente_id', cli.id)
         .neq('estado', 'cancelada').gte('fecha_inicio', new Date().toISOString())
         .order('fecha_inicio').limit(5)
@@ -242,6 +242,23 @@ export default function SalonPortal() {
     } finally {
       setBuscandoMis(false)
     }
+  }
+
+  const [cancelando, setCancelando] = useState(null) // citaId being cancelled
+
+  async function cancelarCita(citaId) {
+    setCancelando(citaId)
+    const { data, error } = await supabase.rpc('cancelar_cita_portal', {
+      p_cita_id:   citaId,
+      p_tenant_id: tenant.id,
+      p_telefono:  misCitasTel,
+    })
+    setCancelando(null)
+    if (error || !data?.ok) {
+      alert(data?.error || error?.message || 'No se pudo cancelar')
+      return
+    }
+    await buscarMisCitas()
   }
 
   const [reglas, setReglas] = useState([])
@@ -427,7 +444,7 @@ export default function SalonPortal() {
       if (e) { setError('Error al registrar. Intenta de nuevo.'); setSaving(false); return }
       cliId = nc.id
     }
-    const { data: cita, error: eCita } = await supabase.from('citas').insert({ tenant_id: tenant.id, profesional_id: profId, servicio_id: servIds[0], servicios_ids: servIds, cliente_id: cliId, fecha_inicio: slot.inicio, fecha_fin: slot.fin, estado: 'confirmada', precio_cobrado: precioTotal||null, notas: notasPortal.trim()||null }).select('id').single()
+    const { data: cita, error: eCita } = await supabase.from('citas').insert({ tenant_id: tenant.id, profesional_id: profId, servicio_id: servIds[0], servicios_ids: servIds, cliente_id: cliId, fecha_inicio: slot.inicio, fecha_fin: slot.fin, estado: 'confirmada', precio_cobrado: precioTotal||null, notas: notasPortal.trim()||null, fuente: 'portal' }).select('id').single()
     if (eCita) { setError('Error al agendar. Intenta de nuevo.'); setSaving(false); return }
     if (wompiTransactionId) {
       await supabase.from('pagos').insert({ tenant_id: tenant.id, cita_id: cita.id, monto: precioTotal, metodo: 'wompi', estado: 'pagado', referencia: wompiTransactionId })
@@ -671,12 +688,32 @@ export default function SalonPortal() {
                           <div key={i} style={{ padding:'10px 12px', borderRadius:12, marginBottom:6,
                             background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
                             border:`1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}` }}>
-                            <div style={{ fontSize:13, fontWeight:700, color:T.text }}>
-                              📅 {new Date(c.fecha_inicio).toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'short' })}
-                              {' · '}{new Date(c.fecha_inicio).toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })}
-                            </div>
-                            <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>
-                              {c.servicios?.nombre || '—'}{c.profesionales?.nombre ? ` con ${c.profesionales.nombre.split(' ')[0]}` : ''}
+                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                              <div>
+                                <div style={{ fontSize:13, fontWeight:700, color:T.text }}>
+                                  📅 {new Date(c.fecha_inicio).toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'short' })}
+                                  {' · '}{new Date(c.fecha_inicio).toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })}
+                                </div>
+                                <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>
+                                  {c.servicios?.nombre || '—'}{c.profesionales?.nombre ? ` con ${c.profesionales.nombre.split(' ')[0]}` : ''}
+                                </div>
+                              </div>
+                              {(() => {
+                                const horasCancelacion = tenant?.config_vertical?.horas_cancelacion ?? 2
+                                if (horasCancelacion === 0) return null
+                                const deadline = new Date(c.fecha_inicio)
+                                deadline.setHours(deadline.getHours() - horasCancelacion)
+                                if (new Date() >= deadline) return null
+                                return (
+                                  <button
+                                    onClick={() => cancelarCita(c.id)}
+                                    disabled={cancelando === c.id}
+                                    style={{ flexShrink:0, padding:'5px 10px', borderRadius:8, border:`1px solid rgba(239,68,68,0.4)`, background:'rgba(239,68,68,0.1)', color:'#ef4444', fontSize:11, fontWeight:700, cursor:'pointer', opacity: cancelando===c.id ? 0.5 : 1 }}
+                                  >
+                                    {cancelando === c.id ? '…' : 'Cancelar'}
+                                  </button>
+                                )
+                              })()}
                             </div>
                           </div>
                         ))}
