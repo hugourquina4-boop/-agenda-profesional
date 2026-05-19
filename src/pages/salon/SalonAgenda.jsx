@@ -640,6 +640,23 @@ export default function SalonAgenda() {
                     }}>{cnt}</div>
                   ) : null
                 })()}
+                {selDay === today.toISOString().slice(0,10) && nowOffset !== null && (() => {
+                  const enCita = citasDia.some(c =>
+                    c.profesional_id === p.id &&
+                    !['cancelada','no_asistio','completada'].includes(c.estado) &&
+                    (() => {
+                      const ini = parseInt(c.fecha_inicio.substring(11,13))*60+parseInt(c.fecha_inicio.substring(14,16))
+                      const fin = c.fecha_fin ? parseInt(c.fecha_fin.substring(11,13))*60+parseInt(c.fecha_fin.substring(14,16)) : ini+(c.servicios?.duracion_min||60)
+                      return nowOffset >= ini && nowOffset < fin
+                    })()
+                  )
+                  return (
+                    <div style={{ width:7, height:7, borderRadius:'50%', margin:'3px auto 0',
+                      background: enCita ? '#f59e0b' : '#22c55e',
+                      boxShadow: `0 0 5px ${enCita ? '#f59e0b' : '#22c55e'}80`,
+                    }} title={enCita ? 'En cita' : 'Disponible'} />
+                  )
+                })()}
               </div>
             ))}
           </div>
@@ -1278,7 +1295,7 @@ export default function SalonAgenda() {
                   return null
                 })()}
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <span style={{
                   fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:8,
                   background:`${ESTADO_COLOR[selCita.estado] || col}20`,
@@ -1286,6 +1303,16 @@ export default function SalonAgenda() {
                 }}>
                   {ESTADO_LABEL[selCita.estado] || selCita.estado}
                 </span>
+                {selCita.clientes_agenda?.telefono && (
+                  <a href={`https://wa.me/${selCita.clientes_agenda.telefono.replace(/\D/g,'')}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ width:30, height:30, borderRadius:8, border:'none',
+                      background:'rgba(37,211,102,0.12)', color:'#25d366', cursor:'pointer',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:14, lineHeight:1, flexShrink:0, textDecoration:'none' }}>
+                    💬
+                  </a>
+                )}
                 <button onClick={() => setSelCita(null)} style={{
                   width:30, height:30, borderRadius:8, border:'none',
                   background:'rgba(255,255,255,0.08)', color:'var(--text-3)', cursor:'pointer',
