@@ -518,10 +518,14 @@ v72_portal_anon_tenants.sql       ⏳ PENDIENTE — corregido (quitó config_ver
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Caja: gráfico de barras ingresos vs egresos por semana | sin SQL | 🟡 Media |
-| Inventario: historial de movimientos de stock | sin SQL | 🟡 Media |
-| Búsqueda global (barra que busca clientes/citas desde cualquier módulo) | sin SQL | 🟡 Media |
-| Caja: cierre del día con PDF de cuadre | sin SQL | 🟡 Media |
+| Caja: gráfico de barras ingresos vs egresos por semana | sin SQL | ✅ DONE — 7 barras dobles (ing/eg), solo visible en periodo='semana' |
+| Caja: cierre del día con PDF de cuadre | sin SQL | ✅ DONE — botón 'Z Cierre' en periodo='hoy', PDF con KPIs+métodos+cobros+firma |
+| Inventario: historial de movimientos de stock | v73 ⏳ | ✅ DONE — botón historial en cada producto, modal con ajuste manual + timeline |
+| Búsqueda global (barra que busca clientes/citas desde cualquier módulo) | sin SQL | 🟡 Pendiente |
+
+**SQL pendiente de aplicar:**
+- `v72_portal_anon_tenants.sql` — portal `/reservar/slug` en blanco (CRÍTICO)
+- `v73_movimientos_stock.sql` — historial de movimientos de stock
 
 ---
 
