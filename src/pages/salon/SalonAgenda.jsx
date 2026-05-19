@@ -84,6 +84,10 @@ export default function SalonAgenda() {
   const [guardandoAnticipo,setGuardandoAnticipo]= useState(false)
   const [dupMode,          setDupMode]          = useState(false)
   const [dupFecha,         setDupFecha]         = useState('')
+  const [serieMode,        setSerieMode]        = useState(false)
+  const [serieFreq,        setSerieFreq]        = useState('semanal')
+  const [serieReps,        setSerieReps]        = useState(4)
+  const [creandoSerie,     setCreandoSerie]     = useState(false)
   const [busqAgenda,       setBusqAgenda]       = useState('')
 
   // Bloquear franja horaria
@@ -137,7 +141,7 @@ export default function SalonAgenda() {
   useEffect(() => { cargarMes() }, [cargarMes])
 
   useEffect(() => {
-    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); setDupMode(false); setDupFecha(''); return }
+    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); setDupMode(false); setDupFecha(''); setSerieMode(false); return }
     setNota(selCita.notas || '')
     setAnticoInput('')
     setLoadPago(true)
@@ -186,6 +190,37 @@ export default function SalonAgenda() {
     await supabase.from('citas').update({ notas: nota.trim() || null }).eq('id', selCita.id)
     setSelCita(c => ({ ...c, notas: nota.trim() || null }))
     setGuardandoNota(false)
+  }
+
+  async function crearSerie() {
+    if (!selCita) return
+    setCreandoSerie(true)
+    const diasFreq = { semanal:7, quincenal:14, mensual:30 }[serieFreq]
+    const horaIni  = selCita.fecha_inicio.substring(10)
+    const horaFin  = selCita.fecha_fin?.substring(10) || 'T10:00:00'
+    const rows = []
+    for (let i = 1; i <= serieReps; i++) {
+      const d = new Date(selCita.fecha_inicio)
+      d.setDate(d.getDate() + i * diasFreq)
+      const f = d.toISOString().slice(0, 10)
+      rows.push({
+        tenant_id:      tenant.id,
+        profesional_id: selCita.profesional_id,
+        servicio_id:    selCita.servicio_id,
+        servicios_ids:  selCita.servicios_ids,
+        cliente_id:     selCita.cliente_id,
+        fecha_inicio:   `${f}${horaIni}`,
+        fecha_fin:      `${f}${horaFin}`,
+        estado:         'pendiente',
+        precio_cobrado: selCita.precio_cobrado,
+        sede_id:        selCita.sede_id,
+      })
+    }
+    await supabase.from('citas').insert(rows)
+    setCreandoSerie(false)
+    setSerieMode(false)
+    setSelCita(null)
+    cargarMes()
   }
 
   async function duplicarCita() {
@@ -1212,18 +1247,29 @@ export default function SalonAgenda() {
               <div style={{ marginBottom:16 }} />
             )}
 
-            {/* Duplicar cita */}
-            {!dupMode ? (
-              <button onClick={() => setDupMode(true)} style={{
-                width:'100%', padding:'12px', borderRadius:13, cursor:'pointer', marginBottom:16,
-                background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.22)',
-                color:'#818cf8', fontWeight:700, fontSize:13, fontFamily:'Plus Jakarta Sans',
-                display:'flex', alignItems:'center', justifyContent:'center', gap:7,
-              }}>
-                <Ico d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" size={15} />
-                Duplicar a otra fecha
-              </button>
-            ) : (
+            {/* Duplicar / Crear serie */}
+            {!dupMode && !serieMode ? (
+              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                <button onClick={() => setDupMode(true)} style={{
+                  flex:1, padding:'12px', borderRadius:13, cursor:'pointer',
+                  background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.22)',
+                  color:'#818cf8', fontWeight:700, fontSize:12,
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:5,
+                }}>
+                  <Ico d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" size={14} />
+                  Duplicar
+                </button>
+                <button onClick={() => setSerieMode(true)} style={{
+                  flex:1, padding:'12px', borderRadius:13, cursor:'pointer',
+                  background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.22)',
+                  color:'#818cf8', fontWeight:700, fontSize:12,
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:5,
+                }}>
+                  <Ico d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" size={14} />
+                  Crear serie
+                </button>
+              </div>
+            ) : dupMode ? (
               <div style={{ marginBottom:16, padding:'14px 16px', borderRadius:13,
                 background:'rgba(99,102,241,0.07)', border:'1px solid rgba(99,102,241,0.22)' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#818cf8', marginBottom:10 }}>
@@ -1246,7 +1292,53 @@ export default function SalonAgenda() {
                   }}>Cancelar</button>
                 </div>
               </div>
-            )}
+            ) : serieMode ? (
+              <div style={{ marginBottom:16, padding:'14px 16px', borderRadius:13,
+                background:'rgba(99,102,241,0.07)', border:'1px solid rgba(99,102,241,0.22)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#818cf8', marginBottom:12 }}>
+                  Crear citas recurrentes
+                </div>
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:6 }}>Frecuencia</div>
+                  <div style={{ display:'flex', gap:6 }}>
+                    {[['semanal','Semanal'],['quincenal','Quincenal'],['mensual','Mensual']].map(([v,l]) => (
+                      <button key={v} onClick={() => setSerieFreq(v)} style={{
+                        flex:1, padding:'8px 4px', borderRadius:9, border:'none', cursor:'pointer', fontSize:11, fontWeight:700,
+                        background: serieFreq === v ? '#6366f1' : 'var(--card)',
+                        color: serieFreq === v ? '#fff' : 'var(--text-3)',
+                      }}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:6 }}>Repeticiones: {serieReps}</div>
+                  <input type="range" min={2} max={24} value={serieReps}
+                    onChange={e => setSerieReps(Number(e.target.value))}
+                    style={{ width:'100%', accentColor:'#6366f1' }} />
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-3)', marginTop:2 }}>
+                    <span>2</span><span>24</span>
+                  </div>
+                </div>
+                <div style={{ fontSize:11, color:'#818cf8', marginBottom:12, padding:'8px 10px',
+                  background:'rgba(99,102,241,0.07)', borderRadius:8 }}>
+                  Se crearán {serieReps} citas {serieFreq === 'semanal' ? 'cada semana' : serieFreq === 'quincenal' ? 'cada 2 semanas' : 'cada mes'} con el mismo horario y profesional
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={crearSerie} disabled={creandoSerie} style={{
+                    flex:1, padding:'11px', borderRadius:11, border:'none', cursor:'pointer',
+                    background:'linear-gradient(135deg,#6366f1,#4f46e5)', color:'#fff',
+                    fontWeight:700, fontSize:13, opacity: creandoSerie ? 0.6 : 1,
+                  }}>
+                    {creandoSerie ? '…' : `Crear ${serieReps} citas`}
+                  </button>
+                  <button onClick={() => setSerieMode(false)} style={{
+                    padding:'11px 14px', borderRadius:11, border:'none', cursor:'pointer',
+                    background:'var(--card)', color:'var(--text-3)', fontWeight:700, fontSize:13,
+                    boxShadow:'0 1px 4px rgba(0,0,0,0.1)',
+                  }}>Cancelar</button>
+                </div>
+              </div>
+            ) : null}
 
             {/* ── Sección de pago ── */}
             {!['cancelada','no_asistio'].includes(selCita.estado) && (

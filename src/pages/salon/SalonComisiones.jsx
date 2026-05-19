@@ -79,7 +79,7 @@ export default function SalonComisiones() {
     setLoading(true)
     try {
       const [profRes, rulesRes, comRes] = await Promise.all([
-        supabase.from('profesionales').select('id,nombre,especialidad').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+        supabase.from('profesionales').select('id,nombre,especialidad,telefono').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
         supabase.from('commission_rules').select('*').eq('tenant_id', tenant.id).eq('activo', true),
         supabase.from('comisiones').select('*').eq('tenant_id', tenant.id).eq('liquidado', false).order('created_at', { ascending: false }),
       ])
@@ -354,13 +354,30 @@ export default function SalonComisiones() {
     if (isDemo) { showToast('Demo — conecta Supabase para guardar', '#f59e0b'); return }
     setLiquidando(true)
     const ids = [...seleccionados]
+
+    // Calcular totales por profesional antes de liquidar (para WA)
+    const totalesPorProf = {}
+    for (const c of comisiones.filter(c => seleccionados.has(c.id))) {
+      totalesPorProf[c.profesional_id] = (totalesPorProf[c.profesional_id] || 0) + (c.monto_comision || 0)
+    }
+
     await supabase.from('comisiones')
       .update({ liquidado: true, fecha_liquidacion: new Date().toISOString().slice(0,10) })
       .in('id', ids)
     setSeleccionados(new Set())
-    showToast(`${ids.length} comisión${ids.length > 1 ? 'es' : ''} liquidada${ids.length > 1 ? 's' : ''} ✓`)
     setLiquidando(false)
     cargar()
+
+    // Abrir WA para cada profesional con teléfono
+    const mesLabel = new Date().toLocaleDateString('es-CO', { month:'long', year:'numeric' })
+    for (const [profId, total] of Object.entries(totalesPorProf)) {
+      const prof = profesionales.find(p => p.id === profId)
+      if (!prof?.telefono) continue
+      const tel = prof.telefono.replace(/\D/g, '')
+      const msg = `Hola ${prof.nombre?.split(' ')[0] || ''} 👋 Tu liquidación de comisiones de ${mesLabel} ya fue procesada: *$${Math.round(total).toLocaleString('es-CO')}*. ¡Gracias por tu trabajo! 💅`
+      window.open(`https://wa.me/57${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+    }
+    showToast(`${ids.length} comisión${ids.length > 1 ? 'es' : ''} liquidada${ids.length > 1 ? 's' : ''} ✓`)
   }
 
   // Agrupar comisiones pendientes por profesional
