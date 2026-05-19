@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 18)
-> **Versión actual en producción: v1.4-dev** (commit 63befe8)
+> Actualizado: 2026-05-18 (sesión 18 — cont.)
+> **Versión actual en producción: v1.4-dev** (commit 670c065)
 
 ---
 
@@ -591,6 +591,34 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | ------- | --- | ------ |
 | Dashboard: onboarding expandido a 5 pasos (servicios/equipo/clientes/WA/cita) | sin SQL | ✅ DONE |
 | Agenda: banner ⚠️ notas/alergias del cliente en popup de cita | sin SQL | ✅ DONE |
+
+## Bloque X — COMPLETADO (sesión 18 cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Servicios: badge "N este mes" en cada servicio (4ª query paralela) | sin SQL | ✅ DONE |
+| Dashboard: strip 7 próximos días con count de citas (reutiliza analyticsMes) | sin SQL | ✅ DONE |
+| Agenda vista semana: color por estado (ya estaba vía ESTADO_COLOR) | sin SQL | ✅ DONE |
+| Clientes: próxima cita programada en detalle del cliente (chip azul índigo) | sin SQL | ✅ DONE |
+
+## Bloque Y — COMPLETADO (sesión 18 cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Analytics: card "Segmentación" — total/nuevos/recurrentes/VIP + barra retención | sin SQL | ✅ DONE |
+| Agenda VistaSemana: count de citas bajo el número del día en el header | sin SQL | ✅ DONE |
+
+## Bloque Z — COMPLETADO (sesión 18 cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Agenda: botón 📅 Reagendar en popup — fecha + hora picker, update cita | sin SQL | ✅ DONE |
+| Clientes: edad calculada del cliente en el detalle (junto a cumpleaños) | sin SQL | ✅ DONE |
+
+**SQL pendiente aplicar (APLICAR EN SUPABASE):**
+
+- `v75_puntos_config.sql` — ADD COLUMN puntos_por_visita + puntos_canje_min en tenants
+- `v76_cliente_fuente.sql` — ADD COLUMN fuente_captacion en clientes_agenda
 
 ---
 
