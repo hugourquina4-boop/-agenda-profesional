@@ -97,6 +97,12 @@ export default function SalonClientes() {
   const [fotos,       setFotos]       = useState([])
   const [loadFotos,   setLoadFotos]   = useState(false)
 
+  // Fidelidad
+  const [puntos,       setPuntos]       = useState([])
+  const [loadPuntos,   setLoadPuntos]   = useState(false)
+  const [puntosForm,   setPuntosForm]   = useState({ tipo:'ganados', puntos:'', motivo:'' })
+  const [savingPts,    setSavingPts]    = useState(false)
+
   // Préstamos
   const [prestamos,     setPrestamos]     = useState([])
   const [loadPrest,     setLoadPrest]     = useState(false)
@@ -435,6 +441,43 @@ export default function SalonClientes() {
     setFormPrest({ tipo:'prestamo', monto:'', concepto:'', fecha: new Date().toISOString().slice(0,10) })
     showToast('Movimiento registrado ✓')
     cargarPrestamos(sel.id)
+  }
+
+  async function cargarPuntos(clienteId) {
+    if (!tenant) return
+    setLoadPuntos(true)
+    const { data } = await supabase.from('puntos_cliente')
+      .select('*').eq('cliente_id', clienteId).eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: false })
+    setPuntos(data || [])
+    setLoadPuntos(false)
+  }
+
+  async function registrarPuntos() {
+    const pts = parseInt(puntosForm.puntos)
+    if (!pts || pts <= 0) { showToast('Ingresa puntos válidos', false); return }
+    setSavingPts(true)
+    // Compute new saldo
+    const saldoActual = puntos[0]?.saldo ?? (sel?.puntos_acumulados || 0)
+    const delta = puntosForm.tipo === 'canjeados' ? -pts : pts
+    const nuevoSaldo = Math.max(0, saldoActual + delta)
+    const { error } = await supabase.from('puntos_cliente').insert({
+      tenant_id: tenant.id,
+      cliente_id: sel.id,
+      tipo: puntosForm.tipo,
+      puntos: puntosForm.tipo === 'canjeados' ? -pts : pts,
+      saldo: nuevoSaldo,
+      motivo: puntosForm.motivo || null,
+    })
+    if (!error) {
+      await supabase.from('clientes_agenda').update({ puntos_acumulados: nuevoSaldo }).eq('id', sel.id)
+      setPuntosForm({ tipo:'ganados', puntos:'', motivo:'' })
+      showToast('Puntos registrados ✓')
+      cargarPuntos(sel.id)
+    } else {
+      showToast('Error al guardar', false)
+    }
+    setSavingPts(false)
   }
 
   async function eliminarPrestamo(id) {
@@ -1056,10 +1099,11 @@ export default function SalonClientes() {
             {/* ── Tabs Historial / Fotos ── */}
             <div style={{ display:'flex', gap:4, marginBottom:14,
               background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
-              {[['historial','Historial'],['fotos','Fotos 📷'],['credito','Crédito']].map(([t, label]) => (
+              {[['historial','Historial'],['fotos','Fotos 📷'],['credito','Crédito'],['puntos','Puntos ⭐']].map(([t, label]) => (
                 <button key={t} onClick={() => {
                   setTabCliente(t)
                   if (t === 'credito' && sel?.id) cargarPrestamos(sel.id)
+                  if (t === 'puntos' && sel?.id) cargarPuntos(sel.id)
                 }} style={{
                   flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
                   background: tabCliente === t ? col : 'transparent',
@@ -1286,6 +1330,86 @@ export default function SalonClientes() {
                 </>
               )
             })()}
+
+            {tabCliente === 'puntos' && (() => {
+              const saldoActual = puntos[0]?.saldo ?? (sel?.puntos_acumulados || 0)
+              return (
+                <>
+                  {/* Saldo prominente */}
+                  <div style={{
+                    textAlign:'center', padding:'20px 0 16px',
+                    background:`linear-gradient(135deg,${col}18,${col}06)`,
+                    borderRadius:16, marginBottom:14,
+                  }}>
+                    <div style={{ fontSize:40, lineHeight:1 }}>⭐</div>
+                    <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:36, color:col, lineHeight:1.1, marginTop:6 }}>
+                      {saldoActual.toLocaleString('es-CO')}
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:4 }}>puntos disponibles</div>
+                  </div>
+
+                  {/* Form rápido */}
+                  <div style={{ background:'var(--card)', borderRadius:14, padding:'14px', marginBottom:14, boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
+                    <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+                      {[{ k:'ganados', label:'Dar puntos' }, { k:'canjeados', label:'Canjear' }, { k:'ajuste', label:'Ajuste' }].map(opt => (
+                        <button key={opt.k} onClick={() => setPuntosForm(f => ({...f, tipo:opt.k}))} style={{
+                          flex:1, padding:'7px 4px', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:11,
+                          border:`1.5px solid ${puntosForm.tipo === opt.k ? col : 'var(--border)'}`,
+                          background: puntosForm.tipo === opt.k ? `${col}14` : 'transparent',
+                          color: puntosForm.tipo === opt.k ? col : 'var(--text-3)',
+                        }}>{opt.label}</button>
+                      ))}
+                    </div>
+                    <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                      <input className="sp-input" type="number" min="1" placeholder="Puntos"
+                        value={puntosForm.puntos} onChange={e => setPuntosForm(f => ({...f, puntos:e.target.value}))}
+                        style={{ flex:'0 0 90px' }} />
+                      <input className="sp-input" placeholder="Motivo (opcional)"
+                        value={puntosForm.motivo} onChange={e => setPuntosForm(f => ({...f, motivo:e.target.value}))}
+                        style={{ flex:1 }} />
+                    </div>
+                    <button disabled={savingPts} onClick={registrarPuntos} style={{
+                      width:'100%', padding:'11px', borderRadius:12, border:'none', cursor:'pointer',
+                      background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+                      fontWeight:700, fontSize:14, opacity: savingPts ? 0.7 : 1,
+                    }}>
+                      {savingPts ? 'Guardando…' : 'Registrar'}
+                    </button>
+                  </div>
+
+                  {/* Historial de movimientos */}
+                  {loadPuntos ? (
+                    <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}>
+                      <div className="sp-spinner" style={{ borderTopColor:col }} />
+                    </div>
+                  ) : puntos.length === 0 ? (
+                    <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>Sin movimientos</p>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {puntos.map(p => {
+                        const esPos = p.puntos > 0
+                        const clr = esPos ? '#22c55e' : '#f87171'
+                        return (
+                          <div key={p.id} className="sp-tbl-row" style={{ padding:'10px 14px' }}>
+                            <span style={{ fontSize:18, flexShrink:0 }}>{esPos ? '⭐' : '🎁'}</span>
+                            <div style={{ flex:1, minWidth:0, marginLeft:8 }}>
+                              <div style={{ fontSize:12, color:'var(--text)' }}>{p.motivo || p.tipo}</div>
+                              <div style={{ fontSize:10, color:'var(--text-3)' }}>
+                                {new Date(p.created_at).toLocaleDateString('es-CO')} · saldo: {p.saldo}
+                              </div>
+                            </div>
+                            <span style={{ fontFamily:'Outfit', fontWeight:800, fontSize:13, color:clr, flexShrink:0 }}>
+                              {esPos ? '+' : ''}{p.puntos}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+
           </div>
         </>
       )}
