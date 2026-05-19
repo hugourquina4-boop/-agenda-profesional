@@ -358,7 +358,8 @@ v68_trigger_stock.sql             ✅ APLICADO (2026-05-18) — trigger fn_desco
 v69_wompi_portal.sql              ✅ APLICADO (2026-05-18) — wompi_public_key + pagos_portal_activo en tenants
 v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_usuario_tenant SECURITY DEFINER
 v71_sedes_horario.sql             ✅ APLICADO (2026-05-18) — hora_apertura + hora_cierre + dias_activos en sedes
-v72_portal_anon_tenants.sql       ⏳ PENDIENTE — corregido (quitó config_vertical inexistente); aplicar en Supabase SQL Editor
+v72_portal_anon_tenants.sql       ✅ APLICADO — anon RLS en tenants/profesionales/servicios/horarios/sedes/paquetes/citas
+v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS + índices
 ```
 
 ---
@@ -523,9 +524,7 @@ v72_portal_anon_tenants.sql       ⏳ PENDIENTE — corregido (quitó config_ver
 | Inventario: historial de movimientos de stock | v73 ⏳ | ✅ DONE — botón historial en cada producto, modal con ajuste manual + timeline |
 | Búsqueda global (barra que busca clientes/citas desde cualquier módulo) | sin SQL | 🟡 Pendiente |
 
-**SQL pendiente de aplicar:**
-- `v72_portal_anon_tenants.sql` — portal `/reservar/slug` en blanco (CRÍTICO)
-- `v73_movimientos_stock.sql` — historial de movimientos de stock
+**SQL aplicado:** v72 ✅ (portal activo) · v73 ✅ (movimientos stock activos)
 
 ---
 
