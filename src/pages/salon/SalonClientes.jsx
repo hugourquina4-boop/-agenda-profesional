@@ -458,7 +458,7 @@ export default function SalonClientes() {
     if (!pts || pts <= 0) { showToast('Ingresa puntos válidos', false); return }
     setSavingPts(true)
     // Compute new saldo
-    const saldoActual = puntos[0]?.saldo ?? (sel?.puntos_acumulados || 0)
+    const saldoActual = puntos[0]?.saldo ?? (sel?.puntos_fidelizacion || 0)
     const delta = puntosForm.tipo === 'canjeados' ? -pts : pts
     const nuevoSaldo = Math.max(0, saldoActual + delta)
     const { error } = await supabase.from('puntos_cliente').insert({
@@ -470,7 +470,7 @@ export default function SalonClientes() {
       motivo: puntosForm.motivo || null,
     })
     if (!error) {
-      await supabase.from('clientes_agenda').update({ puntos_acumulados: nuevoSaldo }).eq('id', sel.id)
+      await supabase.from('clientes_agenda').update({ puntos_fidelizacion: nuevoSaldo }).eq('id', sel.id)
       setPuntosForm({ tipo:'ganados', puntos:'', motivo:'' })
       showToast('Puntos registrados ✓')
       cargarPuntos(sel.id)
@@ -919,6 +919,10 @@ export default function SalonClientes() {
                     <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
                       background:'rgba(245,158,11,0.15)', color:'#f59e0b' }}>MAYORISTA</span>
                   )}
+                  {(sel.puntos_fidelizacion > 0) && (
+                    <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
+                      background:'rgba(234,179,8,0.15)', color:'#ca8a04' }}>⭐ {sel.puntos_fidelizacion} pts</span>
+                  )}
                   <span style={{ fontSize:12, color:'var(--text-3)' }}>
                     desde {fmtFecha(sel.created_at)}
                   </span>
@@ -1332,7 +1336,7 @@ export default function SalonClientes() {
             })()}
 
             {tabCliente === 'puntos' && (() => {
-              const saldoActual = puntos[0]?.saldo ?? (sel?.puntos_acumulados || 0)
+              const saldoActual = puntos[0]?.saldo ?? (sel?.puntos_fidelizacion || 0)
               return (
                 <>
                   {/* Saldo prominente */}

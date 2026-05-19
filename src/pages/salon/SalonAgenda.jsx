@@ -189,6 +189,25 @@ export default function SalonAgenda() {
     if (!selCita) return
     setActualizando(true)
     await supabase.from('citas').update({ estado: nuevoEstado }).eq('id', selCita.id)
+
+    // Auto-otorgar 10 puntos de fidelidad al completar
+    if (nuevoEstado === 'completada' && selCita.cliente_id) {
+      const { data: ultimo } = await supabase.from('puntos_cliente')
+        .select('saldo').eq('cliente_id', selCita.cliente_id).order('created_at', { ascending:false }).limit(1).maybeSingle()
+      const saldoBase = ultimo?.saldo ?? 0
+      const nuevoSaldo = saldoBase + 10
+      await supabase.from('puntos_cliente').insert({
+        tenant_id: tenant.id,
+        cliente_id: selCita.cliente_id,
+        tipo: 'ganados',
+        puntos: 10,
+        saldo: nuevoSaldo,
+        motivo: `Visita completada`,
+        referencia_id: selCita.id,
+      })
+      await supabase.from('clientes_agenda').update({ puntos_fidelizacion: nuevoSaldo }).eq('id', selCita.cliente_id)
+    }
+
     setActualizando(false)
     setSelCita(null)
     cargarMes()
