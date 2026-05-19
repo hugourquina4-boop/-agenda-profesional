@@ -109,6 +109,8 @@ export default function SalonConfig() {
       wompi_public_key:    tenant.wompi_public_key    || '',
       pagos_portal_activo: tenant.pagos_portal_activo ?? false,
       fotos_galeria:       (tenant.config_vertical?.fotos_galeria || []).concat(['','','','']).slice(0,4),
+      puntos_por_visita:   tenant.puntos_por_visita   ?? 10,
+      puntos_canje_min:    tenant.puntos_canje_min    ?? 50,
     })
   }, [tenant])
 
@@ -136,6 +138,8 @@ export default function SalonConfig() {
       descripcion:          form.descripcion.trim() || null,
       wompi_public_key:     form.wompi_public_key.trim()  || null,
       pagos_portal_activo:  form.pagos_portal_activo,
+      puntos_por_visita:    Number(form.puntos_por_visita) || 10,
+      puntos_canje_min:     Number(form.puntos_canje_min)  || 50,
       config_vertical: {
         ...(tenant.config_vertical || {}),
         fotos_galeria:        form.fotos_galeria.filter(Boolean),
@@ -386,6 +390,25 @@ export default function SalonConfig() {
             onChange={e => set('politica_cancelacion', e.target.value)}
             style={{ resize:'none' }} />
         </Campo>
+      </Seccion>
+
+      {/* ── Programa de puntos ── */}
+      <Seccion titulo="Programa de puntos ⭐">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <Campo label="Puntos por visita completada">
+            <input className="sp-input" type="number" min="0" max="500"
+              value={form.puntos_por_visita}
+              onChange={e => set('puntos_por_visita', e.target.value)} />
+          </Campo>
+          <Campo label="Mínimo para canjear">
+            <input className="sp-input" type="number" min="0" max="5000"
+              value={form.puntos_canje_min}
+              onChange={e => set('puntos_canje_min', e.target.value)} />
+          </Campo>
+        </div>
+        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
+          Los clientes acumulan puntos automáticamente al completar cada cita. El mínimo para canjear controla cuántos puntos se necesitan para un canje.
+        </div>
       </Seccion>
 
       {/* ── Precios dinámicos ── */}

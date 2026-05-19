@@ -129,7 +129,7 @@ export default function SalonAgenda() {
     try {
       const { data } = await supabase
         .from('citas')
-        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
+        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags,num_visitas), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
         .eq('tenant_id', tenant.id)
         .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
         .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
@@ -190,17 +190,18 @@ export default function SalonAgenda() {
     setActualizando(true)
     await supabase.from('citas').update({ estado: nuevoEstado }).eq('id', selCita.id)
 
-    // Auto-otorgar 10 puntos de fidelidad al completar
+    // Auto-otorgar puntos de fidelidad al completar (configurable en Config)
     if (nuevoEstado === 'completada' && selCita.cliente_id) {
+      const ptsVisita = tenant.puntos_por_visita ?? 10
       const { data: ultimo } = await supabase.from('puntos_cliente')
         .select('saldo').eq('cliente_id', selCita.cliente_id).order('created_at', { ascending:false }).limit(1).maybeSingle()
       const saldoBase = ultimo?.saldo ?? 0
-      const nuevoSaldo = saldoBase + 10
+      const nuevoSaldo = saldoBase + ptsVisita
       await supabase.from('puntos_cliente').insert({
         tenant_id: tenant.id,
         cliente_id: selCita.cliente_id,
         tipo: 'ganados',
-        puntos: 10,
+        puntos: ptsVisita,
         saldo: nuevoSaldo,
         motivo: `Visita completada`,
         referencia_id: selCita.id,
@@ -754,7 +755,7 @@ export default function SalonAgenda() {
                       <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, opacity:0.7 }}>🔒</div>
                     )}
                     <div style={{ fontSize:10, fontWeight:800, color: cancelada ? '#71717a' : profClr, lineHeight:1.3 }}>
-                      {fmtHora(c.fecha_inicio)}{isStar ? ' ⭐' : ''}
+                      {fmtHora(c.fecha_inicio)}{isStar ? ' ⭐' : ''}{(c.clientes_agenda?.num_visitas ?? 1) <= 1 ? ' ✨' : ''}
                     </div>
                     <div style={{ fontSize:11, fontWeight:600, color:'var(--text)',
                       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -1153,8 +1154,10 @@ export default function SalonAgenda() {
                 <p className="sp-sheet-title" style={{ margin:0 }}>Detalle cita</p>
                 {(() => {
                   const tags = selCita.clientes_agenda?.tags || []
+                  const visitas = selCita.clientes_agenda?.num_visitas ?? 1
                   if (tags.includes('vip'))  return <span style={{ fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6, background:'rgba(251,191,36,0.15)', color:'#fbbf24' }}>VIP</span>
                   if (tags.includes('star')) return <span style={{ fontSize:13 }}>⭐</span>
+                  if (visitas <= 1) return <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:6, background:'rgba(99,102,241,0.15)', color:'#818cf8' }}>✨ 1ª visita</span>
                   return null
                 })()}
               </div>

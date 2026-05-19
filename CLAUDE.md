@@ -544,7 +544,7 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Agenda: auto-refresh cada 60s (recepción) | sin SQL | ✅ DONE — setInterval solo cuando no hay sheet abierto |
 | Clientes: programa de puntos de fidelidad | v74 ⏳ | ✅ DONE — tab Puntos, saldo prominente, dar/canjear/ajustar, historial |
 
-**SQL pendiente aplicar:** v74_puntos_fidelidad.sql — tabla puntos_cliente + columna puntos_acumulados en clientes_agenda
+**SQL aplicado:** v74_puntos_fidelidad.sql ✅ — tabla puntos_cliente + columna puntos_acumulados en clientes_agenda
 
 **SQL aplicado:** v72 ✅ (portal activo) · v73 ✅ (movimientos stock activos)
 

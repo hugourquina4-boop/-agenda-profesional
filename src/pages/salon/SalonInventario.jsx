@@ -354,10 +354,15 @@ export default function SalonInventario() {
       (p.subcategoria && p.subcategoria.toLowerCase().includes(q)) ||
       (p.proveedor    && p.proveedor.toLowerCase().includes(q))
     return catOk && busOk
+  }).sort((a, b) => {
+    const aCrit = a.stock === 0 ? 2 : (a.stock_minimo > 0 && a.stock <= a.stock_minimo ? 1 : 0)
+    const bCrit = b.stock === 0 ? 2 : (b.stock_minimo > 0 && b.stock <= b.stock_minimo ? 1 : 0)
+    if (bCrit !== aCrit) return bCrit - aCrit
+    return a.nombre.localeCompare(b.nombre)
   })
 
   const valorTotal = filtrados.reduce((s, p) => s + p.stock * p.precio_costo, 0)
-  const bajosStock = productos.filter(p => p.stock <= p.stock_minimo && p.stock_minimo > 0).length
+  const bajosStock = productos.filter(p => p.stock === 0 || (p.stock_minimo > 0 && p.stock <= p.stock_minimo)).length
 
   // ── Shared label style ──────────────────────────────────────────────────
   const lbl = {
@@ -451,8 +456,9 @@ export default function SalonInventario() {
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
           {filtrados.map(p => {
-            const clr  = CAT_COLOR[p.categoria] || col
-            const bajo = p.stock_minimo > 0 && p.stock <= p.stock_minimo
+            const clr     = CAT_COLOR[p.categoria] || col
+            const agotado = p.stock === 0
+            const bajo    = !agotado && p.stock_minimo > 0 && p.stock <= p.stock_minimo
             const desc = [
               p.marca,
               p.contenido ? `${p.contenido} ${p.unidad}` : p.unidad,
@@ -462,8 +468,12 @@ export default function SalonInventario() {
             return (
               <div key={p.id} style={{
                 borderRadius:14,
-                background: bajo ? 'linear-gradient(135deg,rgba(245,158,11,0.1),var(--card))' : `linear-gradient(135deg,${clr}0d,var(--card))`,
-                boxShadow: bajo ? '0 2px 12px rgba(245,158,11,0.15)' : '0 2px 10px rgba(0,0,0,0.08)',
+                background: agotado ? 'linear-gradient(135deg,rgba(239,68,68,0.12),var(--card))'
+                  : bajo ? 'linear-gradient(135deg,rgba(245,158,11,0.1),var(--card))'
+                  : `linear-gradient(135deg,${clr}0d,var(--card))`,
+                boxShadow: agotado ? '0 2px 12px rgba(239,68,68,0.18)'
+                  : bajo ? '0 2px 12px rgba(245,158,11,0.15)'
+                  : '0 2px 10px rgba(0,0,0,0.08)',
                 overflow:'hidden',
               }}>
                 <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px' }}>
@@ -478,6 +488,12 @@ export default function SalonInventario() {
                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                         {p.nombre}
                       </span>
+                      {agotado && (
+                        <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:8,
+                          background:'rgba(239,68,68,0.15)', color:'#ef4444', flexShrink:0 }}>
+                          Agotado
+                        </span>
+                      )}
                       {bajo && (
                         <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:8,
                           background:'rgba(245,158,11,0.15)', color:'#f59e0b', flexShrink:0 }}>
@@ -496,7 +512,7 @@ export default function SalonInventario() {
                   </div>
 
                   <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0 }}>
-                    <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color: bajo ? '#f59e0b' : 'var(--text)' }}>
+                    <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:16, color: agotado ? '#ef4444' : bajo ? '#f59e0b' : 'var(--text)' }}>
                       {p.stock} <span style={{ fontSize:11, fontWeight:500, color:'var(--text-3)' }}>{p.unidad}s</span>
                     </div>
                     <div style={{ display:'flex', gap:4 }}>

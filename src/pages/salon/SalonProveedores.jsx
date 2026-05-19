@@ -183,6 +183,67 @@ export default function SalonProveedores() {
     cargarPedidos()
   }
 
+  async function descargarOrdenCompra(ped) {
+    const { jsPDF } = await import('jspdf')
+    const { data: items } = await supabase.from('pedidos_proveedor_items')
+      .select('*').eq('pedido_id', ped.id).order('id')
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' })
+    const provNombre = ped.proveedores?.nombre || 'Sin proveedor'
+    const hexToRgb = h => { const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16); return [r,g,b] }
+    const [cr,cg,cb] = hexToRgb(col.startsWith('#') ? col : '#f43f5e')
+    // Header
+    doc.setFillColor(cr,cg,cb); doc.rect(0,0,210,32,'F')
+    doc.setTextColor(255,255,255)
+    doc.setFont('helvetica','bold'); doc.setFontSize(18)
+    doc.text('ORDEN DE COMPRA', 14, 13)
+    doc.setFontSize(10); doc.setFont('helvetica','normal')
+    doc.text(`${tenant?.nombre || 'Salón'}`, 14, 21)
+    doc.text(`#${ped.numero || ped.id.slice(0,8).toUpperCase()}`, 196, 13, { align:'right' })
+    doc.text(`Fecha: ${ped.fecha_pedido || '—'}`, 196, 21, { align:'right' })
+    // Proveedor
+    doc.setTextColor(40,40,40); doc.setFont('helvetica','bold'); doc.setFontSize(11)
+    doc.text('PROVEEDOR', 14, 42)
+    doc.setFont('helvetica','normal'); doc.setFontSize(10)
+    doc.text(provNombre, 14, 49)
+    if (ped.fecha_entrega) doc.text(`Entrega estimada: ${ped.fecha_entrega}`, 14, 55)
+    // Items table
+    let y = 65
+    doc.setFillColor(cr,cg,cb); doc.rect(14, y, 182, 7, 'F')
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold')
+    doc.text('Descripción', 16, y+5)
+    doc.text('Cant.', 120, y+5, { align:'right' })
+    doc.text('Unidad', 140, y+5)
+    doc.text('P. Unit.', 168, y+5, { align:'right' })
+    doc.text('Total', 195, y+5, { align:'right' })
+    y += 10
+    doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
+    let grandTotal = 0
+    ;(items || []).forEach((it, idx) => {
+      const subtotal = (Number(it.cantidad)||0) * (Number(it.precio_unit)||0)
+      grandTotal += subtotal
+      if (idx % 2 === 0) { doc.setFillColor(248,248,248); doc.rect(14,y-4,182,8,'F') }
+      doc.setFontSize(9)
+      doc.text(it.descripcion || '—', 16, y)
+      doc.text(String(it.cantidad||''), 120, y, { align:'right' })
+      doc.text(it.unidad||'', 140, y)
+      doc.text(it.precio_unit ? `$${Number(it.precio_unit).toLocaleString('es-CO')}` : '—', 168, y, { align:'right' })
+      doc.text(subtotal > 0 ? `$${subtotal.toLocaleString('es-CO')}` : '—', 195, y, { align:'right' })
+      y += 8
+    })
+    // Total
+    doc.setDrawColor(cr,cg,cb); doc.line(14, y+2, 196, y+2)
+    y += 8
+    doc.setFont('helvetica','bold'); doc.setFontSize(11)
+    doc.setTextColor(cr,cg,cb)
+    doc.text('TOTAL ESTIMADO', 14, y)
+    doc.text(`$${grandTotal.toLocaleString('es-CO')}`, 195, y, { align:'right' })
+    if (ped.notas) {
+      y += 12; doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,100,100)
+      doc.text(`Notas: ${ped.notas}`, 14, y)
+    }
+    doc.save(`orden-compra-${ped.numero || ped.id.slice(0,8)}.pdf`)
+  }
+
   const cargarProvs = useCallback(async () => {
     if (!tenant?.id) return
     const { data } = await supabase
@@ -722,6 +783,10 @@ export default function SalonProveedores() {
                         </span>
                       )}
                     </div>
+                    <button onClick={() => descargarOrdenCompra(ped)} style={{
+                      padding:'6px 10px', borderRadius:8, border:'1px solid rgba(99,102,241,0.25)',
+                      background:'rgba(99,102,241,0.07)', color:'#818cf8', fontSize:11, fontWeight:700, cursor:'pointer',
+                    }}>↓ PDF</button>
                     {ped.estado !== 'pagado' && (
                       <button onClick={() => cancelarPedido(ped.id)} style={{
                         padding:'6px 10px', borderRadius:8, border:'1px solid rgba(239,68,68,0.25)',
