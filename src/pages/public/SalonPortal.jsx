@@ -216,6 +216,34 @@ export default function SalonPortal() {
   const [wlTel,    setWlTel]    = useState('')
   const [wlSaving, setWlSaving] = useState(false)
 
+  // "Ver mis citas"
+  const [showMisCitas, setShowMisCitas] = useState(false)
+  const [misCitasTel,  setMisCitasTel]  = useState('')
+  const [misCitas,     setMisCitas]     = useState(null)
+  const [buscandoMis,  setBuscandoMis]  = useState(false)
+
+  async function buscarMisCitas() {
+    if (!misCitasTel.trim() || !tenant) return
+    setBuscandoMis(true)
+    setMisCitas(null)
+    try {
+      const { data: cli } = await supabase.from('clientes_agenda')
+        .select('id, nombre')
+        .eq('tenant_id', tenant.id)
+        .ilike('telefono', `%${misCitasTel.replace(/\D/g,'').slice(-8)}%`)
+        .limit(1).maybeSingle()
+      if (!cli) { setMisCitas([]); return }
+      const { data: citas } = await supabase.from('citas')
+        .select('fecha_inicio, estado, servicios(nombre), profesionales(nombre)')
+        .eq('tenant_id', tenant.id).eq('cliente_id', cli.id)
+        .neq('estado', 'cancelada').gte('fecha_inicio', new Date().toISOString())
+        .order('fecha_inicio').limit(5)
+      setMisCitas({ nombre: cli.nombre, citas: citas || [] })
+    } finally {
+      setBuscandoMis(false)
+    }
+  }
+
   const [reglas, setReglas] = useState([])
 
   const stepRef = useRef(step)
@@ -597,10 +625,66 @@ export default function SalonPortal() {
                 </div>
               </div>
             )}
-            <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:26, marginBottom:6, letterSpacing:-0.5, color:T.text }}>
-              ¿Qué servicio necesitas?
-            </h2>
-            <p style={{ color:T.muted, fontSize:14, marginBottom:28 }}>Puedes elegir varios servicios</p>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+              <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:26, letterSpacing:-0.5, color:T.text, margin:0 }}>
+                ¿Qué servicio necesitas?
+              </h2>
+              <button onClick={() => setShowMisCitas(v => !v)} style={{
+                padding:'6px 12px', borderRadius:10, border:`1px solid ${col}40`,
+                background:`${col}10`, color:col, fontSize:12, fontWeight:700,
+                cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
+              }}>
+                📋 Mis citas
+              </button>
+            </div>
+            <p style={{ color:T.muted, fontSize:14, marginBottom: showMisCitas ? 12 : 28 }}>Puedes elegir varios servicios</p>
+
+            {showMisCitas && (
+              <div style={{ marginBottom:24, padding:'16px', borderRadius:18, ...T.card({ borderRadius:18 }) }}>
+                <div style={{ fontSize:13, fontWeight:700, color:T.text, marginBottom:10 }}>Consultar mis citas</div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <input
+                    value={misCitasTel} onChange={e => setMisCitasTel(e.target.value)}
+                    placeholder="Tu número de teléfono"
+                    style={{ flex:1, padding:'10px 14px', borderRadius:12, border:`1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', color:T.text, fontSize:14, outline:'none' }}
+                    onKeyDown={e => e.key === 'Enter' && buscarMisCitas()}
+                  />
+                  <button onClick={buscarMisCitas} disabled={buscandoMis} style={{
+                    padding:'10px 16px', borderRadius:12, border:'none', cursor:'pointer',
+                    background:col, color:'#fff', fontWeight:700, fontSize:13,
+                    opacity: buscandoMis ? 0.6 : 1,
+                  }}>
+                    {buscandoMis ? '…' : 'Buscar'}
+                  </button>
+                </div>
+                {misCitas !== null && (
+                  <div style={{ marginTop:12 }}>
+                    {misCitas.length === 0 || (misCitas.citas && misCitas.citas.length === 0) ? (
+                      <p style={{ fontSize:13, color:T.muted, textAlign:'center', padding:'8px 0' }}>
+                        {misCitas.length === 0 ? 'No encontramos citas con ese número.' : `${misCitas.nombre}, no tienes citas próximas.`}
+                      </p>
+                    ) : (
+                      <>
+                        <p style={{ fontSize:12, color:T.muted, marginBottom:8 }}>Hola, {misCitas.nombre} 👋</p>
+                        {misCitas.citas.map((c, i) => (
+                          <div key={i} style={{ padding:'10px 12px', borderRadius:12, marginBottom:6,
+                            background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                            border:`1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}` }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:T.text }}>
+                              📅 {new Date(c.fecha_inicio).toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'short' })}
+                              {' · '}{new Date(c.fecha_inicio).toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })}
+                            </div>
+                            <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>
+                              {c.servicios?.nombre || '—'}{c.profesionales?.nombre ? ` con ${c.profesionales.nombre.split(' ')[0]}` : ''}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {servs.length === 0 ? (
               <div style={{ ...T.card({ borderRadius:24 }), padding:'48px 24px', textAlign:'center' }}>
