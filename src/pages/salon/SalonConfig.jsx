@@ -112,6 +112,7 @@ export default function SalonConfig() {
       puntos_por_visita:   tenant.puntos_por_visita   ?? 10,
       puntos_canje_min:    tenant.puntos_canje_min    ?? 50,
       meta_ingresos_mes:   tenant.config_vertical?.meta_ingresos_mes ?? 0,
+      link_google_reviews: tenant.config_vertical?.link_google_reviews || '',
     })
   }, [tenant])
 
@@ -153,6 +154,7 @@ export default function SalonConfig() {
         anticipacion_horas:   Number(form.anticipacion_horas),
         politica_cancelacion: form.politica_cancelacion.trim() || null,
         meta_ingresos_mes:    Number(form.meta_ingresos_mes) || 0,
+        link_google_reviews:  form.link_google_reviews.trim() || null,
       },
     }).eq('id', tenant.id)
     setSaving(false)
@@ -423,6 +425,19 @@ export default function SalonConfig() {
         </Campo>
         <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
           Aparece como barra de progreso en Caja e informe gerencial. Deja en 0 para ocultar.
+        </div>
+      </Seccion>
+
+      {/* ── Reseñas Google ── */}
+      <Seccion titulo="Reseñas Google ⭐">
+        <Campo label="Link de reseña Google">
+          <input className="sp-input" type="url"
+            placeholder="https://g.page/r/tu-negocio/review"
+            value={form.link_google_reviews}
+            onChange={e => set('link_google_reviews', e.target.value)} />
+        </Campo>
+        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
+          Aparece como botón "Pedir reseña" en cada cita completada para enviar por WhatsApp.
         </div>
       </Seccion>
 

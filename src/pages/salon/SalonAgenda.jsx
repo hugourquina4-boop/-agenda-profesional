@@ -1599,6 +1599,24 @@ export default function SalonAgenda() {
               </div>
             ) : null}
 
+            {/* Pedir reseña Google — solo en completadas con link configurado */}
+            {selCita.estado === 'completada' && tenant?.config_vertical?.link_google_reviews && selCita.clientes_agenda?.telefono && (() => {
+              const tel = selCita.clientes_agenda.telefono.replace(/\D/g, '')
+              const link = tenant.config_vertical.link_google_reviews
+              const msg  = encodeURIComponent(`Hola ${selCita.clientes_agenda.nombre?.split(' ')[0] || ''} 😊 Espero que hayas disfrutado tu visita en ${tenant.nombre}. Si quedaste satisfecho/a, nos ayudaría mucho si nos dejas una reseña: ${link} ¡Gracias! 💛`)
+              return (
+                <a href={`https://wa.me/${tel}?text=${msg}`} target="_blank" rel="noreferrer"
+                  style={{
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                    padding:'12px', borderRadius:13, marginBottom:16, textDecoration:'none',
+                    background:'rgba(37,211,102,0.08)', border:'1px solid rgba(37,211,102,0.3)',
+                    color:'#22c55e', fontWeight:700, fontSize:13,
+                  }}>
+                  ⭐ Pedir reseña Google
+                </a>
+              )
+            })()}
+
             {/* ── Sección de pago ── */}
             {!['cancelada','no_asistio'].includes(selCita.estado) && (
               <div>
