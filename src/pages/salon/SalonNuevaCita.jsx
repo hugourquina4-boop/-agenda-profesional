@@ -242,7 +242,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
   useEffect(() => {
     if (!tenant || busqCliente.length < 2) { setClientes([]); return }
     supabase.from('clientes_agenda')
-      .select('id, nombre, telefono')
+      .select('id, nombre, telefono, tags, notas')
       .eq('tenant_id', tenant.id)
       .or(`nombre.ilike.%${busqCliente}%,telefono.ilike.%${busqCliente}%`)
       .limit(8)
@@ -538,11 +538,26 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
                       display:'flex', alignItems:'center', justifyContent:'center',
                       fontFamily:'Outfit', fontWeight:800, color:col, fontSize:16, flexShrink:0,
                     }}>{c.nombre[0]}</div>
-                    <div>
-                      <div style={{ fontWeight:700, fontSize:14 }}>{c.nombre}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span style={{ fontWeight:700, fontSize:14 }}>{c.nombre}</span>
+                        {c.tags?.includes('dificil') && (
+                          <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
+                            background:'rgba(239,68,68,0.12)', color:'#f87171', letterSpacing:0.4 }}>⚠ DIFÍCIL</span>
+                        )}
+                        {c.tags?.includes('vip') && (
+                          <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
+                            background:'rgba(251,191,36,0.12)', color:'#fbbf24', letterSpacing:0.4 }}>VIP</span>
+                        )}
+                      </div>
                       <div style={{ fontSize:12, color:'var(--text-3)' }}>{c.telefono}</div>
+                      {c.tags?.includes('dificil') && c.notas && clienteId !== c.id && (
+                        <div style={{ fontSize:11, color:'#f87171', marginTop:2, fontStyle:'italic' }}>
+                          ⚠ {c.notas.slice(0, 60)}{c.notas.length > 60 ? '…' : ''}
+                        </div>
+                      )}
                     </div>
-                    {clienteId === c.id && <div style={{ marginLeft:'auto', color:col }}><Ico d="M5 13l4 4L19 7" size={16} /></div>}
+                    {clienteId === c.id && <div style={{ marginLeft:'auto', color:col, flexShrink:0 }}><Ico d="M5 13l4 4L19 7" size={16} /></div>}
                   </button>
                 ))}
                 {busqCliente.length > 1 && clientes.length === 0 && (
