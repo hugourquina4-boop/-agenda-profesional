@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTenant } from '../context/TenantContext'
 import { supabase } from '../lib/supabase'
 import '../salon.css'
@@ -80,11 +80,36 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
   const navSistema   = NAV_SISTEMA.filter(i => tieneAcceso(i.key))
   const navMobile    = NAV_MOBILE.filter(i => i.fab || i.mas || tieneAcceso(i.key))
 
-  const [masOpen, setMasOpen] = useState(false)
-  const [theme,   setTheme]   = useState(() => localStorage.getItem('sp-theme') || 'light')
+  const [masOpen,   setMasOpen]   = useState(false)
+  const [theme,     setTheme]     = useState(() => localStorage.getItem('sp-theme') || 'light')
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [citasHoy,  setCitasHoy]  = useState([])
+  const notifRef = useRef(null)
 
   useEffect(() => { localStorage.setItem('sp-theme', theme) }, [theme])
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+
+  useEffect(() => {
+    if (!tenant?.id) return
+    const ahora = new Date().toISOString()
+    const hoy = ahora.slice(0, 10)
+    supabase.from('citas')
+      .select('id, fecha_inicio, clientes_agenda(nombre), servicios(nombre), estado')
+      .eq('tenant_id', tenant.id)
+      .in('estado', ['pendiente','confirmada'])
+      .gte('fecha_inicio', ahora)
+      .lte('fecha_inicio', `${hoy}T23:59:59`)
+      .order('fecha_inicio')
+      .limit(5)
+      .then(({ data }) => setCitasHoy(data || []))
+  }, [tenant?.id])
+
+  useEffect(() => {
+    if (!notifOpen) return
+    const onClickOut = e => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false) }
+    document.addEventListener('mousedown', onClickOut)
+    return () => document.removeEventListener('mousedown', onClickOut)
+  }, [notifOpen])
 
   async function logout() {
     await supabase.auth.signOut()
@@ -122,6 +147,71 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
   )
 
   const alertaPago = tenant?.alerta_pago
+
+  function fmtHora(iso) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit', hour12:false })
+  }
+
+  const notifBell = (
+    <div ref={notifRef} style={{ position:'relative' }}>
+      <button className="sp-icon-btn" onClick={() => setNotifOpen(o => !o)} style={{ position:'relative' }}>
+        <Ico d={IC.notif} size={18} />
+        {citasHoy.length > 0 && (
+          <span style={{
+            position:'absolute', top:2, right:2,
+            width:14, height:14, borderRadius:'50%',
+            background:'#f43f5e', fontSize:8, fontWeight:800, color:'#fff',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            lineHeight:1, border:'1.5px solid var(--bg)',
+          }}>{citasHoy.length}</span>
+        )}
+      </button>
+      {notifOpen && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 8px)', right:0, zIndex:9999,
+          width:280, borderRadius:16, background:'var(--card)',
+          boxShadow:'0 16px 48px rgba(0,0,0,0.22)',
+          border:'1px solid var(--border)', overflow:'hidden',
+        }}>
+          <div style={{ padding:'12px 14px 8px', fontSize:10, fontWeight:700,
+            color:'var(--text-3)', textTransform:'uppercase', letterSpacing:0.5,
+            borderBottom:'1px solid var(--border)' }}>
+            Próximas citas hoy
+          </div>
+          {citasHoy.length === 0 ? (
+            <div style={{ padding:'16px 14px', fontSize:13, color:'var(--text-3)' }}>
+              No hay citas pendientes
+            </div>
+          ) : citasHoy.map(c => (
+            <div key={c.id} style={{
+              display:'flex', alignItems:'center', gap:10,
+              padding:'10px 14px', borderBottom:'1px solid var(--border)',
+            }}>
+              <div style={{
+                width:36, height:36, borderRadius:10, flexShrink:0,
+                background:`${col}18`, display:'flex', alignItems:'center',
+                justifyContent:'center', fontFamily:'Outfit', fontWeight:800,
+                color:col, fontSize:15,
+              }}>{fmtHora(c.fecha_inicio)}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)',
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {c.clientes_agenda?.nombre || 'Cliente'}
+                </div>
+                <div style={{ fontSize:11, color:'var(--text-3)',
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {c.servicios?.nombre || '—'}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div style={{ height:4 }} />
+        </div>
+      )}
+    </div>
+  )
   const alertaMsg  = tenant?.alerta_pago_msg || 'Tu suscripción requiere atención. Contacta al administrador para renovarla.'
 
   return (
@@ -230,10 +320,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
                 <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={18} />
               </button>
             )}
-            <button className="sp-icon-btn" style={{ position:'relative' }}>
-              <Ico d={IC.notif} size={18} />
-              <span className="sp-notif-dot" />
-            </button>
+            {notifBell}
             <button className="sp-btn-primary" onClick={onNuevaCita}
               style={{ background:`linear-gradient(135deg,${col},${col}bb)`,
                 boxShadow:`0 4px 14px ${col}44` }}>
@@ -259,10 +346,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
                 <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={20} />
               </button>
             )}
-            <button className="sp-icon-btn" style={{ position:'relative' }}>
-              <Ico d={IC.notif} size={20} />
-              <span className="sp-notif-dot" />
-            </button>
+            {notifBell}
           </div>
         </header>
 
