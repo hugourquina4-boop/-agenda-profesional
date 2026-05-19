@@ -560,6 +560,17 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 
 **SQL pendiente aplicar:** v75_puntos_config.sql — columnas puntos_por_visita + puntos_canje_min en tenants
 
+## Bloque T — COMPLETADO (sesión 18 cont. — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Clientes: campo "¿Cómo nos conociste?" (fuente_captacion) | v76 ⏳ aplicar | ✅ DONE |
+| Clientes: filtro por tag (⭐ STAR / VIP / Refiere / Difícil) | sin SQL | ✅ DONE |
+| Analytics: card "¿Cómo nos conocen?" por canal | sin SQL | ✅ DONE |
+| Agenda día: botón 📤 Compartir agenda vía WhatsApp | sin SQL | ✅ DONE |
+
+**SQL pendiente aplicar:** v76_cliente_fuente.sql — columna fuente_captacion en clientes_agenda
+
 ---
 
 ## Contexto de Negocio

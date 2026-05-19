@@ -165,6 +165,7 @@ export default function SalonDashboard({ onNavigate }) {
     { nombre:'Sofía Pérez',    total:175000 },
     { nombre:'Andrea Ruiz',    total:95000  },
   ] : [])
+  const [sinCobrar,      setSinCobrar]      = useState([])
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -187,7 +188,7 @@ export default function SalonDashboard({ onNavigate }) {
       })()
 
       const hace14iso = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes, pagosHoyRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -241,6 +242,11 @@ export default function SalonDashboard({ onNavigate }) {
           .eq('estado', 'pagado')
           .gte('created_at', `${mesInicio}T00:00:00`)
           .lte('created_at', `${mesFin}T23:59:59`),
+        supabase.from('pagos')
+          .select('cita_id')
+          .eq('tenant_id', tenant.id)
+          .gte('created_at', `${fecha}T00:00:00`)
+          .lte('created_at', `${fecha}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -276,6 +282,10 @@ export default function SalonDashboard({ onNavigate }) {
         cltMap[c.id] = { nombre: c.nombre, total: (cltMap[c.id]?.total || 0) + Number(p.monto) }
       })
       setTopClientes(Object.values(cltMap).sort((a, b) => b.total - a.total).slice(0, 3))
+
+      // Citas completadas sin cobrar hoy
+      const citasIdsCobradas = new Set((pagosHoyRes.data || []).map(p => p.cita_id).filter(Boolean))
+      setSinCobrar(citasList.filter(c => c.estado === 'completada' && !citasIdsCobradas.has(c.id)))
 
       // Analytics del mes
       const citasMes = analyticsMesRes.data || []
@@ -1039,6 +1049,28 @@ export default function SalonDashboard({ onNavigate }) {
         </div>
       )}
 
+
+      {/* ── Citas sin cobrar ──────────────────────────────── */}
+      {sinCobrar.length > 0 && (
+        <div style={{ margin:'0 16px 8px' }}>
+          <div style={{
+            padding:'12px 14px', borderRadius:14,
+            background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)',
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+              <span style={{ fontSize:15 }}>💳</span>
+              <span style={{ fontSize:13, fontWeight:700, color:'#f87171' }}>
+                {sinCobrar.length} cita{sinCobrar.length !== 1 ? 's' : ''} completada{sinCobrar.length !== 1 ? 's' : ''} sin cobrar
+              </span>
+            </div>
+            {sinCobrar.map(c => (
+              <div key={c.id} style={{ fontSize:11, color:'var(--text-3)', marginBottom:2 }}>
+                · {fmtHora(c.fecha_inicio)} — {c.clientes_agenda?.nombre?.split(' ')[0] || 'Cliente'} ({c.servicios?.nombre || 'servicio'})
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Equipo strip ─────────────────────────────────── */}
       {equipo.length>0 && (

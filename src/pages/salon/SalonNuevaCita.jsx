@@ -237,12 +237,14 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
     setSlots(generados)
   }
 
-  // Búsqueda de clientes
+  // Búsqueda de clientes (nombre o teléfono)
   useEffect(() => {
     if (!tenant || busqCliente.length < 2) { setClientes([]); return }
     supabase.from('clientes_agenda')
       .select('id, nombre, telefono')
-      .eq('tenant_id', tenant.id).ilike('nombre', `%${busqCliente}%`).limit(8)
+      .eq('tenant_id', tenant.id)
+      .or(`nombre.ilike.%${busqCliente}%,telefono.ilike.%${busqCliente}%`)
+      .limit(8)
       .then(({ data }) => setClientes(data || []))
   }, [busqCliente, tenant])
 
@@ -518,7 +520,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
 
             {!modoNuevo ? (
               <>
-                <input className="sp-input" placeholder="Buscar por nombre…"
+                <input className="sp-input" placeholder="Buscar por nombre o teléfono…"
                   value={busqCliente} onChange={e => setBusqCliente(e.target.value)}
                   style={{ marginBottom:10 }} />
                 {clientes.map(c => (

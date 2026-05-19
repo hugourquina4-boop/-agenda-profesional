@@ -62,6 +62,7 @@ export default function SalonAgenda() {
   const [loading,  setLoading]  = useState(false)
   const [selCita,  setSelCita]  = useState(null)
   const [actualizando, setActualizando] = useState(false)
+  const [confirmandoTodas, setConfirmandoTodas] = useState(false)
   const [esperaDia, setEsperaDia] = useState(0)
 
   // Pagos
@@ -211,6 +212,17 @@ export default function SalonAgenda() {
 
     setActualizando(false)
     setSelCita(null)
+    cargarMes()
+  }
+
+  async function confirmarTodasDelDia() {
+    const pendientes = citas.filter(c => c.fecha_inicio.slice(0,10) === selDay && c.estado === 'pendiente')
+    if (!pendientes.length) return
+    setConfirmandoTodas(true)
+    await supabase.from('citas')
+      .update({ estado: 'confirmada' })
+      .in('id', pendientes.map(c => c.id))
+    setConfirmandoTodas(false)
     cargarMes()
   }
 
@@ -955,6 +967,17 @@ export default function SalonAgenda() {
         )}
         {/* Botón bloquear franja + compartir agenda — visible en vista día */}
         <div style={{ display:'flex', justifyContent:'flex-end', gap:6, padding:'0 16px 8px' }}>
+          {citas.some(c => c.fecha_inicio.slice(0,10) === selDay && c.estado === 'pendiente') && (
+            <button onClick={confirmarTodasDelDia} disabled={confirmandoTodas} style={{
+              padding:'6px 13px', borderRadius:9, border:'1px solid rgba(59,130,246,0.3)',
+              background:'rgba(59,130,246,0.07)', color:'#60a5fa',
+              fontSize:12, fontWeight:700, cursor:'pointer',
+              display:'flex', alignItems:'center', gap:5,
+              opacity: confirmandoTodas ? 0.6 : 1,
+            }}>
+              {confirmandoTodas ? '…' : '✅ Confirmar todas'}
+            </button>
+          )}
           <button onClick={() => {
             const dayLabel = new Date(selDay + 'T12:00:00').toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
             const citasDia = (citas || []).filter(c => c.fecha_inicio.slice(0,10) === selDay && c.estado !== 'cancelada')
