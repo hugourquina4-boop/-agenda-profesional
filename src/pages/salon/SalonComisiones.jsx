@@ -157,6 +157,90 @@ export default function SalonComisiones() {
     cargarAnticipos()
   }
 
+  async function descargarPlanillaColectiva() {
+    setGenerandoPDF('all')
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+      const mesLabel = new Date(mesStr + '-02').toLocaleDateString('es-CO', { month:'long', year:'numeric' })
+      const salonNombre = tenant?.nombre || 'Salón Pro'
+      const accentHex = col.startsWith('#') ? col : '#f43f5e'
+      const hex2rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]
+      const [ra,ga,ba] = hex2rgb(accentHex)
+
+      // === Página header ===
+      doc.setFillColor(ra, ga, ba)
+      doc.rect(0, 0, 210, 28, 'F')
+      doc.setTextColor(255,255,255)
+      doc.setFontSize(16); doc.setFont('helvetica','bold')
+      doc.text('Planilla de Liquidación Colectiva', 14, 12)
+      doc.setFontSize(9); doc.setFont('helvetica','normal')
+      doc.text(`${salonNombre}  ·  ${mesLabel}  ·  ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
+
+      let y = 36
+      const cols = [14, 80, 116, 152, 175]
+      const hdr  = ['Profesional','Comisiones','Anticipos','Deduc.','Neto a pagar']
+
+      // Tabla header row
+      doc.setFillColor(245,245,245)
+      doc.rect(14, y, 182, 8, 'F')
+      doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(100,100,100)
+      hdr.forEach((h, ci) => doc.text(h, cols[ci] + 2, y + 5.5))
+      y += 10
+
+      let grandTotal = 0
+      profesionales.forEach((prof, pi) => {
+        if (y > 270) { doc.addPage(); y = 20 }
+        const profCom = comisiones.filter(c => c.profesional_id === prof.id)
+        const profAnt = anticipos.filter(a => a.profesional_id === prof.id)
+        const totalCom = profCom.reduce((s,c) => s+(c.monto_comision||0), 0)
+        const totalAnt = profAnt.filter(a => a.tipo === 'anticipo').reduce((s,a) => s+a.monto, 0)
+        const totalDed = profAnt.filter(a => a.tipo === 'deduccion').reduce((s,a) => s+a.monto, 0)
+        const neto     = Math.max(0, totalCom - totalAnt - totalDed)
+        grandTotal += neto
+
+        const profColor = PROF_COLORS[pi % PROF_COLORS.length]
+        const [rp,gp,bp] = hex2rgb(profColor)
+        doc.setFillColor(rp, gp, bp, 0.1)
+        doc.rect(14, y, 4, 10, 'F')
+        doc.setFillColor(pi % 2 === 0 ? 252 : 248, 252, 252)
+        doc.rect(18, y, 178, 10, 'F')
+
+        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
+        doc.text(prof.nombre, cols[0] + 2, y + 6.5)
+        doc.setFont('helvetica','normal'); doc.setFontSize(8)
+        doc.setTextColor(60,60,60)
+        doc.text(fmtCOP(totalCom), cols[1] + 2, y + 6.5)
+        doc.setTextColor(245,158,11)
+        doc.text(totalAnt > 0 ? `−${fmtCOP(totalAnt)}` : '—', cols[2] + 2, y + 6.5)
+        doc.setTextColor(239,68,68)
+        doc.text(totalDed > 0 ? `−${fmtCOP(totalDed)}` : '—', cols[3] + 2, y + 6.5)
+        doc.setTextColor(rp, gp, bp); doc.setFont('helvetica','bold')
+        doc.text(fmtCOP(neto), cols[4] + 2, y + 6.5)
+        y += 11
+      })
+
+      // Total row
+      doc.setDrawColor(ra, ga, ba); doc.setLineWidth(0.5)
+      doc.line(14, y, 196, y)
+      y += 6
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(ra, ga, ba)
+      doc.text('TOTAL A PAGAR', cols[0] + 2, y)
+      doc.text(fmtCOP(grandTotal), cols[4] + 2, y)
+
+      y += 14
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
+      doc.text('Firma responsable ___________________________', 14, y)
+      doc.text('Fecha ___________________', 130, y)
+
+      doc.save(`planilla_${salonNombre.replace(/\s+/g,'_')}_${mesStr}.pdf`)
+    } catch(e) {
+      console.error(e)
+    } finally {
+      setGenerandoPDF(null)
+    }
+  }
+
   async function descargarPDFProf(d, i) {
     setGenerandoPDF(d.profesional_id)
     try {
@@ -440,6 +524,23 @@ export default function SalonComisiones() {
 
       {tab === 'planilla' && (
         <div style={{ padding:'16px' }}>
+          {!loadingAnt && profesionales.length > 0 && (
+            <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:12 }}>
+              <button
+                onClick={descargarPlanillaColectiva}
+                disabled={generandoPDF === 'all'}
+                style={{
+                  display:'flex', alignItems:'center', gap:6,
+                  padding:'8px 16px', borderRadius:10, cursor:'pointer',
+                  background:col, border:'none', color:'#fff',
+                  fontWeight:700, fontSize:12,
+                  opacity: generandoPDF === 'all' ? 0.6 : 1,
+                }}>
+                <Ico d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={13} />
+                {generandoPDF === 'all' ? 'Generando…' : '↓ PDF Colectivo'}
+              </button>
+            </div>
+          )}
           {loadingAnt ? (
             <div style={{ display:'flex', justifyContent:'center', padding:'40px 0' }}>
               <div className="sp-spinner" style={{ borderTopColor:col }} />
