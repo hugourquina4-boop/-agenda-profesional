@@ -72,7 +72,7 @@ const PAGE_LABEL = {
   proveedores:'Proveedores', mensajeria:'Mensajería', sedes:'Sedes', accesos:'Accesos', config:'Configuración', superadmin:'Plataforma',
 }
 
-export default function SalonLayout({ page, onNavigate, onNuevaCita, children }) {
+export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, children }) {
   const { tenant, esSuperadmin, tieneAcceso } = useTenant()
 
   const navPrincipal = NAV_PRINCIPAL.filter(i => tieneAcceso(i.key))
@@ -225,6 +225,11 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
           <span className="sp-topbar-title">{PAGE_LABEL[page] || 'Inicio'}</span>
           <div className="sp-topbar-right">
             {themeBtn}
+            {onSearch && (
+              <button className="sp-icon-btn" onClick={onSearch} title="Buscar (Ctrl+K)">
+                <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={18} />
+              </button>
+            )}
             <button className="sp-icon-btn" style={{ position:'relative' }}>
               <Ico d={IC.notif} size={18} />
               <span className="sp-notif-dot" />
@@ -249,6 +254,11 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, children })
           </div>
           <div className="sp-header-right">
             {themeBtn}
+            {onSearch && (
+              <button className="sp-icon-btn" onClick={onSearch}>
+                <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" size={20} />
+              </button>
+            )}
             <button className="sp-icon-btn" style={{ position:'relative' }}>
               <Ico d={IC.notif} size={20} />
               <span className="sp-notif-dot" />

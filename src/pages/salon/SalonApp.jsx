@@ -1,4 +1,4 @@
-import { useState, Suspense, lazy } from 'react'
+import { useState, Suspense, lazy, useEffect, useRef, useCallback } from 'react'
 import SalonLayout from '../../layouts/SalonLayout'
 import { useTenant } from '../../context/TenantContext'
 import { supabase } from '../../lib/supabase'
@@ -304,15 +304,210 @@ function AppBloqueada({ suscripcion, onSignOut }) {
   )
 }
 
+function GlobalSearch({ tenant, col, onNavigate, onClose }) {
+  const [q, setQ]           = useState('')
+  const [clientes, setClientes] = useState([])
+  const [citas,    setCitas]    = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const inputRef = useRef(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const buscar = useCallback(async (texto) => {
+    if (!tenant?.id || texto.trim().length < 2) { setClientes([]); setCitas([]); return }
+    setLoading(true)
+    const [{ data: cltData }, { data: citaData }] = await Promise.all([
+      supabase.from('clientes_agenda')
+        .select('id, nombre, telefono')
+        .eq('tenant_id', tenant.id)
+        .eq('activo', true)
+        .or(`nombre.ilike.%${texto}%,telefono.ilike.%${texto}%`)
+        .limit(5),
+      supabase.from('citas')
+        .select('id, fecha_inicio, clientes_agenda(nombre), servicios(nombre)')
+        .eq('tenant_id', tenant.id)
+        .neq('estado', 'cancelada')
+        .or(`clientes_agenda.nombre.ilike.%${texto}%`)
+        .order('fecha_inicio', { ascending: false })
+        .limit(5),
+    ])
+    setClientes(cltData || [])
+    setCitas(citaData || [])
+    setLoading(false)
+  }, [tenant])
+
+  useEffect(() => {
+    const t = setTimeout(() => buscar(q), 280)
+    return () => clearTimeout(t)
+  }, [q, buscar])
+
+  function fmtFecha(iso) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short' }) + ' ' +
+      d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit', hour12:false })
+  }
+
+  const hayResultados = clientes.length > 0 || citas.length > 0
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position:'fixed', inset:0, zIndex:9999,
+        background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)',
+        display:'flex', flexDirection:'column', alignItems:'center',
+        paddingTop:'10dvh', paddingLeft:16, paddingRight:16,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width:'100%', maxWidth:520, borderRadius:20,
+          background:'var(--card)', boxShadow:'0 24px 80px rgba(0,0,0,0.35)',
+          overflow:'hidden',
+        }}
+      >
+        {/* Input */}
+        <div style={{
+          display:'flex', alignItems:'center', gap:12,
+          padding:'16px 18px', borderBottom:'1px solid var(--border)',
+        }}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none"
+            stroke="var(--text-3)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Buscar clientes, citas…"
+            style={{
+              flex:1, background:'transparent', border:'none', outline:'none',
+              fontSize:16, color:'var(--text)', fontFamily:'inherit',
+            }}
+          />
+          {loading && <div className="sp-spinner" style={{ width:16, height:16, borderWidth:2 }} />}
+          <button onClick={onClose} style={{
+            background:'none', border:'none', cursor:'pointer',
+            color:'var(--text-3)', fontSize:12, padding:'4px 8px',
+            borderRadius:6, background:'var(--border)',
+          }}>Esc</button>
+        </div>
+
+        {/* Resultados */}
+        <div style={{ maxHeight:'60dvh', overflowY:'auto' }}>
+          {!hayResultados && q.trim().length >= 2 && !loading && (
+            <div style={{ padding:'24px 18px', fontSize:14, color:'var(--text-3)', textAlign:'center' }}>
+              Sin resultados para "{q}"
+            </div>
+          )}
+          {!hayResultados && q.trim().length < 2 && (
+            <div style={{ padding:'24px 18px', fontSize:14, color:'var(--text-3)', textAlign:'center' }}>
+              Escribe 2+ caracteres para buscar
+            </div>
+          )}
+
+          {clientes.length > 0 && (
+            <div>
+              <div style={{ padding:'10px 18px 4px', fontSize:10, fontWeight:700,
+                color:'var(--text-3)', textTransform:'uppercase', letterSpacing:0.5 }}>
+                Clientes
+              </div>
+              {clientes.map(c => (
+                <button key={c.id}
+                  onClick={() => { onNavigate('clientes'); onClose() }}
+                  style={{
+                    display:'flex', alignItems:'center', gap:14, width:'100%',
+                    padding:'12px 18px', background:'none', border:'none', cursor:'pointer',
+                    borderBottom:'1px solid var(--border)', textAlign:'left',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <div style={{
+                    width:36, height:36, borderRadius:10, flexShrink:0,
+                    background:`${col}20`, display:'flex', alignItems:'center',
+                    justifyContent:'center', fontWeight:800, color:col, fontSize:14,
+                  }}>{c.nombre?.[0]?.toUpperCase() || '?'}</div>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, color:'var(--text)' }}>{c.nombre}</div>
+                    <div style={{ fontSize:12, color:'var(--text-3)' }}>{c.telefono || 'Sin teléfono'}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {citas.length > 0 && (
+            <div>
+              <div style={{ padding:'10px 18px 4px', fontSize:10, fontWeight:700,
+                color:'var(--text-3)', textTransform:'uppercase', letterSpacing:0.5 }}>
+                Citas recientes
+              </div>
+              {citas.map(c => (
+                <button key={c.id}
+                  onClick={() => { onNavigate('agenda'); onClose() }}
+                  style={{
+                    display:'flex', alignItems:'center', gap:14, width:'100%',
+                    padding:'12px 18px', background:'none', border:'none', cursor:'pointer',
+                    borderBottom:'1px solid var(--border)', textAlign:'left',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <div style={{
+                    width:36, height:36, borderRadius:10, flexShrink:0,
+                    background:'rgba(168,85,247,0.15)', display:'flex', alignItems:'center',
+                    justifyContent:'center', fontSize:16,
+                  }}>📅</div>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, color:'var(--text)' }}>
+                      {c.clientes_agenda?.nombre || 'Cliente'}
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--text-3)' }}>
+                      {c.servicios?.nombre || 'Servicio'} · {fmtFecha(c.fecha_inicio)}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ height:8 }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SalonApp() {
   const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso, suscripcion, rol } = useTenant()
+  const col = tenant?.color_primario || '#f43f5e'
   const [page,          setPage]          = useState('hoy')
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false)
   const [refreshKey,    setRefreshKey]    = useState(0)
+  const [searchOpen,    setSearchOpen]    = useState(false)
 
   function handleNavigate(key) { setPage(key) }
   function handleNuevaCita()   { setNuevaCitaOpen(true) }
   function handleCitaCreada()  { setRefreshKey(k => k + 1); setPage('hoy') }
+
+  useEffect(() => {
+    const onKey = e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(s => !s)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   if (loading) return <PageLoader />
 
@@ -373,6 +568,7 @@ export default function SalonApp() {
       page={page}
       onNavigate={handleNavigate}
       onNuevaCita={handleNuevaCita}
+      onSearch={() => setSearchOpen(true)}
       todosTenants={todosTenants}
       onCambiarTenant={seleccionarTenant}
     >
@@ -389,6 +585,15 @@ export default function SalonApp() {
             onCreada={handleCitaCreada}
           />
         </Suspense>
+      )}
+
+      {searchOpen && (
+        <GlobalSearch
+          tenant={tenant}
+          col={col}
+          onNavigate={handleNavigate}
+          onClose={() => setSearchOpen(false)}
+        />
       )}
     </SalonLayout>
   )
