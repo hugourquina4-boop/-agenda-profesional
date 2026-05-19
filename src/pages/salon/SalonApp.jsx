@@ -487,16 +487,28 @@ function GlobalSearch({ tenant, col, onNavigate, onClose }) {
 }
 
 export default function SalonApp() {
-  const { tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso, suscripcion, rol } = useTenant()
+  const { user, tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso, suscripcion, rol } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
   const [page,          setPage]          = useState('hoy')
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false)
   const [refreshKey,    setRefreshKey]    = useState(0)
   const [searchOpen,    setSearchOpen]    = useState(false)
+  const loggedRef = useRef(false)
 
   function handleNavigate(key) { setPage(key) }
   function handleNuevaCita()   { setNuevaCitaOpen(true) }
   function handleCitaCreada()  { setRefreshKey(k => k + 1); setPage('hoy') }
+
+  // Registrar inicio de sesión para trazabilidad de uso (una vez por carga)
+  useEffect(() => {
+    if (!tenant?.id || !user?.id || loggedRef.current) return
+    loggedRef.current = true
+    supabase.from('access_logs').insert({
+      tenant_id: tenant.id,
+      user_id:   user.id,
+      evento:    'session_start',
+    }).then(() => {})
+  }, [tenant?.id, user?.id])
 
   useEffect(() => {
     const onKey = e => {
@@ -525,10 +537,10 @@ export default function SalonApp() {
     return <TenantPicker todosTenants={todosTenants} onSelect={seleccionarTenant} />
   }
 
-  // Bloqueo por suscripción vencida: >2 días después de fecha_limite
+  // Bloqueo por suscripción vencida: >1 día después de fecha_limite (trial efectivo = 15 días)
   // Superadmin siempre tiene acceso para gestionar / desbloquear
   const diasRestantes = suscripcion?.dias_restantes ?? null
-  if (!esSuperadmin && rol !== 'superadmin' && diasRestantes !== null && diasRestantes < -2) {
+  if (!esSuperadmin && rol !== 'superadmin' && diasRestantes !== null && diasRestantes < -1) {
     return <AppBloqueada suscripcion={suscripcion} onSignOut={() => supabase.auth.signOut()} />
   }
 

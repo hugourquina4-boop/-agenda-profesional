@@ -797,6 +797,8 @@ export default function SalonSuperadmin({ onGestionar }) {
   }, [])
 
   const [historialPagos, setHistorialPagos] = useState([])
+  const [logsUso,        setLogsUso]        = useState([])
+  const [loadingUso,     setLoadingUso]     = useState(false)
 
   const cargarHistorialPagos = useCallback(async () => {
     try {
@@ -805,10 +807,20 @@ export default function SalonSuperadmin({ onGestionar }) {
     } catch { setHistorialPagos([]) }
   }, [])
 
+  const cargarUso = useCallback(async () => {
+    setLoadingUso(true)
+    try {
+      const data = await rpcAnon('salon_admin_get_access_logs', { p_token: ADMIN_HASH })
+      setLogsUso(Array.isArray(data) ? data : [])
+    } catch { setLogsUso([]) }
+    setLoadingUso(false)
+  }, [])
+
   // Siempre cargar al montar — no dependemos de esSuperadmin (sidebar ya filtra)
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { if (tab === 'usuarios') cargarUsuarios() }, [tab, cargarUsuarios])
   useEffect(() => { if (tab === 'pagos') cargarHistorialPagos() }, [tab, cargarHistorialPagos])
+  useEffect(() => { if (tab === 'uso') cargarUso() }, [tab, cargarUso])
 
   async function actualizarClaveMaestra() {
     if (!masterClave.trim() || masterClave.trim().length < 6) {
@@ -827,11 +839,18 @@ export default function SalonSuperadmin({ onGestionar }) {
   }
 
   async function toggleActivo(n) {
+    const ahora_activo = !n.activo
     try {
       await rpcAnon('salon_admin_set_activo', {
-        p_token: ADMIN_HASH, p_tenant_id: n.id, p_activo: !n.activo,
+        p_token: ADMIN_HASH, p_tenant_id: n.id, p_activo: ahora_activo,
       })
-      showToast(n.activo ? `"${n.nombre}" suspendido` : `"${n.nombre}" activado`)
+      // Abrir WA con mensaje pre-escrito al dueño del negocio
+      const tel = (n.whatsapp || n.telefono || '').replace(/\D/g, '')
+      const msg = ahora_activo
+        ? `Hola! Tu acceso a *Salón Pro* (${n.nombre}) ha sido reactivado. Ya puedes ingresar normalmente. Cualquier duda escríbenos. ✨`
+        : `Hola! Tu acceso a *Salón Pro* (${n.nombre}) ha sido suspendido por vencimiento de suscripción. Para reactivarlo contáctanos. 🔒`
+      if (tel) window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+      showToast(ahora_activo ? `"${n.nombre}" activado` : `"${n.nombre}" suspendido`)
       cargar()
     } catch (e) { showToast(e.message, '#f87171') }
   }
@@ -1012,6 +1031,7 @@ export default function SalonSuperadmin({ onGestionar }) {
             ['negocios',  'Negocios'],
             ['accesos',   '🔑 Accesos'],
             ['pagos',     '💳 Pagos'],
+            ['uso',       '📊 Uso'],
             ['mensajes',  '📢 Mensajes'],
             ['usuarios',  'Usuarios'],
           ].map(([key, lbl]) => (
@@ -1322,6 +1342,96 @@ export default function SalonSuperadmin({ onGestionar }) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            TAB: USO — trazabilidad de accesos por negocio
+        ════════════════════════════════════════════════════════ */}
+        {tab === 'uso' && (
+          <div style={{ margin: '12px 16px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <p style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                Último acceso registrado por negocio · sesiones este mes
+              </p>
+              <button onClick={cargarUso} style={{
+                padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)',
+                background: 'var(--card)', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer',
+              }}>↻</button>
+            </div>
+            {loadingUso ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <div className="sp-spinner" />
+              </div>
+            ) : logsUso.length === 0 ? (
+              <div className="sp-empty" style={{ paddingTop: 32 }}>
+                <span className="sp-empty-icon">📊</span>
+                <p className="sp-empty-title">Sin registros de uso</p>
+                <p className="sp-empty-sub">Aplica el SQL v79 en Supabase y los accesos comenzarán a registrarse</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {logsUso.map(n => {
+                  const dias = n.dias_sin_uso
+                  const col =
+                    n.ultimo_acceso === null ? '#9ca3af'
+                    : dias <= 3  ? '#4ade80'
+                    : dias <= 7  ? '#facc15'
+                    : dias <= 14 ? '#fb923c'
+                    : '#f87171'
+                  const label =
+                    n.ultimo_acceso === null ? 'Sin accesos'
+                    : dias === 0 ? 'Hoy'
+                    : dias === 1 ? 'Ayer'
+                    : `Hace ${dias} días`
+                  return (
+                    <div key={n.tenant_id} style={{
+                      ...cardStyle,
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(120px,1fr) 80px 80px 100px',
+                      alignItems: 'center', gap: 8,
+                      opacity: n.tenant_activo ? 1 : 0.5,
+                    }}>
+                      {/* Nombre + slug */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 13, fontWeight: 700, color: 'var(--text)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>{n.tenant_nombre}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>
+                          /{n.tenant_slug} · <PlanBadge plan={n.tenant_plan} />
+                        </div>
+                      </div>
+                      {/* Vence */}
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Vence</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)' }}>
+                          {n.fecha_vence ? new Date(n.fecha_vence + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}
+                        </div>
+                      </div>
+                      {/* Sesiones mes */}
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Mes</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: n.sesiones_mes > 0 ? 'var(--accent)' : 'var(--text-3)' }}>
+                          {n.sesiones_mes}
+                        </div>
+                      </div>
+                      {/* Último acceso */}
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          padding: '3px 8px', borderRadius: 20,
+                          background: `${col}18`, border: `1px solid ${col}35`,
+                        }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0 }} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: col, whiteSpace: 'nowrap' }}>{label}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
