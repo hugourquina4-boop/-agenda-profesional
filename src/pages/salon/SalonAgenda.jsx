@@ -53,7 +53,7 @@ function fmtHora(iso) {
 }
 
 export default function SalonAgenda() {
-  const { tenant } = useTenant()
+  const { tenant, profesionalId, esProfesional } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
   const today = new Date()
@@ -126,8 +126,9 @@ export default function SalonAgenda() {
     ]).then(([pr, sr]) => {
       setProfesionales(pr.data || [])
       setSedes(sr.data || [])
+      if (esProfesional && profesionalId) setFiltroProf(profesionalId)
     })
-  }, [tenant])
+  }, [tenant]) // eslint-disable-line
 
   const cargarMes = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
