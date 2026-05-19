@@ -508,11 +508,11 @@ v72_portal_anon_tenants.sql       ⏳ PENDIENTE — corregido (quitó config_ver
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Agenda: bloquear horario (marcar no disponible sin crear cita falsa) | sin SQL (usa horarios_excepcion) | 🔴 Alta |
-| Portal: notificación WA al cliente al confirmar reserva | sin SQL (llamar notificacion-cita EF) | 🔴 Alta |
-| Agenda: vista semana con color por estado | sin SQL | 🟡 Media |
-| Agenda: cita recurrente (crear serie semanal/mensual) | sin SQL | 🟡 Media |
-| Comisiones: notificación WA al liquidar | sin SQL | 🟡 Media |
+| Agenda: bloquear horario (marcar no disponible sin crear cita falsa) | sin SQL | ✅ DONE — block rayado en grid, sheet con eliminar |
+| Portal: notificación WA al cliente al confirmar reserva | sin SQL | ✅ YA EXISTÍA — SalonPortal.jsx:405 llama notificacion-cita EF |
+| Agenda: cita recurrente (crear serie semanal/mensual) | sin SQL | ✅ DONE — botones Duplicar+Crear serie, slider 2–24 reps |
+| Comisiones: notificación WA al liquidar | sin SQL | ✅ DONE — abre WA por cada prof con teléfono al liquidar |
+| Agenda: vista semana con color por estado | sin SQL | 🟡 Media — ya tiene ESTADO_COLOR, pendiente revisión |
 
 ### Features de calidad
 
