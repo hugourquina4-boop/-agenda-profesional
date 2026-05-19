@@ -102,7 +102,7 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
-export default function SalonNuevaCita({ onClose, onCreada }) {
+export default function SalonNuevaCita({ onClose, onCreada, clientePreId, clientePreNombre }) {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
@@ -124,6 +124,13 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
   const [nuevoCliente,setNuevoCliente]= useState({ nombre:'', telefono:'' })
   const [modoNuevo,   setModoNuevo]   = useState(false)
   const [notasCita,   setNotasCita]   = useState('')
+
+  useEffect(() => {
+    if (clientePreId) {
+      setClienteId(clientePreId)
+      setBusqCliente(clientePreNombre || '')
+    }
+  }, [clientePreId]) // eslint-disable-line
 
   const [saving, setSaving] = useState(false)
   const [toast,  setToast]  = useState(null)

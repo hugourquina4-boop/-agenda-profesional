@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
+import SalonNuevaCita from './SalonNuevaCita'
 
 function Ico({ d, size = 18 }) {
   return (
@@ -106,6 +107,9 @@ export default function SalonClientes() {
 
   // Próxima cita
   const [proximaCita,   setProximaCita]   = useState(null)
+
+  // Agendar desde ficha
+  const [showAgendarCita, setShowAgendarCita] = useState(false)
 
   // Préstamos
   const [prestamos,     setPrestamos]     = useState([])
@@ -996,6 +1000,16 @@ export default function SalonClientes() {
               </button>
             </div>
 
+            {/* Agendar cita */}
+            <button onClick={() => setShowAgendarCita(true)} style={{
+              width:'100%', padding:'10px', borderRadius:12, border:`1.5px solid ${col}`,
+              background:`${col}12`, color:col, fontSize:13, fontWeight:700,
+              cursor:'pointer', marginBottom:14, display:'flex', alignItems:'center',
+              justifyContent:'center', gap:6,
+            }}>
+              📅 Agendar cita
+            </button>
+
             {/* Tags */}
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
               {TAGS_OPCIONES.map(tag => {
@@ -1505,6 +1519,15 @@ export default function SalonClientes() {
 
           </div>
         </>
+      )}
+
+      {showAgendarCita && sel && (
+        <SalonNuevaCita
+          onClose={() => setShowAgendarCita(false)}
+          onCreada={() => { setShowAgendarCita(false); setProximaCita(null); abrirCliente(sel) }}
+          clientePreId={sel.id}
+          clientePreNombre={sel.nombre}
+        />
       )}
     </div>
   )
