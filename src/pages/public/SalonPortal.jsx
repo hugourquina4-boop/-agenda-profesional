@@ -559,6 +559,22 @@ export default function SalonPortal() {
                 Confirmar por WhatsApp
               </a>
             )}
+            {(() => {
+              const ini   = new Date(confirmada.slot.inicio)
+              const fin   = new Date(ini.getTime() + confirmada.duracionTotal * 60000)
+              const fmt   = d => d.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'')
+              const gcUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(confirmada.servs.map(s=>s.nombre).join('+') + ' — ' + tenant.nombre)}&dates=${fmt(ini)}/${fmt(fin)}&details=${encodeURIComponent(`Con ${confirmada.prof?.nombre || ''}. Reservado en ${tenant.nombre}.`)}&sf=true&output=xml`
+              return (
+                <a href={gcUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+                    width:'100%', padding:'16px', borderRadius:18, marginBottom:12,
+                    background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.25)',
+                    color:'#3b82f6', fontFamily:'Outfit', fontWeight:700, fontSize:14,
+                    textDecoration:'none', boxSizing:'border-box' }}>
+                  📅 Agregar al calendario
+                </a>
+              )
+            })()}
             <button onClick={resetAll} style={{ ...T.card({ borderRadius:18 }), width:'100%', padding:'16px', color:col, fontFamily:'Outfit', fontWeight:700, fontSize:15, cursor:'pointer', border:`1px solid ${col}30` }}>
               Agendar otra cita
             </button>
