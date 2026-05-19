@@ -332,6 +332,11 @@ export default function SalonPortal() {
       })
   }, [profId])
 
+  // Declarar ANTES del useEffect que los usa para evitar TDZ
+  const selectedServs = useMemo(() => servs.filter(s => servIds.includes(s.id)), [servs, servIds])
+  const duracionTotal = useMemo(() => selectedServs.reduce((s, x) => s + (x.duracion_min || 0), 0), [selectedServs])
+  const precioBase    = useMemo(() => selectedServs.reduce((s, x) => s + (Number(x.precio) || 0), 0), [selectedServs])
+
   // ── Regenerar slots al cambiar prof / fecha / duración ──
   useEffect(() => {
     if (!profId || duracionTotal === 0 || !fecha) { setSlots([]); return }
@@ -349,10 +354,6 @@ export default function SalonPortal() {
     if (filtroSede) lista = lista.filter(p => p.sede_id === filtroSede)
     return lista
   }, [profs, servIds, profServMap, filtroSede])
-
-  const selectedServs = useMemo(() => servs.filter(s => servIds.includes(s.id)), [servs, servIds])
-  const duracionTotal = useMemo(() => selectedServs.reduce((s, x) => s + (x.duracion_min || 0), 0), [selectedServs])
-  const precioBase    = useMemo(() => selectedServs.reduce((s, x) => s + (Number(x.precio) || 0), 0), [selectedServs])
 
   const reglaActiva = useMemo(() => {
     if (!slot || !reglas.length) return null
@@ -767,9 +768,13 @@ export default function SalonPortal() {
             )}
 
             {profsParaServicios.length === 0 ? (
-              <div style={{ ...T.card({ borderRadius:24 }), padding:'48px 24px', textAlign:'center' }}>
+              <div style={{ ...T.card({ borderRadius:24 }), padding:'40px 24px', textAlign:'center' }}>
                 <p style={{ fontSize:36, marginBottom:12 }}>🚧</p>
-                <p style={{ color:T.muted, fontSize:15 }}>Sin profesionales disponibles para estos servicios</p>
+                <p style={{ fontWeight:700, fontSize:16, color:T.text, marginBottom:8 }}>Sin profesionales disponibles</p>
+                <p style={{ color:T.muted, fontSize:14, marginBottom:24, lineHeight:1.6 }}>
+                  Ningún profesional ofrece los servicios seleccionados.<br />Intenta con otra combinación.
+                </p>
+                <button onClick={() => avanzar(0)} style={{ ...primaryBtn(col), maxWidth:260, margin:'0 auto' }}>← Cambiar servicios</button>
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -799,6 +804,20 @@ export default function SalonPortal() {
               Con {prof?.nombre?.split(' ')[0]} · {selectedServs.map(s=>s.nombre).join(' + ')} · {duracionTotal}min
             </p>
 
+            {duracionTotal === 0 ? (
+              <div style={{ ...T.card({ borderRadius:24 }), padding:'32px 24px', textAlign:'center' }}>
+                <p style={{ fontSize:36, marginBottom:12 }}>⚙️</p>
+                <p style={{ fontWeight:700, fontSize:16, color:T.text, marginBottom:8 }}>Servicio sin duración configurada</p>
+                <p style={{ color:T.muted, fontSize:13, lineHeight:1.6, marginBottom:20 }}>El salón debe asignar la duración de los servicios antes de habilitar reservas.</p>
+                {tenant.whatsapp && (
+                  <a href={`https://wa.me/57${tenant.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${tenant.nombre}, quiero agendar una cita pero el link de reservas no muestra horarios.`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'12px 20px', borderRadius:14, background:'rgba(37,211,102,0.1)', border:'1px solid rgba(37,211,102,0.25)', color:'#25d166', textDecoration:'none', fontWeight:700, fontSize:13 }}>
+                    💬 Contactar al salón
+                  </a>
+                )}
+              </div>
+            ) : <>
             {/* Calendario con días de trabajo visibles */}
             <PortalCalendario
               value={fecha}
@@ -888,6 +907,7 @@ export default function SalonPortal() {
                 )}
               </>
             ) : null}
+            </>}
           </>
         )}
 

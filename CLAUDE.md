@@ -4,7 +4,7 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-19 (sesión 20)
+> Actualizado: 2026-05-19 (sesión 21)
 > **Versión actual en producción: v1.4-dev** (commit b4841bd)
 
 ---
@@ -558,7 +558,7 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Agenda: badge ✨ "1ª visita" en chip y popup (num_visitas ≤ 1) | sin SQL | ✅ DONE |
 | Proveedores: PDF orden de compra por pedido | sin SQL | ✅ DONE |
 
-**SQL pendiente aplicar:** v75_puntos_config.sql — columnas puntos_por_visita + puntos_canje_min en tenants
+**SQL aplicado:** v75_puntos_config.sql ✅ — columnas puntos_por_visita + puntos_canje_min en tenants
 
 ## Bloque T — COMPLETADO (sesión 18 cont. — 2026-05-18)
 
@@ -569,7 +569,7 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Analytics: card "¿Cómo nos conocen?" por canal | sin SQL | ✅ DONE |
 | Agenda día: botón 📤 Compartir agenda vía WhatsApp | sin SQL | ✅ DONE |
 
-**SQL pendiente aplicar:** v76_cliente_fuente.sql — columna fuente_captacion en clientes_agenda
+**SQL aplicado:** v76_cliente_fuente.sql ✅ — columna fuente_captacion en clientes_agenda
 
 ## Bloque U — COMPLETADO (sesión 18 cont.)
 
@@ -615,10 +615,7 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Agenda: botón 📅 Reagendar en popup — fecha + hora picker, update cita | sin SQL | ✅ DONE |
 | Clientes: edad calculada del cliente en el detalle (junto a cumpleaños) | sin SQL | ✅ DONE |
 
-**SQL pendiente aplicar (APLICAR EN SUPABASE):**
-
-- `v75_puntos_config.sql` — ADD COLUMN puntos_por_visita + puntos_canje_min en tenants
-- `v76_cliente_fuente.sql` — ADD COLUMN fuente_captacion en clientes_agenda
+**SQL aplicado:** v75_puntos_config.sql ✅ · v76_cliente_fuente.sql ✅
 
 ## Bloque AA — COMPLETADO (sesión 19 — 2026-05-19)
 
@@ -657,9 +654,19 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Portal: botón "📅 Agregar al calendario" (Google Calendar) en confirmación | sin SQL | ✅ DONE |
 | Dashboard Mañana: botón 📲 Recordar → lista WA individuales con mensaje pre-llenado | sin SQL | ✅ DONE |
 
-**SQL pendiente aplicar (APLICAR EN SUPABASE):**
-- `v75_puntos_config.sql` — ADD COLUMN puntos_por_visita + puntos_canje_min en tenants
-- `v76_cliente_fuente.sql` — ADD COLUMN fuente_captacion en clientes_agenda
+**SQL aplicado:** v75_puntos_config.sql ✅ · v76_cliente_fuente.sql ✅
+
+## Bloque AE — COMPLETADO (sesión 21 — 2026-05-19)
+
+### Portal público — Fix blank screen + UX flujo servicio-primero
+
+| Problema | Causa raíz | Fix |
+| -------- | ---------- | --- |
+| Pantalla en blanco al abrir `/reservar/:slug` | `duracionTotal` declarado como `const` (useMemo) en línea 354 pero referenciado en el array de dependencias del `useEffect` en línea 337 → Temporal Dead Zone (TDZ): `ReferenceError` en cada render | Movidas las declaraciones `selectedServs`, `duracionTotal`, `precioBase` a ANTES del `useEffect` que las usa |
+| Step 1 bloqueado sin salida cuando ningún profesional ofrece el servicio | `profsParaServicios` = [] → mensaje estático sin CTA | Añadido botón "← Cambiar servicios" en el card vacío → `avanzar(0)` |
+| Step 2 muestra "Sin disponibilidad" cuando el servicio no tiene duración | `duracionTotal === 0` → useEffect no genera slots → UI cae en rama "sin disponibilidad" para cada fecha | Añadido card informativo "Servicio sin duración configurada" + link WA al salón antes del calendario cuando `duracionTotal === 0` |
+
+**SQL aplicado:** v75 ✅ · v76 ✅
 
 ---
 
