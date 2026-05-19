@@ -479,6 +479,10 @@ export default function SalonAgenda() {
                     fontFamily:'Outfit', fontWeight:800, fontSize:15,
                     color: esSel ? '#fff' : esHoy ? col : 'var(--text)',
                   }}>{diaNum}</div>
+                  {dc.length > 0 && (
+                    <div style={{ fontSize:9, fontWeight:700, color: esHoy ? col : 'var(--text-3)',
+                      marginTop:2 }}>{dc.length}</div>
+                  )}
                 </button>
 
                 {/* Citas del día */}

@@ -115,6 +115,7 @@ export default function SalonAnalytics() {
   const [heatmap,   setHeatmap]   = useState(new Array(7).fill(0)) // Lun→Dom
   const [kpiPrev,   setKpiPrev]   = useState(null) // mes anterior para comparativa
   const [fuenteData,setFuenteData]= useState([]) // captación por canal
+  const [segData,   setSegData]   = useState(null) // {nuevos, recurrentes, vip, total}
 
   // Finanzas
   const [gastosHist, setGastosHist] = useState([])
@@ -325,12 +326,13 @@ export default function SalonAnalytics() {
       const now = new Date()
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      const [kpiRes, staffRes, retRes, citasRes, fuenteRes] = await Promise.all([
+      const [kpiRes, staffRes, retRes, citasRes, fuenteRes, cliSegRes] = await Promise.all([
         supabase.from('v_kpis_mes').select('*').eq('tenant_id', tenant.id).order('mes', { ascending: false }),
         supabase.from('v_revenue_staff').select('*').eq('tenant_id', tenant.id).order('ingresos_brutos', { ascending: false }),
         supabase.from('v_retention').select('*').eq('tenant_id', tenant.id).maybeSingle(),
         supabase.from('citas').select('fecha_inicio, servicios(id,nombre,precio)').eq('tenant_id', tenant.id).eq('estado', 'completada').gte('fecha_inicio', firstOfMonth),
         supabase.from('clientes_agenda').select('fuente_captacion').eq('tenant_id', tenant.id).not('fuente_captacion', 'is', null),
+        supabase.from('clientes_agenda').select('id, num_visitas, segmento, created_at').eq('tenant_id', tenant.id).eq('activo', true),
       ])
 
       const kpiRows = kpiRes.data || []
@@ -364,6 +366,16 @@ export default function SalonAnalytics() {
         fMap[f] = (fMap[f] || 0) + 1
       })
       setFuenteData(Object.entries(fMap).map(([canal, count]) => ({ canal, count })).sort((a,b) => b.count - a.count))
+
+      // Segmentación de clientes
+      const cliAll = cliSegRes.data || []
+      const mesIso = firstOfMonth.slice(0, 7)
+      setSegData({
+        total:        cliAll.length,
+        nuevos:       cliAll.filter(c => c.created_at?.slice(0, 7) === mesIso).length,
+        recurrentes:  cliAll.filter(c => (c.num_visitas || 0) >= 2).length,
+        vip:          cliAll.filter(c => c.segmento === 'vip' || c.segmento === 'frecuente').length,
+      })
     } catch (e) {
       console.error('[SalonAnalytics]', e)
     } finally {
@@ -1527,6 +1539,40 @@ export default function SalonAnalytics() {
               </div>
             )
           })}
+        </div>
+      </>)}
+
+      {segData && segData.total > 0 && (<>
+        <div className="sp-section" style={{ marginTop:20 }}>
+          <span className="sp-section-title">Segmentación de clientes</span>
+        </div>
+        <div style={{ margin:'0 16px', padding:'16px', borderRadius:16,
+          background:'var(--card)', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
+            {[
+              { label:'Total activos', value:segData.total,       icon:'👥', color:'var(--text)' },
+              { label:'Nuevos este mes',value:segData.nuevos,     icon:'🆕', color:'#818cf8' },
+              { label:'Recurrentes',   value:segData.recurrentes, icon:'🔄', color:col },
+              { label:'VIP / Frecuentes',value:segData.vip,      icon:'⭐', color:'#f59e0b' },
+            ].map(s => (
+              <div key={s.label} style={{ padding:'10px 12px', borderRadius:12,
+                background:'var(--bg)', border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:16, marginBottom:4 }}>{s.icon}</div>
+                <div style={{ fontFamily:'Outfit', fontWeight:800, fontSize:20, color:s.color }}>{s.value}</div>
+                <div style={{ fontSize:11, color:'var(--text-3)', fontWeight:600 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ height:6, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
+            <div style={{
+              height:'100%', borderRadius:4, background:`linear-gradient(90deg,${col},#818cf8)`,
+              width:`${segData.total > 0 ? Math.round(segData.recurrentes/segData.total*100) : 0}%`,
+              transition:'width 0.5s',
+            }} />
+          </div>
+          <div style={{ fontSize:11, color:'var(--text-3)', textAlign:'center', marginTop:6 }}>
+            {segData.total > 0 ? Math.round(segData.recurrentes/segData.total*100) : 0}% retención (clientes con ≥2 visitas)
+          </div>
         </div>
       </>)}
 
