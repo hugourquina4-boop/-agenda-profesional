@@ -628,98 +628,98 @@ export default function SalonEquipo() {
           {profs.map((p, i) => {
             const color = p.color || COLORS[i % COLORS.length]
             const st = profStats[p.id]
-            const fmtK = n => n >= 1000000 ? `$${(n/1000000).toFixed(1)}M` : n >= 1000 ? `$${Math.round(n/1000)}K` : `$${Math.round(n)}`
+            const fmtK = n => n >= 1_000_000 ? `$${(n/1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${Math.round(n/1_000)}K` : `$${Math.round(n)}`
+            const isAusente = ausentesHoy.has(p.id)
+            const btnBase = { width:30, height:30, borderRadius:9, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--card)', color:'var(--text-2)' }
             return (
               <div key={p.id} style={{
-                display:'flex', alignItems:'center', gap:12,
-                padding:'14px 16px', borderRadius:16,
-                background:`linear-gradient(135deg,${color}10,${color}05)`,
-                boxShadow:'0 2px 12px rgba(0,0,0,0.1)',
+                padding:'11px 13px', borderRadius:16,
+                background:`linear-gradient(135deg,${color}09,${color}04)`,
+                border:`1px solid ${color}22`,
+                boxShadow:'0 2px 8px rgba(0,0,0,0.07)',
               }}>
-                {/* Avatar */}
-                <div style={{
-                  width:46, height:46, borderRadius:14, background:`${color}25`,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontFamily:'Outfit', fontWeight:800, fontSize:19, color, flexShrink:0,
-                }}>
-                  {p.foto_url
-                    ? <img src={p.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'inherit' }} />
-                    : p.nombre[0]
-                  }
-                </div>
-
-                {/* Info */}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text)',
-                    overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                    {p.nombre}
+                {/* Fila 1: Avatar + Nombre/Rol + Acciones */}
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{
+                    width:42, height:42, borderRadius:13, background:`${color}22`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'Outfit', fontWeight:800, fontSize:18, color, flexShrink:0, overflow:'hidden',
+                  }}>
+                    {p.foto_url
+                      ? <img src={p.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'inherit' }} />
+                      : p.nombre[0]
+                    }
                   </div>
-                  {p.especialidad && (
-                    <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>{p.especialidad}</div>
-                  )}
-                  {st && st.citas > 0 && (
-                    <div style={{ fontSize:11, color:color, marginTop:3, fontWeight:600 }}>
-                      {st.citas} cita{st.citas !== 1 ? 's' : ''}
-                      {st.ingresos > 0 ? ` · ${fmtK(st.ingresos)}` : ''}
-                      {st.citas > 0 && st.ingresos > 0 ? ` · $${Math.round(st.ingresos/st.citas/1000)}K avg` : ''} este mes
-                      {st.noShows > 0 && (
-                        <span style={{ color:'#f87171', marginLeft:6 }}>· {st.noShows} no-show</span>
+
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:5, minWidth:0 }}>
+                      <span style={{ fontWeight:700, fontSize:14, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1, minWidth:0 }}>
+                        {p.nombre}
+                      </span>
+                      {isAusente && (
+                        <span style={{ flexShrink:0, padding:'1px 7px', borderRadius:20, fontSize:10, fontWeight:700, background:'rgba(239,68,68,0.1)', color:'#f87171' }}>
+                          Ausente
+                        </span>
                       )}
                     </div>
-                  )}
-                </div>
+                    {p.especialidad && (
+                      <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                        {p.especialidad}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Botones de acción — agrupados para que nunca se corten */}
-                <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                  <button
-                    onClick={() => marcarAusenteHoy(p)}
-                    disabled={marcandoAus === p.id}
-                    title={ausentesHoy.has(p.id) ? 'Marcar disponible hoy' : 'Marcar ausente hoy'}
-                    style={{
-                      padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700,
-                      background: ausentesHoy.has(p.id) ? 'rgba(239,68,68,0.12)' : 'rgba(113,113,122,0.08)',
-                      color:       ausentesHoy.has(p.id) ? '#f87171' : 'var(--text-3)',
-                      border:'none', cursor:'pointer', whiteSpace:'nowrap',
-                      opacity: marcandoAus === p.id ? 0.6 : 1,
-                    }}>
-                    {ausentesHoy.has(p.id) ? '🏠 Ausente' : '🏠'}
-                  </button>
-                  <button
-                    onClick={() => toggleActivo(p)}
-                    title={p.activo ? 'Desactivar' : 'Activar'}
-                    style={{
-                      padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700,
+                  {/* Botones compactos — no se solapan con el texto */}
+                  <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+                    <button
+                      onClick={() => marcarAusenteHoy(p)} disabled={marcandoAus === p.id}
+                      title={isAusente ? 'Marcar disponible' : 'Marcar ausente hoy'}
+                      style={{ ...btnBase, background: isAusente ? 'rgba(239,68,68,0.1)' : 'var(--card)', color: isAusente ? '#f87171' : 'var(--text-3)', opacity: marcandoAus === p.id ? 0.5 : 1 }}>
+                      <Ico d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" size={13} />
+                    </button>
+                    <button onClick={() => toggleActivo(p)} title={p.activo ? 'Desactivar' : 'Activar'} style={{
+                      padding:'3px 8px', borderRadius:7, fontSize:10, fontWeight:700,
                       background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
                       color:       p.activo ? '#4ade80' : '#f87171',
                       border:'none', cursor:'pointer', whiteSpace:'nowrap',
                     }}>
-                    {p.activo ? 'Activo' : 'Inactivo'}
-                  </button>
-
-                  <button onClick={() => abrirHorarios(p)} title="Horarios" style={{
-                    width:32, height:32, borderRadius:9, border:'none',
-                    background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={14} />
-                  </button>
-
-                  <button onClick={() => abrir(p)} title="Editar" style={{
-                    width:32, height:32, borderRadius:9, border:'none',
-                    background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={14} />
-                  </button>
-
-                  <button onClick={() => setElimTarget(p)} title="Eliminar" style={{
-                    width:32, height:32, borderRadius:9, border:'1px solid rgba(239,68,68,0.35)',
-                    background:'rgba(239,68,68,0.06)', color:'#ef4444', cursor:'pointer',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} />
-                  </button>
+                      {p.activo ? 'Activo' : 'Inactivo'}
+                    </button>
+                    <button onClick={() => abrirHorarios(p)} title="Horarios" style={btnBase}>
+                      <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={13} />
+                    </button>
+                    <button onClick={() => abrir(p)} title="Editar" style={btnBase}>
+                      <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={13} />
+                    </button>
+                    <button onClick={() => setElimTarget(p)} title="Eliminar" style={{ ...btnBase, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
+                      <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={13} />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Fila 2: badges de estadísticas del mes — siempre en su propia línea */}
+                {st && st.citas > 0 && (
+                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:9, paddingTop:8, borderTop:`1px solid ${color}18` }}>
+                    <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:`${color}16`, color }}>
+                      {st.citas} {st.citas === 1 ? 'cita' : 'citas'}
+                    </span>
+                    {st.ingresos > 0 && (
+                      <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>
+                        {fmtK(st.ingresos)}
+                      </span>
+                    )}
+                    {st.citas > 0 && st.ingresos > 0 && (
+                      <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:'rgba(99,102,241,0.1)', color:'#818cf8' }}>
+                        {fmtK(Math.round(st.ingresos / st.citas))} avg
+                      </span>
+                    )}
+                    {st.noShows > 0 && (
+                      <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:'rgba(239,68,68,0.08)', color:'#f87171' }}>
+                        {st.noShows} no-show
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

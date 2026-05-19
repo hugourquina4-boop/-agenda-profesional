@@ -284,16 +284,20 @@ export default function SalonClientes() {
       const s = busq.trim().replace(/[%_]/g, '\\$&')
       q.or(`nombre.ilike.%${s}%,telefono.ilike.%${s}%,email.ilike.%${s}%`)
     }
-    const [{ data }, { data: prestData }] = await Promise.all([
+    const [res, resPrest] = await Promise.all([
       q.limit(100),
       supabase.from('prestamos_cliente').select('cliente_id, tipo, monto').eq('tenant_id', tenant.id),
     ])
-    // Compute saldo per client
+    if (res.error) {
+      showToast('Error al cargar: ' + res.error.message, false)
+      setLoading(false)
+      return
+    }
     const saldoMap = {}
-    ;(prestData || []).forEach(p => {
+    ;(resPrest.data || []).forEach(p => {
       saldoMap[p.cliente_id] = (saldoMap[p.cliente_id] || 0) + (p.tipo === 'prestamo' ? p.monto : -p.monto)
     })
-    const merged = (data || []).map(c => ({ ...c, saldo_prestamos: saldoMap[c.id] || 0 }))
+    const merged = (res.data || []).map(c => ({ ...c, saldo_prestamos: saldoMap[c.id] || 0 }))
     setClientes(merged)
     setLoading(false)
   }, [tenant, busq])

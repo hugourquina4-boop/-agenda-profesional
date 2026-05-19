@@ -404,7 +404,7 @@ export default function SalonDashboard({ onNavigate }) {
   }
 
   function enviarWA(cita) {
-    const tel = cita.clientes?.telefono?.replace(/\D/g,'')
+    const tel = cita.clientes_agenda?.telefono?.replace(/\D/g,'')
     if (!tel) return showToast('Sin teléfono registrado', '#f59e0b')
     const msg = encodeURIComponent(
       `Hola ${cita.clientes_agenda?.nombre||'Cliente'} 👋 Te recordamos tu cita de ${cita.servicios?.nombre||'servicio'} hoy a las ${fmtHora(cita.fecha_inicio)}. ¡Te esperamos!`
@@ -1268,34 +1268,42 @@ export default function SalonDashboard({ onNavigate }) {
                 <div className="sp-tl-card" style={{
                   background:`linear-gradient(135deg, ${profColor}10 0%, var(--card) 55%)`,
                   borderColor:`${profColor}28`,
+                  padding:'10px 12px',
                 }}>
-                  <div style={{ paddingLeft:2 }}>
-                    <div className="sp-tl-top">
-                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        <span className="sp-tl-client">{cita.clientes_agenda?.nombre||'Cliente'}</span>
-                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div>
+                    <div className="sp-tl-top" style={{ marginBottom:3 }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                        <button
+                          onClick={() => onNavigate?.('clientes')}
+                          style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}
+                        >
+                          <span className="sp-tl-client" style={{ fontSize:14 }}>{cita.clientes_agenda?.nombre||'Cliente'}</span>
+                        </button>
+                        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
                           <span style={{
-                            display:'inline-flex', alignItems:'center', gap:4,
+                            display:'inline-flex', alignItems:'center', gap:3,
                             fontSize:11, fontWeight:700,
-                            padding:'2px 8px', borderRadius:20,
+                            padding:'2px 7px', borderRadius:20,
                             background:`${profColor}20`, color:profColor,
                           }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:profColor, flexShrink:0 }} />
+                            <span style={{ width:5, height:5, borderRadius:'50%', background:profColor, flexShrink:0 }} />
                             {cita.profesionales?.nombre?.split(' ')[0]||'—'}
                           </span>
                           {cita.servicios?.duracion_min && (
                             <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:500 }}>
-                              {cita.servicios.duracion_min} min
+                              {cita.servicios.duracion_min}m
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className="sp-tl-badge" style={{ background:est.bg, color:est.color }}>{est.label}</span>
+                      <span className="sp-tl-badge" style={{ background:est.bg, color:est.color, fontSize:10 }}>{est.label}</span>
                     </div>
-                    <p className="sp-tl-service" style={{ marginTop:6 }}>{cita.servicios?.nombre||'Servicio'}</p>
-                    <div className="sp-tl-actions">
-                      <button className="sp-tl-action wa" onClick={()=>enviarWA(cita)} style={{ flex:'0 0 44px' }}>
-                        <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={15} />
+                    <p className="sp-tl-service" style={{ marginTop:4, marginBottom:6, fontSize:12 }}>{cita.servicios?.nombre||'Servicio'}</p>
+                    <div className="sp-tl-actions" style={{ gap:6 }}>
+                      <button className="sp-tl-action wa" onClick={()=>enviarWA(cita)}
+                        title={cita.clientes_agenda?.telefono ? 'Enviar recordatorio WA' : 'Sin teléfono'}
+                        style={{ flex:'0 0 38px', height:34 }}>
+                        <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={14} />
                       </button>
                       {canDone && (
                         <button className="sp-tl-action ok" style={{
