@@ -533,6 +533,19 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Mensajería: filtro "Cumpleaños esta semana" (≤7d) | sin SQL | ✅ DONE — isCumpleEstaSemana() |
 | Mensajería: filtro "Sin visita 60d" | sin SQL | ✅ DONE — sinVisita60d() |
 
+## Bloque R — COMPLETADO (sesión 17 final — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Búsqueda global Ctrl+K (clientes + citas) | sin SQL | ✅ DONE — overlay debounce 280ms, navega módulo |
+| Campanita: popover citas próximas hoy | sin SQL | ✅ DONE — badge rojo, lista horas/clientes/servicios |
+| Agenda semana: drag & drop mover cita a otro día | sin SQL | ✅ DONE — HTML5 drag events, preserva hora, drop en columna destino |
+| Comisiones: PDF colectivo de planilla del mes | sin SQL | ✅ DONE — tabla todos los profs, total a pagar, firma |
+| Agenda: auto-refresh cada 60s (recepción) | sin SQL | ✅ DONE — setInterval solo cuando no hay sheet abierto |
+| Clientes: programa de puntos de fidelidad | v74 ⏳ | ✅ DONE — tab Puntos, saldo prominente, dar/canjear/ajustar, historial |
+
+**SQL pendiente aplicar:** v74_puntos_fidelidad.sql — tabla puntos_cliente + columna puntos_acumulados en clientes_agenda
+
 **SQL aplicado:** v72 ✅ (portal activo) · v73 ✅ (movimientos stock activos)
 
 ---
