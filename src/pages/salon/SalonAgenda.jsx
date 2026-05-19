@@ -86,6 +86,9 @@ export default function SalonAgenda() {
   const [dupMode,          setDupMode]          = useState(false)
   const [dupFecha,         setDupFecha]         = useState('')
   const [serieMode,        setSerieMode]        = useState(false)
+  const [reagendarMode,    setReagendarMode]    = useState(false)
+  const [reagendarFecha,   setReagendarFecha]   = useState('')
+  const [reagendarHora,    setReagendarHora]    = useState('')
   const [serieFreq,        setSerieFreq]        = useState('semanal')
   const [serieReps,        setSerieReps]        = useState(4)
   const [creandoSerie,     setCreandoSerie]     = useState(false)
@@ -152,7 +155,7 @@ export default function SalonAgenda() {
   }, [cargarMes, selCita, bloqueoModal])
 
   useEffect(() => {
-    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); setDupMode(false); setDupFecha(''); setSerieMode(false); return }
+    if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); setDupMode(false); setDupFecha(''); setSerieMode(false); setReagendarMode(false); setReagendarFecha(''); setReagendarHora(''); return }
     setNota(selCita.notas || '')
     setAnticoInput('')
     setLoadPago(true)
@@ -286,6 +289,30 @@ export default function SalonAgenda() {
     if (!error) {
       setDupMode(false); setSelCita(null)
       cargarMes()
+    }
+  }
+
+  async function reagendarCita() {
+    if (!selCita || !reagendarFecha || !reagendarHora) return
+    setActualizando(true)
+    const dur = selCita.servicios?.duracion_min || 30
+    const [hh, mm] = reagendarHora.split(':').map(Number)
+    const ini = new Date(`${reagendarFecha}T${reagendarHora}:00`)
+    const fin = new Date(ini.getTime() + dur * 60000)
+    const pad = n => String(n).padStart(2,'0')
+    const finStr = `${fin.getFullYear()}-${pad(fin.getMonth()+1)}-${pad(fin.getDate())}T${pad(fin.getHours())}:${pad(fin.getMinutes())}:00`
+    void hh; void mm
+    const { error } = await supabase.from('citas').update({
+      fecha_inicio: `${reagendarFecha}T${reagendarHora}:00`,
+      fecha_fin: finStr,
+      estado: 'pendiente',
+    }).eq('id', selCita.id).eq('tenant_id', tenant.id)
+    setActualizando(false)
+    if (!error) {
+      setReagendarMode(false)
+      setSelCita(null)
+      cargarMes()
+      showToast('Cita reagendada ✓', '#6366f1')
     }
   }
 
@@ -1392,9 +1419,22 @@ export default function SalonAgenda() {
               <div style={{ marginBottom:16 }} />
             )}
 
-            {/* Duplicar / Crear serie */}
-            {!dupMode && !serieMode ? (
+            {/* Reagendar / Duplicar / Crear serie */}
+            {!dupMode && !serieMode && !reagendarMode ? (
               <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                <button onClick={() => {
+                  const h = new Date(selCita.fecha_inicio)
+                  setReagendarFecha(h.toISOString().slice(0,10))
+                  setReagendarHora(`${String(h.getHours()).padStart(2,'0')}:${String(h.getMinutes()).padStart(2,'0')}`)
+                  setReagendarMode(true)
+                }} style={{
+                  flex:1, padding:'12px', borderRadius:13, cursor:'pointer',
+                  background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.22)',
+                  color:'#f59e0b', fontWeight:700, fontSize:12,
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:5,
+                }}>
+                  📅 Reagendar
+                </button>
                 <button onClick={() => setDupMode(true)} style={{
                   flex:1, padding:'12px', borderRadius:13, cursor:'pointer',
                   background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.22)',
@@ -1478,6 +1518,39 @@ export default function SalonAgenda() {
                   </button>
                   <button onClick={() => setSerieMode(false)} style={{
                     padding:'11px 14px', borderRadius:11, border:'none', cursor:'pointer',
+                    background:'var(--card)', color:'var(--text-3)', fontWeight:700, fontSize:13,
+                    boxShadow:'0 1px 4px rgba(0,0,0,0.1)',
+                  }}>Cancelar</button>
+                </div>
+              </div>
+            ) : reagendarMode ? (
+              <div style={{ marginBottom:16, padding:'14px 16px', borderRadius:13,
+                background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.22)' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b', marginBottom:10 }}>
+                  Reagendar cita
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                  <div>
+                    <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:0.4 }}>Fecha</label>
+                    <input type="date" value={reagendarFecha} onChange={e => setReagendarFecha(e.target.value)}
+                      className="sp-input" style={{ fontSize:13 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:0.4 }}>Hora</label>
+                    <input type="time" value={reagendarHora} onChange={e => setReagendarHora(e.target.value)}
+                      className="sp-input" style={{ fontSize:13 }} />
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={reagendarCita} disabled={!reagendarFecha || !reagendarHora || actualizando} style={{
+                    flex:1, padding:'11px', borderRadius:11, border:'none', cursor:'pointer',
+                    background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#fff',
+                    fontWeight:700, fontSize:13, opacity: (!reagendarFecha || !reagendarHora || actualizando) ? 0.6 : 1,
+                  }}>
+                    {actualizando ? '…' : 'Confirmar'}
+                  </button>
+                  <button onClick={() => setReagendarMode(false)} style={{
+                    padding:'11px 16px', borderRadius:11, border:'none', cursor:'pointer',
                     background:'var(--card)', color:'var(--text-3)', fontWeight:700, fontSize:13,
                     boxShadow:'0 1px 4px rgba(0,0,0,0.1)',
                   }}>Cancelar</button>

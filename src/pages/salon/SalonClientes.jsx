@@ -1096,6 +1096,15 @@ export default function SalonClientes() {
                 <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'var(--text-2)' }}>
                   <span style={{ fontSize:16 }}>🎂</span>
                   {new Date(sel.fecha_nacimiento + 'T12:00:00').toLocaleDateString('es-CO', { day:'numeric', month:'long' })}
+                  {(() => {
+                    const hoy = new Date()
+                    const nac = new Date(sel.fecha_nacimiento + 'T12:00:00')
+                    let edad = hoy.getFullYear() - nac.getFullYear()
+                    if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) edad--
+                    return edad >= 0 && edad < 120 ? (
+                      <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:600 }}>({edad} años)</span>
+                    ) : null
+                  })()}
                   {cumpleProximo(sel.fecha_nacimiento) && (
                     <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:6,
                       background:'rgba(251,191,36,0.15)', color:'#fbbf24' }}>Próximo</span>
