@@ -859,6 +859,38 @@ export default function SalonDashboard({ onNavigate }) {
         </div>
       )}
 
+      {/* ── Meta de ingresos del mes ── */}
+      {(() => {
+        const meta = Number(tenant?.config_vertical?.meta_ingresos_mes || 0)
+        if (!meta) return null
+        const pct = Math.min(ingresosMes / meta * 100, 100)
+        const alcanzado = ingresosMes >= meta
+        return (
+          <div style={{ margin:'10px 16px', padding:'12px 14px', borderRadius:14,
+            background:'var(--card)', boxShadow:'0 2px 10px rgba(0,0,0,0.07)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase' }}>
+                🎯 Meta del mes
+              </span>
+              <span style={{ fontSize:12, fontWeight:800, fontFamily:'Outfit',
+                color: alcanzado ? '#22c55e' : col }}>
+                {alcanzado ? '✓ Alcanzada!' : `${Math.round(pct)}%`}
+              </span>
+            </div>
+            <div style={{ height:7, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
+              <div style={{
+                height:'100%', borderRadius:4, width:`${pct}%`, transition:'width 0.5s',
+                background: alcanzado ? '#22c55e' : `linear-gradient(90deg,${col},${col}cc)`,
+              }} />
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginTop:4, fontSize:10, color:'var(--text-3)' }}>
+              <span>{fmtCOP(ingresosMes)}</span>
+              <span>Meta: {fmtCOP(meta)}</span>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ── Tendencia ingresos: semana actual vs anterior ── */}
       {tendencia14 && tendencia14.some(v => v > 0) && (() => {
         const semAnt = tendencia14.slice(0, 7)

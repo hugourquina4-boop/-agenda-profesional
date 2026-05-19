@@ -585,6 +585,39 @@ export default function SalonCaja() {
             </div>
           </div>
 
+          {/* Meta de ingresos del mes */}
+          {(() => {
+            const meta = Number(tenant?.config_vertical?.meta_ingresos_mes || 0)
+            if (!meta || periodo !== 'mes') return null
+            const pct = Math.min(totalCobrado / meta * 100, 100)
+            const alcanzado = totalCobrado >= meta
+            return (
+              <div style={{ padding:'12px 14px', borderRadius:14, background:'var(--card)',
+                marginBottom:10, boxShadow:'0 2px 10px rgba(0,0,0,0.07)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase' }}>
+                    🎯 Meta del mes
+                  </span>
+                  <span style={{ fontSize:12, fontWeight:800, fontFamily:'Outfit',
+                    color: alcanzado ? '#22c55e' : col }}>
+                    {alcanzado ? '✓ Meta alcanzada!' : `${Math.round(pct)}% — faltan $${Math.max(0, meta - totalCobrado).toLocaleString('es-CO')}`}
+                  </span>
+                </div>
+                <div style={{ height:8, borderRadius:4, background:'var(--border)', overflow:'hidden' }}>
+                  <div style={{
+                    height:'100%', borderRadius:4, transition:'width 0.5s',
+                    width:`${pct}%`,
+                    background: alcanzado ? '#22c55e' : `linear-gradient(90deg, ${col}, ${col}cc)`,
+                  }} />
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginTop:5, fontSize:10, color:'var(--text-3)' }}>
+                  <span>${totalCobrado.toLocaleString('es-CO')}</span>
+                  <span>Meta: ${meta.toLocaleString('es-CO')}</span>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Gráfico semanal ingresos vs egresos */}
           {periodo === 'semana' && (historial.length > 0 || egresos.length > 0) && (() => {
             const hoy = new Date()

@@ -111,6 +111,7 @@ export default function SalonConfig() {
       fotos_galeria:       (tenant.config_vertical?.fotos_galeria || []).concat(['','','','']).slice(0,4),
       puntos_por_visita:   tenant.puntos_por_visita   ?? 10,
       puntos_canje_min:    tenant.puntos_canje_min    ?? 50,
+      meta_ingresos_mes:   tenant.config_vertical?.meta_ingresos_mes ?? 0,
     })
   }, [tenant])
 
@@ -151,6 +152,7 @@ export default function SalonConfig() {
         duracion_slot_min:    Number(form.duracion_slot_min),
         anticipacion_horas:   Number(form.anticipacion_horas),
         politica_cancelacion: form.politica_cancelacion.trim() || null,
+        meta_ingresos_mes:    Number(form.meta_ingresos_mes) || 0,
       },
     }).eq('id', tenant.id)
     setSaving(false)
@@ -408,6 +410,19 @@ export default function SalonConfig() {
         </div>
         <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
           Los clientes acumulan puntos automáticamente al completar cada cita. El mínimo para canjear controla cuántos puntos se necesitan para un canje.
+        </div>
+      </Seccion>
+
+      {/* ── Objetivos del mes ── */}
+      <Seccion titulo="Objetivos del mes 🎯">
+        <Campo label="Meta de ingresos (COP)">
+          <input className="sp-input" type="number" min="0" step="50000"
+            placeholder="Ej: 3000000"
+            value={form.meta_ingresos_mes || ''}
+            onChange={e => set('meta_ingresos_mes', e.target.value)} />
+        </Campo>
+        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
+          Aparece como barra de progreso en Caja e informe gerencial. Deja en 0 para ocultar.
         </div>
       </Seccion>
 
