@@ -217,9 +217,9 @@ export default function SalonDashboard({ onNavigate }) {
           .gte('fecha_inicio', `${mananaFecha}T00:00:00`).lte('fecha_inicio', `${mananaFecha}T23:59:59`)
           .neq('estado', 'cancelada').order('fecha_inicio').limit(5),
         supabase.from('clientes_agenda')
-          .select('id,nombre,telefono')
+          .select('id,nombre,telefono,fecha_nacimiento')
           .eq('tenant_id', tenant.id).eq('activo', true)
-          .like('fecha_nacimiento', `%-${fecha.slice(5)}`),
+          .or(Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i);return `fecha_nacimiento.like.%-${d.toISOString().slice(5,10)}`}).join(',')),
         supabase.from('citas')
           .select('fecha_inicio,servicios(id,nombre),profesionales(id,nombre)')
           .eq('tenant_id', tenant.id)
@@ -532,36 +532,62 @@ export default function SalonDashboard({ onNavigate }) {
       })()}
 
       {/* ── Alerta cumpleaños ────────────────────────────── */}
-      {cumpleaneros.length > 0 && (
-        <div className="sp-alert rose" style={{ marginTop:16 }}>
-          <span style={{ fontSize:22, flexShrink:0, lineHeight:1 }}>🎂</span>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
-              {cumpleaneros.length === 1
-                ? `¡Hoy es el cumpleaños de ${cumpleaneros[0].nombre}!`
-                : `¡${cumpleaneros.length} clientes cumplen años hoy!`}
-            </div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {cumpleaneros.map(c => {
-                const tel = c.telefono?.replace(/\D/g,'')
-                const msg = encodeURIComponent(`¡Feliz cumpleaños ${c.nombre.split(' ')[0]}! 🎉 En ${tenant?.nombre || 'el salón'} te deseamos un día increíble. ¡Queremos celebrarlo contigo — tienes un descuento especial hoy! 💅`)
-                return tel ? (
-                  <a key={c.id} href={`https://wa.me/57${tel}?text=${msg}`} target="_blank" rel="noopener noreferrer"
-                    style={{
-                      fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:7,
-                      background:'rgba(236,72,153,0.12)', border:'1px solid rgba(236,72,153,0.35)',
-                      color:'#ec4899', textDecoration:'none', whiteSpace:'nowrap',
-                    }}>
-                    🎁 WA {cumpleaneros.length > 1 ? c.nombre.split(' ')[0] : 'Saludar'}
-                  </a>
-                ) : (
-                  <span key={c.id} style={{ fontSize:11, color:'var(--text-3)' }}>{c.nombre}</span>
-                )
-              })}
+      {cumpleaneros.length > 0 && (() => {
+        const hoyStr = new Date().toISOString().slice(5, 10) // MM-DD
+        const conDias = cumpleaneros.map(c => {
+          const nacMMDD = c.fecha_nacimiento?.slice(5, 10) || ''
+          const esHoy = nacMMDD === hoyStr
+          let dias = 0
+          if (!esHoy) {
+            for (let i = 1; i < 7; i++) {
+              const d = new Date(); d.setDate(d.getDate() + i)
+              if (d.toISOString().slice(5, 10) === nacMMDD) { dias = i; break }
+            }
+          }
+          return { ...c, esHoy, dias }
+        }).sort((a, b) => a.dias - b.dias)
+        const hoy = conDias.filter(c => c.esHoy)
+        const prox = conDias.filter(c => !c.esHoy)
+        return (
+          <div className="sp-alert rose" style={{ marginTop:16 }}>
+            <span style={{ fontSize:22, flexShrink:0, lineHeight:1 }}>🎂</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              {hoy.length > 0 && (
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:6 }}>
+                  {hoy.length === 1 ? `¡Hoy cumple años ${hoy[0].nombre.split(' ')[0]}!` : `¡${hoy.length} clientes cumplen hoy!`}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {conDias.map(c => {
+                  const tel = c.telefono?.replace(/\D/g,'')
+                  const msg = encodeURIComponent(c.esHoy
+                    ? `¡Feliz cumpleaños ${c.nombre.split(' ')[0]}! 🎉 En ${tenant?.nombre || 'el salón'} te deseamos un día increíble. ¡Queremos celebrarlo contigo! 💅`
+                    : `Hola ${c.nombre.split(' ')[0]} 👋 Queríamos recordarte que en ${tenant?.nombre || 'el salón'} estamos pensando en ti para tu cumpleaños. ¡Te esperamos! 🎂`)
+                  const label = c.esHoy ? `🎁 ${c.nombre.split(' ')[0]}` : `📅 ${c.nombre.split(' ')[0]} (en ${c.dias}d)`
+                  return tel ? (
+                    <a key={c.id} href={`https://wa.me/57${tel}?text=${msg}`} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:7,
+                        background: c.esHoy ? 'rgba(236,72,153,0.15)' : 'rgba(236,72,153,0.07)',
+                        border:`1px solid ${c.esHoy ? 'rgba(236,72,153,0.4)' : 'rgba(236,72,153,0.2)'}`,
+                        color:'#ec4899', textDecoration:'none', whiteSpace:'nowrap',
+                      }}>
+                      {label}
+                    </a>
+                  ) : (
+                    <span key={c.id} style={{ fontSize:11, color:'var(--text-3)' }}>
+                      {c.nombre.split(' ')[0]}{!c.esHoy ? ` (${c.dias}d)` : ''}
+                    </span>
+                  )
+                })}
+              </div>
+              {prox.length > 0 && hoy.length === 0 && (
+                <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>Cumpleaños próximos — recuerda saludar</div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Onboarding: checklist de configuración inicial ── */}
       {!isDemo && !loading && (() => {
