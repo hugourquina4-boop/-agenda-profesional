@@ -574,6 +574,21 @@ export default function SalonServicios() {
                       {s.productos_ids?.length ? ` · ${s.productos_ids.length} prod.` : ''}
                     </div>
                   </div>
+                  <button onClick={async e => {
+                    e.stopPropagation()
+                    const { nombre, categoria, precio, precio_oferta, duracion_min, descripcion, profesionales_ids, visible_portal } = s
+                    await supabase.from('servicios').insert({
+                      tenant_id: tenant.id, nombre: nombre + ' (copia)', categoria, precio, precio_oferta,
+                      duracion_min, descripcion, profesionales_ids, visible_portal, activo: true,
+                    })
+                    cargar()
+                  }} title="Duplicar" style={{
+                    width:30, height:30, borderRadius:8, border:'none',
+                    background:'rgba(99,102,241,0.08)', color:'#818cf8', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginRight:4,
+                  }}>
+                    <Ico d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" size={13} />
+                  </button>
                   <button onClick={e => { e.stopPropagation(); setElimTarget(s) }} title="Eliminar" style={{
                     width:30, height:30, borderRadius:8, border:'none',
                     background:'rgba(239,68,68,0.08)', color:'#f87171', cursor:'pointer',

@@ -810,6 +810,11 @@ export default function SalonAgenda() {
                         {c.servicios?.nombre}
                       </div>
                     )}
+                    {height > SLOT_H * 2 && c.servicios?.duracion_min && (
+                      <div style={{ fontSize:9, color:'var(--text-3)', opacity:0.7 }}>
+                        {c.servicios.duracion_min}min
+                      </div>
+                    )}
                   </div>
                 )
               })
