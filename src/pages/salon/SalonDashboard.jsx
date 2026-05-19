@@ -160,6 +160,11 @@ export default function SalonDashboard({ onNavigate }) {
   const [analyticsData,  setAnalyticsData]  = useState(isDemo ? DEMO_ANALYTICS : null)
   const [tendencia14,    setTendencia14]    = useState(null)
   const [listaEsperaHoy, setListaEsperaHoy] = useState(isDemo ? 2 : 0)
+  const [topClientes,    setTopClientes]    = useState(isDemo ? [
+    { nombre:'Laura González', total:320000 },
+    { nombre:'Sofía Pérez',    total:175000 },
+    { nombre:'Andrea Ruiz',    total:95000  },
+  ] : [])
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -182,7 +187,7 @@ export default function SalonDashboard({ onNavigate }) {
       })()
 
       const hace14iso = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes] = await Promise.all([
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -230,6 +235,12 @@ export default function SalonDashboard({ onNavigate }) {
           .eq('tenant_id', tenant.id)
           .eq('activo', true)
           .eq('fecha_preferida', fecha),
+        supabase.from('pagos')
+          .select('monto, citas(clientes_agenda(id,nombre))')
+          .eq('tenant_id', tenant.id)
+          .eq('estado', 'pagado')
+          .gte('created_at', `${mesInicio}T00:00:00`)
+          .lte('created_at', `${mesFin}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -256,6 +267,15 @@ export default function SalonDashboard({ onNavigate }) {
       })
       setCumpleaneros(cumplRes?.data || [])
       setListaEsperaHoy(esperaRes?.count || 0)
+
+      // Top 3 clientes por ingresos del mes
+      const cltMap = {}
+      ;(pagosCltRes.data || []).forEach(p => {
+        const c = p.citas?.clientes_agenda
+        if (!c?.id) return
+        cltMap[c.id] = { nombre: c.nombre, total: (cltMap[c.id]?.total || 0) + Number(p.monto) }
+      })
+      setTopClientes(Object.values(cltMap).sort((a, b) => b.total - a.total).slice(0, 3))
 
       // Analytics del mes
       const citasMes = analyticsMesRes.data || []
@@ -930,6 +950,32 @@ export default function SalonDashboard({ onNavigate }) {
               )}
             </div>
           </div>
+
+          {/* Top clientes del mes */}
+          {topClientes.length > 0 && (
+            <div className="sp-kpi-card" style={{ padding:'14px 14px 12px' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>
+                Top clientes del mes
+              </div>
+              {topClientes.map((c, i) => {
+                const max = topClientes[0]?.total || 1
+                const medal = ['🥇','🥈','🥉'][i] || ''
+                return (
+                  <div key={i} style={{ marginBottom: i < topClientes.length - 1 ? 8 : 0 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--text-2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, paddingRight:4 }}>
+                        {medal} {c.nombre}
+                      </span>
+                      <span style={{ fontSize:10, fontWeight:800, color:col, flexShrink:0 }}>{fmtCOP(c.total)}</span>
+                    </div>
+                    <div style={{ height:3, borderRadius:2, background:'var(--border)' }}>
+                      <div style={{ height:'100%', width:`${c.total/max*100}%`, background:col, borderRadius:2 }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Heatmap días de la semana */}
           <div className="sp-kpi-card" style={{ padding:'14px' }}>

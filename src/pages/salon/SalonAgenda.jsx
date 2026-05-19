@@ -582,6 +582,20 @@ export default function SalonAgenda() {
               const profCitas = citasDia.filter(c =>
                 (c.profesionales?.id || c.profesionales?.nombre) === profKey
               )
+              // Detectar solapamientos entre citas activas del mismo profesional
+              const citasActivas = profCitas.filter(c =>
+                !['cancelada','no_asistio'].includes(c.estado) && !c.notas?.startsWith('__bloqueo__')
+              )
+              const conflictos = new Set()
+              for (let a = 0; a < citasActivas.length; a++) {
+                for (let b = a + 1; b < citasActivas.length; b++) {
+                  const sA = new Date(citasActivas[a].fecha_inicio)
+                  const eA = new Date(citasActivas[a].fecha_fin || citasActivas[a].fecha_inicio)
+                  const sB = new Date(citasActivas[b].fecha_inicio)
+                  const eB = new Date(citasActivas[b].fecha_fin || citasActivas[b].fecha_inicio)
+                  if (sA < eB && eA > sB) { conflictos.add(citasActivas[a].id); conflictos.add(citasActivas[b].id) }
+                }
+              }
               return profCitas.map(c => {
                 const top      = minOffset(c.fecha_inicio)
                 const height   = durPx(c)
@@ -591,6 +605,7 @@ export default function SalonAgenda() {
                 const isStar = tags.includes('star') || tags.includes('vip')
                 const esBloqueo = c.notas?.startsWith('__bloqueo__')
                 const motiBloqueo = esBloqueo ? c.notas.slice(11) : ''
+                const tieneConflicto = conflictos.has(c.id)
                 if (top < 0 || top > TOTAL_H) return null
                 const isDragged = ghostPos && draggingRef.current?.citaId === c.id
 
@@ -669,6 +684,9 @@ export default function SalonAgenda() {
                   >
                     <div style={{ position:'absolute', top:5, right:5,
                       width:7, height:7, borderRadius:'50%', background:estColor }} />
+                    {tieneConflicto && (
+                      <div style={{ position:'absolute', top:3, left:4, fontSize:9, lineHeight:1 }} title="Solapamiento de horario">⚠️</div>
+                    )}
                     {c.estado === 'completada' && (
                       <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, opacity:0.7 }}>🔒</div>
                     )}

@@ -51,10 +51,12 @@ const TEMPLATES = [
 ]
 
 const FILTROS = [
-  { key: 'todos',       label: 'Todos'          },
-  { key: 'cumple',      label: 'Cumpleaños'     },
-  { key: 'sin_visita',  label: 'Sin visita 30d' },
-  { key: 'servicio',    label: 'Por servicio'   },
+  { key: 'todos',        label: 'Todos'             },
+  { key: 'cumple',       label: 'Cumpleaños 30d'    },
+  { key: 'cumple_semana',label: 'Cumple esta semana' },
+  { key: 'sin_visita',   label: 'Sin visita 30d'    },
+  { key: 'sin_visita_60',label: 'Sin visita 60d'    },
+  { key: 'servicio',     label: 'Por servicio'      },
 ]
 
 function formatFecha(iso) {
@@ -81,6 +83,22 @@ function sinVisita30d(ultimaVisita) {
   if (!ultimaVisita) return true
   const diff = (new Date() - new Date(ultimaVisita)) / (1000 * 60 * 60 * 24)
   return diff >= 30
+}
+
+function sinVisita60d(ultimaVisita) {
+  if (!ultimaVisita) return true
+  const diff = (new Date() - new Date(ultimaVisita)) / (1000 * 60 * 60 * 24)
+  return diff >= 60
+}
+
+function isCumpleEstaSemana(fechaNac) {
+  if (!fechaNac) return false
+  const hoyDate = new Date()
+  const [, mesNac, diaNac] = fechaNac.split('-').map(Number)
+  const proxCumple = new Date(hoyDate.getFullYear(), mesNac - 1, diaNac)
+  if (proxCumple < hoyDate) proxCumple.setFullYear(hoyDate.getFullYear() + 1)
+  const diff = (proxCumple - hoyDate) / (1000 * 60 * 60 * 24)
+  return diff <= 7
 }
 
 export default function SalonMensajeria() {
@@ -175,9 +193,11 @@ export default function SalonMensajeria() {
     const telefono = c.telefono?.replace(/\D/g, '') || ''
     if (!telefono) return false
     if (buscar && !c.nombre.toLowerCase().includes(buscar.toLowerCase())) return false
-    if (filtro === 'cumple')     return isCumpleProximo(c.fecha_nacimiento)
-    if (filtro === 'sin_visita') return sinVisita30d(c.ultima_visita)
-    if (filtro === 'servicio')   return filtroServicio ? c.servicios_usados.includes(filtroServicio) : true
+    if (filtro === 'cumple')        return isCumpleProximo(c.fecha_nacimiento)
+    if (filtro === 'cumple_semana') return isCumpleEstaSemana(c.fecha_nacimiento)
+    if (filtro === 'sin_visita')    return sinVisita30d(c.ultima_visita)
+    if (filtro === 'sin_visita_60') return sinVisita60d(c.ultima_visita)
+    if (filtro === 'servicio')      return filtroServicio ? c.servicios_usados.includes(filtroServicio) : true
     return true
   })
 
@@ -185,9 +205,11 @@ export default function SalonMensajeria() {
     return clientes.filter(c => {
       if (!c.telefono?.replace(/\D/g,'')) return false
       if (key === 'todos')      return true
-      if (key === 'cumple')     return isCumpleProximo(c.fecha_nacimiento)
-      if (key === 'sin_visita') return sinVisita30d(c.ultima_visita)
-      if (key === 'servicio')   return filtroServicio ? c.servicios_usados.includes(filtroServicio) : true
+      if (key === 'cumple')        return isCumpleProximo(c.fecha_nacimiento)
+      if (key === 'cumple_semana') return isCumpleEstaSemana(c.fecha_nacimiento)
+      if (key === 'sin_visita')    return sinVisita30d(c.ultima_visita)
+      if (key === 'sin_visita_60') return sinVisita60d(c.ultima_visita)
+      if (key === 'servicio')      return filtroServicio ? c.servicios_usados.includes(filtroServicio) : true
       return false
     }).length
   }
