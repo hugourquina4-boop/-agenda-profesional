@@ -205,6 +205,7 @@ export default function SalonPortal() {
 
   const [nombre,     setNombre]    = useState('')
   const [telefono,   setTelefono]  = useState('')
+  const [notasPortal,setNotasPortal]= useState('')
   const [saving,     setSaving]    = useState(false)
   const [error,      setError]     = useState(null)
   const [confirmada, setConfirmada]= useState(null)
@@ -397,7 +398,7 @@ export default function SalonPortal() {
       if (e) { setError('Error al registrar. Intenta de nuevo.'); setSaving(false); return }
       cliId = nc.id
     }
-    const { data: cita, error: eCita } = await supabase.from('citas').insert({ tenant_id: tenant.id, profesional_id: profId, servicio_id: servIds[0], servicios_ids: servIds, cliente_id: cliId, fecha_inicio: slot.inicio, fecha_fin: slot.fin, estado: 'confirmada', precio_cobrado: precioTotal||null }).select('id').single()
+    const { data: cita, error: eCita } = await supabase.from('citas').insert({ tenant_id: tenant.id, profesional_id: profId, servicio_id: servIds[0], servicios_ids: servIds, cliente_id: cliId, fecha_inicio: slot.inicio, fecha_fin: slot.fin, estado: 'confirmada', precio_cobrado: precioTotal||null, notas: notasPortal.trim()||null }).select('id').single()
     if (eCita) { setError('Error al agendar. Intenta de nuevo.'); setSaving(false); return }
     if (wompiTransactionId) {
       await supabase.from('pagos').insert({ tenant_id: tenant.id, cita_id: cita.id, monto: precioTotal, metodo: 'wompi', estado: 'pagado', referencia: wompiTransactionId })
@@ -824,6 +825,14 @@ export default function SalonPortal() {
                   <input value={f.value} onChange={e => f.setter(e.target.value)} placeholder={f.placeholder} type={f.type} style={T.input} />
                 </div>
               ))}
+              <div>
+                <label style={{ fontSize:11, color:T.faint, fontWeight:700, letterSpacing:1, display:'block', marginBottom:9 }}>
+                  NOTAS PARA EL SALÓN (OPCIONAL)
+                </label>
+                <textarea value={notasPortal} onChange={e => setNotasPortal(e.target.value)}
+                  placeholder="Alergias, preferencias, algo que debamos saber…"
+                  rows={2} style={{ ...T.input, resize:'none', lineHeight:1.5 }} />
+              </div>
             </div>
 
             {error && (

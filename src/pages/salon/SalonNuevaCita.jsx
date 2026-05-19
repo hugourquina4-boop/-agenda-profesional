@@ -123,6 +123,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
   const [busqCliente, setBusqCliente] = useState('')
   const [nuevoCliente,setNuevoCliente]= useState({ nombre:'', telefono:'' })
   const [modoNuevo,   setModoNuevo]   = useState(false)
+  const [notasCita,   setNotasCita]   = useState('')
 
   const [saving, setSaving] = useState(false)
   const [toast,  setToast]  = useState(null)
@@ -275,6 +276,7 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
         estado:         'confirmada',
         precio_cobrado: precioTotal || null,
         sede_id:        profs.find(p => p.id === profId)?.sede_id || null,
+        notas:          notasCita.trim() || null,
       }).select('id').single()
       if (error) throw error
       if (citaNew?.id) supabase.functions.invoke('notificacion-cita', { body: { cita_id: citaNew.id } }).catch(() => {})
@@ -555,6 +557,19 @@ export default function SalonNuevaCita({ onClose, onCreada }) {
                   value={nuevoCliente.telefono} onChange={e => setNuevoCliente(p => ({...p, telefono:e.target.value}))} />
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Notas de la cita (solo en paso 3) ── */}
+        {step === 3 && (
+          <div style={{ marginTop:16, marginBottom:0 }}>
+            <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
+              display:'block', marginBottom:6, textTransform:'uppercase' }}>
+              Notas internas (opcional)
+            </label>
+            <textarea className="sp-input" rows={2} placeholder="Alergias, preferencias, indicaciones especiales…"
+              value={notasCita} onChange={e => setNotasCita(e.target.value)}
+              style={{ resize:'none', lineHeight:1.5 }} />
           </div>
         )}
 
