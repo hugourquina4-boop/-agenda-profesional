@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-19 (sesión 22)
-> **Versión actual en producción: v1.4-dev** (commit e2af217)
+> Actualizado: 2026-05-19 (sesión 23)
+> **Versión actual en producción: v1.4-dev** (commit 8541199)
 
 ---
 
@@ -679,14 +679,32 @@ ALTER TABLE servicios ADD COLUMN IF NOT EXISTS sedes_ids UUID[];
 CREATE INDEX IF NOT EXISTS idx_servicios_sedes ON servicios USING GIN(sedes_ids);
 ```
 
+## Bloque AH — COMPLETADO (sesión 23 — 2026-05-19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Access logs: tabla + RPC superadmin | v79 ⏳ aplicar | ✅ DONE — tabla `access_logs` + `salon_admin_get_access_logs` |
+| SalonApp: registrar session_start al cargar tenant | sin SQL | ✅ DONE — useEffect con ref guard, best-effort |
+| Superadmin tab '📊 Uso': último acceso + sesiones/mes + semáforo | sin SQL | ✅ DONE — verde≤3d / amarillo≤7d / naranja≤14d / rojo>14d |
+| toggleActivo: WA pre-escrito al dueño al suspender/reactivar | sin SQL | ✅ DONE — abre wa.me con mensaje personalizado si tiene teléfono |
+| Trial efectivo = 15 días: gracia reducida de 2→1 día | sin SQL | ✅ DONE — `diasRestantes < -1` en SalonApp.jsx |
+
+**SQL pendiente aplicar en Supabase:** `sql/v79_access_logs.sql`
+```sql
+-- Crear tabla + índices + RLS + RPC en Supabase SQL Editor
+-- El contenido completo está en sql/v79_access_logs.sql
+```
+
 ## Próximos pasos sugeridos
 
 | Prioridad | Feature | Tiempo |
 | --------- | ------- | ------ |
-| 🔴 Alta | Deploy edge functions WA: `cumpleanos-clientes` + `resumen-diario` | 5 min |
 | 🔴 Alta | Aplicar v78 en Supabase (SQL Editor) | 2 min |
-| 🟡 Media | Mobile Sprint 5: verificar bottom nav y sidebar colapsable | — |
-| 🟡 Media | POS Facturatech / DIAN — docs en `NEGOCIO/Rest deleite MAR/Facturatech/` | — |
+| 🔴 Alta | Aplicar v79 en Supabase (SQL Editor) — access logs | 2 min |
+| 🔴 Alta | Deploy edge functions WA: `cumpleanos-clientes` + `resumen-diario` | 5 min |
+| 🟡 Media | Bóveda de contraseñas (Área 15) — AES-GCM, clave local, vault por tenant | Sprint 4 |
+| 🟡 Media | Mobile Sprint 5: bottom nav + sidebar colapsable | Sprint 5 |
+| 🟢 Futuro | Play Store Android: TWA wrapper sobre PWA ya existente | Post-venta |
 
 ## Bloque AE — COMPLETADO (sesión 21 — 2026-05-19)
 
