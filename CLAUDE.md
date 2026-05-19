@@ -521,8 +521,17 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | ------- | ------------- | --------- |
 | Caja: gráfico de barras ingresos vs egresos por semana | sin SQL | ✅ DONE — 7 barras dobles (ing/eg), solo visible en periodo='semana' |
 | Caja: cierre del día con PDF de cuadre | sin SQL | ✅ DONE — botón 'Z Cierre' en periodo='hoy', PDF con KPIs+métodos+cobros+firma |
-| Inventario: historial de movimientos de stock | v73 ⏳ | ✅ DONE — botón historial en cada producto, modal con ajuste manual + timeline |
-| Búsqueda global (barra que busca clientes/citas desde cualquier módulo) | sin SQL | 🟡 Pendiente |
+| Inventario: historial de movimientos de stock | v73 ✅ | ✅ DONE — botón historial en cada producto, modal con ajuste manual + timeline |
+| Búsqueda global (barra que busca clientes/citas desde cualquier módulo) | sin SQL | ✅ DONE — overlay Ctrl+K, debounce 280ms, clientes+citas, navega módulo |
+
+## Bloque Q — COMPLETADO (sesión 17 cont. — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Agenda: detección de solapamiento de citas por profesional | sin SQL | ✅ DONE — badge ⚠️ sobre cita; O(n²) comparación de rangos activos |
+| Dashboard: card "Top 3 clientes del mes" con barras | sin SQL | ✅ DONE — query #12 pagos→citas→clientes; medallas 🥇🥈🥉 + barras |
+| Mensajería: filtro "Cumpleaños esta semana" (≤7d) | sin SQL | ✅ DONE — isCumpleEstaSemana() |
+| Mensajería: filtro "Sin visita 60d" | sin SQL | ✅ DONE — sinVisita60d() |
 
 **SQL aplicado:** v72 ✅ (portal activo) · v73 ✅ (movimientos stock activos)
 
