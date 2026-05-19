@@ -167,6 +167,7 @@ export default function SalonDashboard({ onNavigate }) {
   ] : [])
   const [sinCobrar,      setSinCobrar]      = useState([])
   const [proximos7,      setProximos7]      = useState([])
+  const [showRecordManana, setShowRecordManana] = useState(false)
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -212,10 +213,10 @@ export default function SalonDashboard({ onNavigate }) {
           .eq('tenant_id', tenant.id)
           .gte('created_at', `${mesInicio}T00:00:00`).lte('created_at', `${mesFin}T23:59:59`),
         supabase.from('citas')
-          .select('id,fecha_inicio,clientes_agenda(nombre),servicios(nombre)')
+          .select('id,fecha_inicio,clientes_agenda(nombre,telefono),servicios(nombre),profesionales(nombre)')
           .eq('tenant_id', tenant.id)
           .gte('fecha_inicio', `${mananaFecha}T00:00:00`).lte('fecha_inicio', `${mananaFecha}T23:59:59`)
-          .neq('estado', 'cancelada').order('fecha_inicio').limit(5),
+          .neq('estado', 'cancelada').order('fecha_inicio').limit(20),
         supabase.from('clientes_agenda')
           .select('id,nombre,telefono,fecha_nacimiento')
           .eq('tenant_id', tenant.id).eq('activo', true)
@@ -267,9 +268,12 @@ export default function SalonDashboard({ onNavigate }) {
       setManana({
         count: citasM.length,
         citas: citasM.map(c => ({
-          nombre:  c.clientes_agenda?.nombre || 'Cliente',
-          servicio: c.servicios?.nombre || '',
-          hora:    fmtHora(c.fecha_inicio),
+          nombre:    c.clientes_agenda?.nombre || 'Cliente',
+          telefono:  c.clientes_agenda?.telefono || null,
+          servicio:  c.servicios?.nombre || '',
+          profesional: c.profesionales?.nombre || '',
+          hora:      fmtHora(c.fecha_inicio),
+          fechaIso:  c.fecha_inicio,
         })),
       })
       setCumpleaneros(cumplRes?.data || [])
@@ -1415,13 +1419,24 @@ export default function SalonDashboard({ onNavigate }) {
                   </div>
                 </div>
               </div>
-              <button onClick={() => onNavigate?.('agenda')} style={{
-                fontSize:12, fontWeight:700, color:col, padding:'6px 12px',
-                borderRadius:9, border:'none',
-                background:`${col}22`, cursor:'pointer', whiteSpace:'nowrap',
-              }}>
-                Ver →
-              </button>
+              <div style={{ display:'flex', gap:6 }}>
+                {manana.citas.some(c => c.telefono) && (
+                  <button onClick={() => setShowRecordManana(v => !v)} style={{
+                    fontSize:11, fontWeight:700, color:'#25d366', padding:'6px 11px',
+                    borderRadius:9, border:'1px solid rgba(37,211,102,0.3)',
+                    background:'rgba(37,211,102,0.08)', cursor:'pointer', whiteSpace:'nowrap',
+                  }}>
+                    📲 Recordar
+                  </button>
+                )}
+                <button onClick={() => onNavigate?.('agenda')} style={{
+                  fontSize:12, fontWeight:700, color:col, padding:'6px 12px',
+                  borderRadius:9, border:'none',
+                  background:`${col}22`, cursor:'pointer', whiteSpace:'nowrap',
+                }}>
+                  Ver →
+                </button>
+              </div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.025)' }}>
               {manana.citas.map((c, i) => (
@@ -1442,6 +1457,32 @@ export default function SalonDashboard({ onNavigate }) {
                   </div>
                 </div>
               ))}
+              {showRecordManana && (
+                <div style={{ padding:'12px 16px 16px', borderTop:'1px solid var(--border)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', marginBottom:10, letterSpacing:0.5, textTransform:'uppercase' }}>
+                    Enviar recordatorio individual
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {manana.citas.filter(c => c.telefono).map((c, i) => {
+                      const tel = c.telefono.replace(/\D/g, '')
+                      const fecha = new Date(c.fechaIso).toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
+                      const msg = encodeURIComponent(`Hola ${c.nombre.split(' ')[0]} 👋 Te recordamos que tienes cita mañana ${fecha} a las ${c.hora}${c.servicio ? ` · ${c.servicio}` : ''}${c.profesional ? ` con ${c.profesional}` : ''} en ${tenant?.nombre || 'el salón'}. ¡Te esperamos! 💇`)
+                      return (
+                        <a key={i} href={`https://wa.me/${tel}?text=${msg}`} target="_blank" rel="noreferrer"
+                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                            padding:'10px 12px', borderRadius:10, textDecoration:'none',
+                            background:'rgba(37,211,102,0.07)', border:'1px solid rgba(37,211,102,0.22)' }}>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{c.nombre}</div>
+                            <div style={{ fontSize:11, color:'var(--text-3)' }}>{c.hora} · {c.servicio}</div>
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:700, color:'#25d366', flexShrink:0, marginLeft:8 }}>📲 WA</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
