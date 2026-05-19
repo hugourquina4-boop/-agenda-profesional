@@ -571,6 +571,27 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 
 **SQL pendiente aplicar:** v76_cliente_fuente.sql — columna fuente_captacion en clientes_agenda
 
+## Bloque U — COMPLETADO (sesión 18 cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Dashboard: alerta "X citas completadas sin cobrar hoy" | sin SQL | ✅ DONE |
+| Agenda día: botón ✅ Confirmar todas las pendientes | sin SQL | ✅ DONE |
+| NuevaCita: búsqueda cliente por nombre o teléfono | sin SQL | ✅ DONE |
+
+## Bloque V — COMPLETADO (sesión 18 cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Equipo: botón 🏠 Ausente hoy (upsert horarios_excepcion activo=false) | sin SQL | ✅ DONE |
+
+## Bloque W — COMPLETADO (sesión 18 cont.)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Dashboard: onboarding expandido a 5 pasos (servicios/equipo/clientes/WA/cita) | sin SQL | ✅ DONE |
+| Agenda: banner ⚠️ notas/alergias del cliente en popup de cita | sin SQL | ✅ DONE |
+
 ---
 
 ## Contexto de Negocio
