@@ -144,6 +144,12 @@ export default function SalonAgenda() {
 
   useEffect(() => { cargarMes() }, [cargarMes])
 
+  // Auto-refresh cada 60s para recepción siempre activa
+  useEffect(() => {
+    const id = setInterval(() => { if (!selCita && !bloqueoModal) cargarMes() }, 60_000)
+    return () => clearInterval(id)
+  }, [cargarMes, selCita, bloqueoModal])
+
   useEffect(() => {
     if (!selCita) { setPago(null); setPagoForm(false); setNota(''); setAnticoInput(''); setDupMode(false); setDupFecha(''); setSerieMode(false); return }
     setNota(selCita.notas || '')
