@@ -132,6 +132,9 @@ export default function SalonEquipo() {
   const [savingH,     setSavingH]     = useState(false)
   const [expandedDia, setExpandedDia] = useState(null)
 
+  const [ausentesHoy, setAusentesHoy] = useState(new Set())  // profesional_ids ausentes hoy
+  const [marcandoAus, setMarcandoAus] = useState(null)      // profesional_id en proceso
+
   // Sheet excepciones
   const [excProf,     setExcProf]     = useState(null)
   const [excepciones, setExcepciones] = useState([])
@@ -163,7 +166,8 @@ export default function SalonEquipo() {
     const nextM = m === 12 ? 1 : m + 1
     const nextY = m === 12 ? y + 1 : y
     const fin = `${nextY}-${String(nextM).padStart(2,'0')}-01`
-    const [{ data: profsData }, { data: citasData }] = await Promise.all([
+    const todayISO = new Date().toISOString().slice(0, 10)
+    const [{ data: profsData }, { data: citasData }, { data: excHoyData }] = await Promise.all([
       supabase.from('profesionales').select('*').eq('tenant_id', tenant.id).order('nombre'),
       supabase.from('citas')
         .select('profesional_id, precio_cobrado')
@@ -171,6 +175,11 @@ export default function SalonEquipo() {
         .not('estado', 'in', '("cancelada","no_asistio")')
         .gte('fecha_inicio', inicio)
         .lt('fecha_inicio', fin),
+      supabase.from('horarios_excepcion')
+        .select('profesional_id, activo')
+        .eq('tenant_id', tenant.id)
+        .eq('fecha', todayISO)
+        .eq('activo', false),
     ])
     setProfs(profsData || [])
     const stats = {}
@@ -180,6 +189,7 @@ export default function SalonEquipo() {
       stats[c.profesional_id].ingresos += Number(c.precio_cobrado) || 0
     })
     setProfStats(stats)
+    setAusentesHoy(new Set((excHoyData || []).map(e => e.profesional_id)))
     setLoading(false)
   }, [tenant])
 
@@ -189,6 +199,33 @@ export default function SalonEquipo() {
     setSel(null)
     setAllServs([])
     setProfServs([])
+  }
+
+  async function marcarAusenteHoy(p) {
+    const todayISO = new Date().toISOString().slice(0, 10)
+    setMarcandoAus(p.id)
+    const yaAusente = ausentesHoy.has(p.id)
+    if (yaAusente) {
+      await supabase.from('horarios_excepcion')
+        .delete()
+        .eq('tenant_id', tenant.id)
+        .eq('profesional_id', p.id)
+        .eq('fecha', todayISO)
+        .eq('activo', false)
+      setAusentesHoy(s => { const n = new Set(s); n.delete(p.id); return n })
+      showToast(`${p.nombre.split(' ')[0]} — disponible hoy`)
+    } else {
+      await supabase.from('horarios_excepcion').upsert({
+        tenant_id: tenant.id,
+        profesional_id: p.id,
+        fecha: todayISO,
+        activo: false,
+        nota: 'Ausente',
+      }, { onConflict: 'tenant_id,profesional_id,fecha' })
+      setAusentesHoy(s => new Set([...s, p.id]))
+      showToast(`${p.nombre.split(' ')[0]} — marcado/a ausente hoy`)
+    }
+    setMarcandoAus(null)
   }
 
   // ── Horarios ─────────────────────────────────────────────────
@@ -620,6 +657,19 @@ export default function SalonEquipo() {
 
                 {/* Botones de acción — agrupados para que nunca se corten */}
                 <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                  <button
+                    onClick={() => marcarAusenteHoy(p)}
+                    disabled={marcandoAus === p.id}
+                    title={ausentesHoy.has(p.id) ? 'Marcar disponible hoy' : 'Marcar ausente hoy'}
+                    style={{
+                      padding:'4px 9px', borderRadius:7, fontSize:11, fontWeight:700,
+                      background: ausentesHoy.has(p.id) ? 'rgba(239,68,68,0.12)' : 'rgba(113,113,122,0.08)',
+                      color:       ausentesHoy.has(p.id) ? '#f87171' : 'var(--text-3)',
+                      border:'none', cursor:'pointer', whiteSpace:'nowrap',
+                      opacity: marcandoAus === p.id ? 0.6 : 1,
+                    }}>
+                    {ausentesHoy.has(p.id) ? '🏠 Ausente' : '🏠'}
+                  </button>
                   <button
                     onClick={() => toggleActivo(p)}
                     title={p.activo ? 'Desactivar' : 'Activar'}
