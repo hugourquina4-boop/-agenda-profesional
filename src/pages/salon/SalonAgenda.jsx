@@ -453,20 +453,56 @@ export default function SalonAgenda() {
 
   // ── Vista Semana: 7 columnas día ──────────────────────────────────────
   function VistaSemana() {
+    const SLOT_SEM = 28
+    const H_S = 8, H_E = 20
+    const TOT_SEM = (H_E - H_S) * 2 * SLOT_SEM
+
     const pivot = new Date(selDay + 'T12:00:00')
     const dow   = pivot.getDay()
     const lunes = new Date(pivot)
     lunes.setDate(pivot.getDate() - (dow === 0 ? 6 : dow - 1))
     const diasSemana = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(lunes)
-      d.setDate(lunes.getDate() + i)
+      const d = new Date(lunes); d.setDate(lunes.getDate() + i)
       return d.toISOString().slice(0, 10)
     })
     const hoyIso = today.toISOString().slice(0, 10)
+    const HEADER_H = 58
+
+    const PCLR = {}
+    profesionales.forEach((p, i) => { PCLR[p.id] = p.color || PROF_COLORS[i % PROF_COLORS.length] })
+
+    function semOff(iso) {
+      const [h, m] = iso.substring(11, 16).split(':').map(Number)
+      return ((h - H_S) * 60 + m) / 30 * SLOT_SEM
+    }
+    function semDur(c) {
+      const min = c.servicios?.duracion_min
+      if (min && min > 0) return Math.max(SLOT_SEM, min / 30 * SLOT_SEM)
+      if (c.fecha_fin) {
+        const dur = (new Date(c.fecha_fin) - new Date(c.fecha_inicio)) / 60000
+        if (dur > 0 && dur <= 480) return Math.max(SLOT_SEM, dur / 30 * SLOT_SEM)
+      }
+      return SLOT_SEM * 2
+    }
 
     return (
-      <div style={{ overflowX:'auto', overflowY:'clip', paddingBottom:80 }}>
-        <div style={{ display:'flex', minWidth: 7 * 78 }}>
+      <div style={{ overflowX:'auto', overflowY:'auto', maxHeight:'calc(100dvh - 180px)', paddingBottom:40 }}>
+        <div style={{ display:'flex', minWidth: 44 + 7 * 100 }}>
+
+          {/* ── Eje de horas ── */}
+          <div style={{ width:44, flexShrink:0, position:'sticky', left:0, zIndex:4, background:'var(--bg)' }}>
+            <div style={{ height:HEADER_H, borderBottom:'2px solid var(--border)' }} />
+            <div style={{ position:'relative', height:TOT_SEM }}>
+              {Array.from({ length: H_E - H_S }, (_, i) => (
+                <div key={i} style={{ position:'absolute', top: i*2*SLOT_SEM - 6, right:6,
+                  fontSize:9, fontWeight:600, color:'var(--text-3)', userSelect:'none' }}>
+                  {String(H_S + i).padStart(2,'0')}:00
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Columnas de día ── */}
           {diasSemana.map(iso => {
             const dc     = citasPorDia[iso] || []
             const fecha  = new Date(iso + 'T12:00:00')
@@ -475,79 +511,82 @@ export default function SalonAgenda() {
             const diaNom = DIAS[fecha.getDay()]
             const diaNum = fecha.getDate()
             return (
-              <div
-                key={iso}
-                onDragOver={e => { e.preventDefault(); setSemDragOver(iso) }}
-                onDragLeave={() => setSemDragOver(s => s === iso ? null : s)}
-                onDrop={e => {
-                  e.preventDefault()
-                  const id = e.dataTransfer.getData('citaId')
-                  setSemDragOver(null)
-                  if (id) moverCitaSemana(id, iso)
-                }}
-                style={{
-                  flex:1, minWidth:78, borderRight:'1px solid var(--border)',
-                  display:'flex', flexDirection:'column',
-                  background: semDragOver === iso ? `${col}10` : 'transparent',
-                  transition:'background 0.15s',
-                }}
-              >
+              <div key={iso} style={{ flex:1, minWidth:100, borderLeft:'1px solid var(--border)', display:'flex', flexDirection:'column' }}>
                 {/* Cabecera del día */}
                 <button
                   onClick={() => { setSelDay(iso); setVistaAgenda('dia') }}
-                  style={{
-                    width:'100%', padding:'10px 2px 8px', textAlign:'center',
+                  style={{ height:HEADER_H, width:'100%', padding:'8px 2px', textAlign:'center',
                     background:'transparent', border:'none', cursor:'pointer',
-                    borderBottom:'2px solid var(--border)',
-                  }}>
+                    borderBottom:'2px solid var(--border)' }}
+                >
                   <div style={{ fontSize:10, fontWeight:700, letterSpacing:0.5,
-                    color: esHoy ? col : 'var(--text-3)', textTransform:'uppercase' }}>
-                    {diaNom}
-                  </div>
-                  <div style={{
-                    width:28, height:28, borderRadius:8, margin:'4px auto 0',
+                    color: esHoy ? col : 'var(--text-3)', textTransform:'uppercase' }}>{diaNom}</div>
+                  <div style={{ width:28, height:28, borderRadius:8, margin:'3px auto 0',
                     background: esSel ? col : esHoy ? `${col}22` : 'transparent',
                     display:'flex', alignItems:'center', justifyContent:'center',
                     fontFamily:'Outfit', fontWeight:800, fontSize:15,
-                    color: esSel ? '#fff' : esHoy ? col : 'var(--text)',
-                  }}>{diaNum}</div>
+                    color: esSel ? '#fff' : esHoy ? col : 'var(--text)' }}>{diaNum}</div>
                   {dc.length > 0 && (
-                    <div style={{ fontSize:9, fontWeight:700, color: esHoy ? col : 'var(--text-3)',
-                      marginTop:2 }}>{dc.length}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color: esHoy ? col : 'var(--text-3)', marginTop:1 }}>{dc.length}</div>
                   )}
                 </button>
 
-                {/* Citas del día */}
-                <div style={{ padding:'5px 3px', display:'flex', flexDirection:'column', gap:3 }}>
-                  {dc.length === 0
-                    ? <div style={{ height:8 }} />
-                    : dc.slice(0, 7).map(c => {
-                        const clr = ESTADO_COLOR[c.estado] || col
-                        return (
-                          <button
-                            key={c.id}
-                            draggable
-                            onDragStart={e => { e.dataTransfer.setData('citaId', c.id); e.dataTransfer.effectAllowed = 'move' }}
-                            onClick={() => setSelCita(c)}
-                            style={{
-                              width:'100%', padding:'5px 4px', borderRadius:6, textAlign:'left',
-                              background:`${clr}18`, border:`1px solid ${clr}40`, cursor:'grab',
-                            }}>
-                            <div style={{ fontSize:9, fontWeight:800, color:clr, lineHeight:1.2 }}>
-                              {fmtHora(c.fecha_inicio)}
-                            </div>
-                            <div style={{ fontSize:10, fontWeight:600, color:'var(--text)',
-                              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                              {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
-                            </div>
-                          </button>
-                        )
-                      })
-                  }
-                  {dc.length > 7 && (
-                    <div style={{ fontSize:9, color:'var(--text-3)', textAlign:'center',
-                      fontWeight:700, paddingTop:2 }}>+{dc.length - 7} más</div>
-                  )}
+                {/* Grid de tiempo */}
+                <div
+                  onDragOver={e => { e.preventDefault(); setSemDragOver(iso) }}
+                  onDragLeave={() => setSemDragOver(s => s === iso ? null : s)}
+                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('citaId'); setSemDragOver(null); if (id) moverCitaSemana(id, iso) }}
+                  style={{ position:'relative', height:TOT_SEM,
+                    background: semDragOver === iso ? `${col}10` : 'transparent',
+                    transition:'background 0.15s' }}
+                >
+                  {/* Líneas de hora */}
+                  {Array.from({ length: H_E - H_S }, (_, i) => (
+                    <div key={i} style={{ position:'absolute', left:0, right:0, top: i*2*SLOT_SEM, height:1, background:'var(--border)' }} />
+                  ))}
+                  {/* Líneas de media hora */}
+                  {Array.from({ length: H_E - H_S }, (_, i) => (
+                    <div key={`m${i}`} style={{ position:'absolute', left:0, right:0, top:(i*2+1)*SLOT_SEM, height:1, background:'var(--border)', opacity:0.3 }} />
+                  ))}
+                  {/* Línea hora actual */}
+                  {esHoy && nowOffset !== null && (() => {
+                    const np = ((nowOffset / 60 - H_S) * 60 / 30) * SLOT_SEM
+                    return (np >= 0 && np <= TOT_SEM)
+                      ? <div style={{ position:'absolute', left:0, right:0, top:np, height:2, background:'#ef4444', zIndex:3, pointerEvents:'none' }} />
+                      : null
+                  })()}
+                  {/* Citas */}
+                  {dc.map(c => {
+                    const top    = semOff(c.fecha_inicio)
+                    const height = semDur(c)
+                    if (top < 0 || top > TOT_SEM) return null
+                    const cancelada = ['cancelada','no_asistio'].includes(c.estado)
+                    const clr = PCLR[c.profesionales?.id] || ESTADO_COLOR[c.estado] || col
+                    return (
+                      <button key={c.id}
+                        draggable={!cancelada}
+                        onDragStart={e => { e.dataTransfer.setData('citaId', c.id); e.dataTransfer.effectAllowed = 'move' }}
+                        onClick={() => setSelCita(c)}
+                        style={{ position:'absolute', top, left:2, right:2,
+                          height: Math.max(18, height - 2), borderRadius:5,
+                          background: cancelada ? 'rgba(113,113,122,0.10)' : `${clr}1a`,
+                          border:`1px solid ${cancelada ? '#71717a44' : clr+'55'}`,
+                          borderLeft:`3px solid ${cancelada ? '#71717a' : clr}`,
+                          padding:'2px 4px', cursor: cancelada ? 'pointer' : 'grab',
+                          textAlign:'left', overflow:'hidden', zIndex:2,
+                          opacity: cancelada ? 0.6 : 1 }}
+                      >
+                        <div style={{ fontSize:9, fontWeight:800, color:clr, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                          {fmtHora(c.fecha_inicio)}
+                        </div>
+                        {height > SLOT_SEM && (
+                          <div style={{ fontSize:9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.2 }}>
+                            {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -663,7 +702,39 @@ export default function SalonAgenda() {
           </div>
 
           {/* Grid de tiempo */}
-          <div style={{ position:'relative', height:TOTAL_H }}>
+          <div style={{ position:'relative', height:TOTAL_H, touchAction:'none', userSelect:'none' }}
+            onPointerMove={e => {
+              const dr = draggingRef.current
+              if (!dr) return
+              const dY = e.clientY - dr.startY
+              const dX = e.clientX - dr.startX
+              if (!dr.moved && Math.abs(dY) < 6 && Math.abs(dX) < 6) return
+              const snapped = Math.round((dr.origTop + dY) / SLOT_H) * SLOT_H
+              const curTop = Math.max(0, Math.min(TOTAL_H - dr.height, snapped))
+              const curProfIdx = Math.max(0, Math.min(PROFS.length - 1, dr.profIdx + Math.round(dX / COL_W)))
+              const profKey = PROFS[curProfIdx]?.id || PROFS[curProfIdx]?.nombre
+              draggingRef.current = { ...dr, curTop, curProfIdx, moved:true }
+              setGhostPos({ top:curTop, profIdx:curProfIdx, height:dr.height, color:PROF_CLR[profKey]||col })
+            }}
+            onPointerUp={async e => {
+              const dr = draggingRef.current
+              if (!dr) return
+              draggingRef.current = null
+              setGhostPos(null)
+              if (!dr.moved) { setSelCita(dr.cita); return }
+              const minsFromStart = (dr.curTop / SLOT_H) * 30
+              const totalMins = H_START * 60 + minsFromStart
+              const pad = n => String(Math.floor(n)).padStart(2,'0')
+              const newStart = `${selDay}T${pad(totalMins/60)}:${pad(totalMins%60)}:00`
+              const durMin = dr.cita.servicios?.duracion_min || 60
+              const endMins = totalMins + durMin
+              const newEnd = `${selDay}T${pad(endMins/60)}:${pad(endMins%60)}:00`
+              const updates = { fecha_inicio:newStart, fecha_fin:newEnd }
+              if (dr.curProfIdx !== dr.profIdx) updates.profesional_id = PROFS[dr.curProfIdx].id
+              await supabase.from('citas').update(updates).eq('id', dr.cita.id).eq('tenant_id', tenant.id)
+              cargarMes()
+            }}
+          >
             {/* Líneas de hora */}
             {Array.from({ length: H_END - H_START }, (_, i) => (
               <div key={i} style={{ position:'absolute', left:0, right:0, top: i * 2 * SLOT_H, display:'flex' }}>
@@ -791,43 +862,13 @@ export default function SalonAgenda() {
                     padding:'4px 7px', overflow:'hidden',
                     boxShadow:`0 1px 4px ${profClr}20`,
                     opacity: isDragged ? 0.2 : cancelada ? 0.6 : 1,
-                    userSelect:'none', touchAction:'none',
+                    userSelect:'none', touchAction:'none', zIndex:2,
                   }}
+                  onClick={e => e.stopPropagation()}
                   onPointerDown={e => {
                     if (cancelada || c.estado === 'completada') return
-                    e.currentTarget.setPointerCapture(e.pointerId)
+                    e.stopPropagation()
                     draggingRef.current = { citaId:c.id, profIdx:pi, origTop:top, curTop:top, curProfIdx:pi, height:height-2, startY:e.clientY, startX:e.clientX, moved:false, cita:c }
-                  }}
-                  onPointerMove={e => {
-                    const dr = draggingRef.current
-                    if (!dr || dr.citaId !== c.id) return
-                    const dY = e.clientY - dr.startY
-                    const dX = e.clientX - dr.startX
-                    if (!dr.moved && Math.abs(dY) < 6 && Math.abs(dX) < 6) return
-                    const snapped = Math.round((dr.origTop + dY) / SLOT_H) * SLOT_H
-                    const curTop = Math.max(0, Math.min(TOTAL_H - dr.height, snapped))
-                    const curProfIdx = Math.max(0, Math.min(PROFS.length - 1, dr.profIdx + Math.round(dX / COL_W)))
-                    draggingRef.current = { ...dr, curTop, curProfIdx, moved:true }
-                    setGhostPos({ top:curTop, profIdx:curProfIdx, height:dr.height, color:profClr })
-                  }}
-                  onPointerUp={async e => {
-                    const dr = draggingRef.current
-                    if (!dr || dr.citaId !== c.id) return
-                    e.currentTarget.releasePointerCapture(e.pointerId)
-                    draggingRef.current = null
-                    setGhostPos(null)
-                    if (!dr.moved) { setSelCita(c); return }
-                    const minsFromStart = (dr.curTop / SLOT_H) * 30
-                    const totalMins = H_START * 60 + minsFromStart
-                    const pad = n => String(Math.floor(n)).padStart(2,'0')
-                    const newStart = `${selDay}T${pad(totalMins/60)}:${pad(totalMins%60)}:00`
-                    const durMin = c.servicios?.duracion_min || 60
-                    const endMins = totalMins + durMin
-                    const newEnd = `${selDay}T${pad(endMins/60)}:${pad(endMins%60)}:00`
-                    const updates = { fecha_inicio:newStart, fecha_fin:newEnd }
-                    if (dr.curProfIdx !== dr.profIdx) updates.profesional_id = PROFS[dr.curProfIdx].id
-                    await supabase.from('citas').update(updates).eq('id', c.id)
-                    cargarMes()
                   }}
                   >
                     <div style={{ position:'absolute', top:5, right:5,
@@ -1015,7 +1056,7 @@ export default function SalonAgenda() {
       {/* ── Vistas (ocultas durante búsqueda) ── */}
       {!busqAgenda.trim() && (<>
 
-      {vistaAgenda === 'semana' && <VistaSemana />}
+      {vistaAgenda === 'semana' && VistaSemana()}
       {vistaAgenda === 'dia' && (<>
         {/* Filtro de sede — solo visible cuando hay más de una */}
         {sedes.length > 1 && (
@@ -1055,8 +1096,10 @@ export default function SalonAgenda() {
             ))}
           </div>
         )}
-        {/* Botón bloquear franja + compartir agenda — visible en vista día */}
-        <div style={{ display:'flex', justifyContent:'flex-end', gap:6, padding:'0 16px 8px' }}>
+        {VistaDia()}
+
+        {/* Acciones del día — debajo del grid */}
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:6, padding:'10px 16px 4px', flexWrap:'wrap' }}>
           {citas.some(c => c.fecha_inicio.slice(0,10) === selDay && c.estado === 'pendiente') && (
             <button onClick={confirmarTodasDelDia} disabled={confirmandoTodas} style={{
               padding:'6px 13px', borderRadius:9, border:'1px solid rgba(59,130,246,0.3)',
@@ -1105,8 +1148,6 @@ export default function SalonAgenda() {
             🚫 Bloquear
           </button>
         </div>
-
-        <VistaDia />
       </>)}
 
       {vistaAgenda === 'mes' && (<>
