@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 16)
-> **Versión actual en producción: v1.4-dev** (commit 2155117)
+> Actualizado: 2026-05-18 (sesión 18)
+> **Versión actual en producción: v1.4-dev** (commit 63befe8)
 
 ---
 
@@ -547,6 +547,18 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 **SQL aplicado:** v74_puntos_fidelidad.sql ✅ — tabla puntos_cliente + columna puntos_acumulados en clientes_agenda
 
 **SQL aplicado:** v72 ✅ (portal activo) · v73 ✅ (movimientos stock activos)
+
+## Bloque S — COMPLETADO (sesión 18 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Inventario: sort agotado→bajo→normal + badge rojo "Agotado" | sin SQL | ✅ DONE |
+| Inventario: bajosStock incluye stock=0 aunque sin mínimo | sin SQL | ✅ DONE |
+| Config: sección "Programa de puntos" (pts/visita + mínimo canje) | v75 ⏳ aplicar | ✅ DONE |
+| Agenda: badge ✨ "1ª visita" en chip y popup (num_visitas ≤ 1) | sin SQL | ✅ DONE |
+| Proveedores: PDF orden de compra por pedido | sin SQL | ✅ DONE |
+
+**SQL pendiente aplicar:** v75_puntos_config.sql — columnas puntos_por_visita + puntos_canje_min en tenants
 
 ---
 

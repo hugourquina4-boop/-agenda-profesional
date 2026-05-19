@@ -114,6 +114,7 @@ export default function SalonAnalytics() {
   const [topServs,  setTopServs]  = useState([])
   const [heatmap,   setHeatmap]   = useState(new Array(7).fill(0)) // Lun→Dom
   const [kpiPrev,   setKpiPrev]   = useState(null) // mes anterior para comparativa
+  const [fuenteData,setFuenteData]= useState([]) // captación por canal
 
   // Finanzas
   const [gastosHist, setGastosHist] = useState([])
@@ -324,11 +325,12 @@ export default function SalonAnalytics() {
       const now = new Date()
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      const [kpiRes, staffRes, retRes, citasRes] = await Promise.all([
+      const [kpiRes, staffRes, retRes, citasRes, fuenteRes] = await Promise.all([
         supabase.from('v_kpis_mes').select('*').eq('tenant_id', tenant.id).order('mes', { ascending: false }),
         supabase.from('v_revenue_staff').select('*').eq('tenant_id', tenant.id).order('ingresos_brutos', { ascending: false }),
         supabase.from('v_retention').select('*').eq('tenant_id', tenant.id).maybeSingle(),
         supabase.from('citas').select('fecha_inicio, servicios(id,nombre,precio)').eq('tenant_id', tenant.id).eq('estado', 'completada').gte('fecha_inicio', firstOfMonth),
+        supabase.from('clientes_agenda').select('fuente_captacion').eq('tenant_id', tenant.id).not('fuente_captacion', 'is', null),
       ])
 
       const kpiRows = kpiRes.data || []
@@ -354,6 +356,14 @@ export default function SalonAnalytics() {
         svcMap[s.id].total += s.precio || 0
       })
       setTopServs(Object.values(svcMap).sort((a,b) => b.total - a.total).slice(0,5))
+
+      // Captación por canal
+      const fMap = {}
+      ;(fuenteRes.data || []).forEach(c => {
+        const f = c.fuente_captacion || 'otro'
+        fMap[f] = (fMap[f] || 0) + 1
+      })
+      setFuenteData(Object.entries(fMap).map(([canal, count]) => ({ canal, count })).sort((a,b) => b.count - a.count))
     } catch (e) {
       console.error('[SalonAnalytics]', e)
     } finally {
@@ -1488,6 +1498,35 @@ export default function SalonAnalytics() {
               )
             })()}
           </div>
+        </div>
+      </>)}
+
+      {/* ── Captación por canal ───────────────────────────── */}
+      {fuenteData.length > 0 && (<>
+        <div className="sp-section" style={{ marginTop:20 }}>
+          <span className="sp-section-title">¿Cómo nos conocen?</span>
+        </div>
+        <div style={{ margin:'0 16px', padding:'16px', borderRadius:16,
+          background:'var(--card)', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+          {fuenteData.map((f, i) => {
+            const max = fuenteData[0].count
+            const pct = f.count / max
+            const EMOJI = { instagram:'📸', facebook:'👍', tiktok:'🎵', google:'🔍', referido:'🤝', paso_por_aqui:'🚶', otro:'💬' }
+            const LABEL = { instagram:'Instagram', facebook:'Facebook', tiktok:'TikTok', google:'Google', referido:'Referido', paso_por_aqui:'Pasó por aquí', otro:'Otro' }
+            return (
+              <div key={f.canal} style={{ marginBottom: i < fuenteData.length-1 ? 12 : 0 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                  <span style={{ fontSize:13, color:'var(--text-2)', fontWeight:600 }}>
+                    {EMOJI[f.canal] || '💬'} {LABEL[f.canal] || f.canal}
+                  </span>
+                  <span style={{ fontSize:13, fontWeight:800, fontFamily:'Outfit', color:col }}>{f.count}</span>
+                </div>
+                <div style={{ height:6, borderRadius:4, background:'var(--border)' }}>
+                  <div style={{ height:'100%', borderRadius:4, width:`${pct*100}%`, background:col }} />
+                </div>
+              </div>
+            )
+          })}
         </div>
       </>)}
 

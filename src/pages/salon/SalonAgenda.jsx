@@ -953,8 +953,30 @@ export default function SalonAgenda() {
             ))}
           </div>
         )}
-        {/* Botón bloquear franja — visible en vista día */}
-        <div style={{ display:'flex', justifyContent:'flex-end', padding:'0 16px 8px' }}>
+        {/* Botón bloquear franja + compartir agenda — visible en vista día */}
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:6, padding:'0 16px 8px' }}>
+          <button onClick={() => {
+            const dayLabel = new Date(selDay + 'T12:00:00').toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
+            const citasDia = (citas || []).filter(c => c.fecha_inicio.slice(0,10) === selDay && c.estado !== 'cancelada')
+              .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
+            if (!citasDia.length) { alert('No hay citas para compartir en este día'); return }
+            const lineas = citasDia.map(c => {
+              const h = fmtHora(c.fecha_inicio)
+              const cli = c.clientes_agenda?.nombre?.split(' ')[0] || 'Cliente'
+              const svc = c.servicios?.nombre || 'Servicio'
+              const prof = c.profesionales?.nombre?.split(' ')[0] || ''
+              return `${h} — ${cli} · ${svc}${prof ? ` (${prof})` : ''}`
+            })
+            const msg = encodeURIComponent(`📅 Agenda ${dayLabel}\n${tenant?.nombre || ''}\n\n${lineas.join('\n')}\n\n_${citasDia.length} cita${citasDia.length !== 1 ? 's' : ''} programada${citasDia.length !== 1 ? 's' : ''}_`)
+            window.open(`https://wa.me/?text=${msg}`, '_blank')
+          }} style={{
+            padding:'6px 13px', borderRadius:9, border:'1px solid rgba(34,197,94,0.3)',
+            background:'rgba(34,197,94,0.07)', color:'#4ade80',
+            fontSize:12, fontWeight:700, cursor:'pointer',
+            display:'flex', alignItems:'center', gap:5,
+          }}>
+            📤 Compartir
+          </button>
           <button onClick={() => {
             setBloqueoProf(profesionales[0]?.id || '')
             setBloqueoHIni('09:00')
@@ -967,7 +989,7 @@ export default function SalonAgenda() {
             fontSize:12, fontWeight:700, cursor:'pointer',
             display:'flex', alignItems:'center', gap:5,
           }}>
-            🚫 Bloquear franja
+            🚫 Bloquear
           </button>
         </div>
 

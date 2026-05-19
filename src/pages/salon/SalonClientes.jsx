@@ -70,7 +70,7 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
-const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'', tipo_precio:'normal' }
+const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'', tipo_precio:'normal', fuente_captacion:'' }
 
 export default function SalonClientes() {
   const { tenant } = useTenant()
@@ -80,6 +80,7 @@ export default function SalonClientes() {
   const [busq,       setBusq]      = useState('')
   const [loading,    setLoading]   = useState(true)
   const [filtroSeg,  setFiltroSeg] = useState('todos')
+  const [filtroTag,  setFiltroTag] = useState(null) // key de TAGS_OPCIONES o null
   const [sel,        setSel]       = useState(null)
   const [saldo,      setSaldo]     = useState(null)
   const [historial,  setHistorial] = useState([])
@@ -269,7 +270,7 @@ export default function SalonClientes() {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
     const q = supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags')
+      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags, fuente_captacion')
       .eq('tenant_id', tenant.id)
       .order('nombre')
     if (busq.trim()) {
@@ -292,9 +293,9 @@ export default function SalonClientes() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  const clientesFiltrados = filtroSeg === 'todos'
-    ? clientes
-    : clientes.filter(c => c.segmento === filtroSeg)
+  const clientesFiltrados = clientes
+    .filter(c => filtroSeg === 'todos' || c.segmento === filtroSeg)
+    .filter(c => !filtroTag || (c.tags || []).includes(filtroTag))
 
   const conteos = clientes.reduce((acc, c) => {
     acc[c.segmento || 'nuevo'] = (acc[c.segmento || 'nuevo'] || 0) + 1
@@ -331,6 +332,7 @@ export default function SalonClientes() {
       total_gastado:        0,
       puntos_fidelizacion:  0,
       tipo_precio:          nuevoForm.tipo_precio || 'normal',
+      fuente_captacion:     nuevoForm.fuente_captacion || null,
     })
     setGuardando(false)
     if (error) { showToast('Error al crear cliente', false); return }
@@ -701,6 +703,22 @@ export default function SalonClientes() {
               {nuevoTab === 'notas' && <>
                 <div>
                   <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                    ¿CÓMO NOS CONOCISTE?
+                  </label>
+                  <select className="sp-input" value={nuevoForm.fuente_captacion}
+                    onChange={e => setNuevoForm(p => ({ ...p, fuente_captacion: e.target.value }))}>
+                    <option value="">Sin especificar</option>
+                    <option value="instagram">📸 Instagram</option>
+                    <option value="facebook">👍 Facebook</option>
+                    <option value="tiktok">🎵 TikTok</option>
+                    <option value="google">🔍 Google</option>
+                    <option value="referido">🤝 Referido de cliente</option>
+                    <option value="paso_por_aqui">🚶 Pasó por aquí</option>
+                    <option value="otro">💬 Otro</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
                     NOTAS / ALERGIAS
                   </label>
                   <textarea className="sp-input"
@@ -789,6 +807,26 @@ export default function SalonClientes() {
                   color: activo ? (cfg ? cfg.color : col) : 'var(--text-3)',
                 }}>
                 {f.label} {cnt > 0 && <span style={{ opacity:0.7 }}>· {cnt}</span>}
+              </button>
+            )
+          })}
+        </div>
+        {/* Tags filter row */}
+        <div style={{ display:'flex', gap:5, overflowX:'auto', overflowY:'clip', paddingBottom:2, marginTop:4 }}>
+          {TAGS_OPCIONES.map(t => {
+            const activo = filtroTag === t.key
+            const cnt = clientes.filter(c => (c.tags || []).includes(t.key)).length
+            if (!cnt) return null
+            return (
+              <button key={t.key} onClick={() => setFiltroTag(activo ? null : t.key)}
+                style={{
+                  flexShrink:0, padding:'3px 9px', borderRadius:8, fontSize:11,
+                  fontWeight:700, cursor:'pointer', border:'1px solid',
+                  background: activo ? `${t.color}20` : 'transparent',
+                  borderColor: activo ? t.color : 'var(--border)',
+                  color: activo ? t.color : 'var(--text-3)',
+                }}>
+                {t.icon} {t.label} · {cnt}
               </button>
             )
           })}
@@ -1034,6 +1072,14 @@ export default function SalonClientes() {
                 <div style={{ display:'flex', alignItems:'flex-start', gap:10, fontSize:14, color:'var(--text-2)' }}>
                   <span style={{ fontSize:16, flexShrink:0 }}>✂️</span>
                   <span style={{ lineHeight:1.5 }}>{sel.servicios_interes}</span>
+                </div>
+              )}
+              {sel.fuente_captacion && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color:'var(--text-3)' }}>
+                  <span style={{ fontSize:15 }}>
+                    {sel.fuente_captacion === 'instagram' ? '📸' : sel.fuente_captacion === 'facebook' ? '👍' : sel.fuente_captacion === 'tiktok' ? '🎵' : sel.fuente_captacion === 'google' ? '🔍' : sel.fuente_captacion === 'referido' ? '🤝' : sel.fuente_captacion === 'paso_por_aqui' ? '🚶' : '💬'}
+                  </span>
+                  {{instagram:'Instagram', facebook:'Facebook', tiktok:'TikTok', google:'Google', referido:'Referido de cliente', paso_por_aqui:'Pasó por aquí', otro:'Otro'}[sel.fuente_captacion] || sel.fuente_captacion}
                 </div>
               )}
             </div>
