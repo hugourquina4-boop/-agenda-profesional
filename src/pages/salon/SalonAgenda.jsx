@@ -130,7 +130,7 @@ export default function SalonAgenda() {
     try {
       const { data } = await supabase
         .from('citas')
-        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags,num_visitas), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
+        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags,num_visitas,notas), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
         .eq('tenant_id', tenant.id)
         .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
         .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
@@ -1222,6 +1222,18 @@ export default function SalonAgenda() {
                 }}>×</button>
               </div>
             </div>
+
+            {/* Alerta de notas del cliente */}
+            {selCita.clientes_agenda?.notas && (
+              <div style={{
+                padding:'10px 14px', borderRadius:10, marginBottom:12,
+                background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)',
+                display:'flex', gap:8, alignItems:'flex-start',
+              }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+                <span style={{ fontSize:12, color:'#fbbf24', lineHeight:1.4 }}>{selCita.clientes_agenda.notas}</span>
+              </div>
+            )}
 
             {/* WA rápido */}
             {selCita.clientes_agenda?.telefono && (

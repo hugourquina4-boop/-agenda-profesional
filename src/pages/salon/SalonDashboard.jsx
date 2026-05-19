@@ -567,15 +567,29 @@ export default function SalonDashboard({ onNavigate }) {
             icon:  'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
           },
           {
+            label: 'Registra tu primer cliente',
+            desc:  'Agrega nombre y teléfono WhatsApp.',
+            done:  citas.length > 0 || (serviciosCount ?? 0) > 0,
+            page:  'clientes',
+            icon:  'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z',
+          },
+          {
             label: 'Configura tu WhatsApp',
             desc:  'Para enviar recordatorios automáticos.',
-            done:  !!(tenant?.telefono),
+            done:  !!(tenant?.telefono || tenant?.whatsapp),
             page:  'config',
             icon:  'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
           },
+          {
+            label: 'Crea tu primera cita',
+            desc:  '¡El sistema ya funciona!',
+            done:  citas.length > 0,
+            page:  'agenda',
+            icon:  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+          },
         ]
         const doneCount = steps.filter(s => s.done).length
-        if (doneCount === 3) return null
+        if (doneCount === steps.length) return null
         return (
           <div style={{ margin:'16px 16px 0', borderRadius:20,
             background:`linear-gradient(135deg,${col}10,${col}05)`,
@@ -588,7 +602,7 @@ export default function SalonDashboard({ onNavigate }) {
                   Configura tu negocio
                 </div>
                 <div style={{ fontSize:12, color:'var(--text-3)' }}>
-                  {doneCount} de 3 pasos completados
+                  {doneCount} de {steps.length} pasos completados
                 </div>
               </div>
               <div style={{
@@ -598,7 +612,7 @@ export default function SalonDashboard({ onNavigate }) {
                 fontFamily:'Outfit', fontWeight:900, fontSize:15,
                 color: doneCount === 0 ? 'var(--text-3)' : col,
               }}>
-                {doneCount}/3
+                {doneCount}/{steps.length}
               </div>
             </div>
 
@@ -607,7 +621,7 @@ export default function SalonDashboard({ onNavigate }) {
               <div style={{
                 height:'100%', borderRadius:5,
                 background:`linear-gradient(90deg, ${col}, ${col}bb)`,
-                width:`${(doneCount/3)*100}%`,
+                width:`${(doneCount/steps.length)*100}%`,
                 transition:'width 0.6s cubic-bezier(0.34,1.56,0.64,1)',
               }} />
             </div>
