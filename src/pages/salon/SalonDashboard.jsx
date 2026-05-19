@@ -166,6 +166,7 @@ export default function SalonDashboard({ onNavigate }) {
     { nombre:'Andrea Ruiz',    total:95000  },
   ] : [])
   const [sinCobrar,      setSinCobrar]      = useState([])
+  const [proximos7,      setProximos7]      = useState([])
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -305,6 +306,19 @@ export default function SalonDashboard({ onNavigate }) {
         topProf:      Object.entries(profCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([nombre,count])=>({nombre,count})),
         diasSemana,
       })
+
+      // Próximos 7 días: count de citas por fecha
+      const p7Map = {}
+      citasMes.forEach(c => {
+        const d = c.fecha_inicio?.slice(0, 10)
+        if (d >= fecha) p7Map[d] = (p7Map[d] || 0) + 1
+      })
+      const DIAS_CORTOS = ['Do','Lu','Ma','Mi','Ju','Vi','Sa']
+      setProximos7(Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() + i)
+        const iso = d.toISOString().slice(0, 10)
+        return { iso, diaNom: DIAS_CORTOS[d.getDay()], diaNum: d.getDate(), count: p7Map[iso] || 0, esHoy: i === 0 }
+      }))
 
       // Tendencia 14 días: semana anterior (0-6) + semana actual (7-13)
       const pagos14Data = pagos14Res.data || []
@@ -1080,6 +1094,36 @@ export default function SalonDashboard({ onNavigate }) {
             {sinCobrar.map(c => (
               <div key={c.id} style={{ fontSize:11, color:'var(--text-3)', marginBottom:2 }}>
                 · {fmtHora(c.fecha_inicio)} — {c.clientes_agenda?.nombre?.split(' ')[0] || 'Cliente'} ({c.servicios?.nombre || 'servicio'})
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Próximos 7 días ──────────────────────────────── */}
+      {proximos7.length > 0 && (
+        <div style={{ margin:'0 16px 12px' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.8,
+            textTransform:'uppercase', marginBottom:8 }}>Esta semana</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4 }}>
+            {proximos7.map(d => (
+              <div key={d.iso} style={{
+                textAlign:'center', padding:'8px 4px', borderRadius:10,
+                background: d.esHoy ? `${col}20` : 'var(--card)',
+                border: d.esHoy ? `1.5px solid ${col}50` : '1px solid var(--border)',
+                boxShadow:'0 1px 4px rgba(0,0,0,0.06)',
+              }}>
+                <div style={{ fontSize:9, fontWeight:700, color: d.esHoy ? col : 'var(--text-3)',
+                  textTransform:'uppercase', letterSpacing:0.5 }}>{d.diaNom}</div>
+                <div style={{ fontSize:14, fontWeight:800, color: d.esHoy ? col : 'var(--text)',
+                  lineHeight:1.2, marginTop:2 }}>{d.diaNum}</div>
+                {d.count > 0
+                  ? <div style={{ marginTop:3, fontSize:11, fontWeight:700, color: d.esHoy ? col : 'var(--text-2)',
+                      background: d.esHoy ? `${col}18` : 'var(--bg)', borderRadius:6, padding:'1px 0' }}>
+                      {d.count}
+                    </div>
+                  : <div style={{ marginTop:3, fontSize:10, color:'var(--text-3)', lineHeight:1 }}>—</div>
+                }
               </div>
             ))}
           </div>

@@ -41,6 +41,8 @@ export default function SalonServicios() {
   const [elimTarget,   setElimTarget]   = useState(null)
 
   // Vista principal: servicios | paquetes
+  const [citasMes,     setCitasMes]     = useState({}) // servicio_id → count
+
   const [vistaMain,    setVistaMain]    = useState('servicios')
 
   // Paquetes
@@ -60,14 +62,21 @@ export default function SalonServicios() {
   const cargar = useCallback(async () => {
     if (!tenant) { setLoading(false); return }
     setLoading(true)
-    const [{ data: servs }, { data: profs }, { data: prods }] = await Promise.all([
+    const mesInicio = new Date(); mesInicio.setDate(1); mesInicio.setHours(0,0,0,0)
+    const mesFin = new Date(mesInicio.getFullYear(), mesInicio.getMonth() + 1, 1)
+    const [{ data: servs }, { data: profs }, { data: prods }, { data: citasData }] = await Promise.all([
       supabase.from('servicios').select('*').eq('tenant_id', tenant.id).order('categoria').order('nombre'),
       supabase.from('profesionales').select('id,nombre,color').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
       supabase.from('productos_salon').select('id,nombre,categoria').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+      supabase.from('citas').select('servicio_id').eq('tenant_id', tenant.id)
+        .neq('estado', 'cancelada').gte('fecha_inicio', mesInicio.toISOString()).lt('fecha_inicio', mesFin.toISOString()),
     ])
     setServicios(servs || [])
     setProfesionales(profs || [])
     setProductos(prods || [])
+    const cMap = {}
+    ;(citasData || []).forEach(c => { if (c.servicio_id) cMap[c.servicio_id] = (cMap[c.servicio_id] || 0) + 1 })
+    setCitasMes(cMap)
     setLoading(false)
   }, [tenant])
 
@@ -546,6 +555,12 @@ export default function SalonServicios() {
                         <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
                           background:'rgba(34,197,94,0.15)', color:'#22c55e', letterSpacing:0.4 }}>
                           OFERTA
+                        </span>
+                      )}
+                      {citasMes[s.id] > 0 && (
+                        <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
+                          background:`${col}18`, color:col, letterSpacing:0.4 }}>
+                          {citasMes[s.id]} este mes
                         </span>
                       )}
                     </div>
