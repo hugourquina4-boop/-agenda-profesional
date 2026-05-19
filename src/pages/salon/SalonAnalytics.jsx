@@ -116,6 +116,7 @@ export default function SalonAnalytics() {
   const [kpiPrev,   setKpiPrev]   = useState(null) // mes anterior para comparativa
   const [fuenteData,setFuenteData]= useState([]) // captación por canal
   const [segData,   setSegData]   = useState(null) // {nuevos, recurrentes, vip, total}
+  const [cliNuevosMes, setCliNuevosMes] = useState([])
 
   // Finanzas
   const [gastosHist, setGastosHist] = useState([])
@@ -376,6 +377,16 @@ export default function SalonAnalytics() {
         recurrentes:  cliAll.filter(c => (c.num_visitas || 0) >= 2).length,
         vip:          cliAll.filter(c => c.segmento === 'vip' || c.segmento === 'frecuente').length,
       })
+      // Tendencia nuevos clientes — últimos 6 meses
+      setCliNuevosMes(Array.from({ length:6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+        const iso = d.toISOString().slice(0, 7)
+        return {
+          mes: iso,
+          label: d.toLocaleDateString('es-CO', { month:'short' }),
+          count: cliAll.filter(c => c.created_at?.slice(0, 7) === iso).length,
+        }
+      }))
     } catch (e) {
       console.error('[SalonAnalytics]', e)
     } finally {
@@ -1573,6 +1584,39 @@ export default function SalonAnalytics() {
           <div style={{ fontSize:11, color:'var(--text-3)', textAlign:'center', marginTop:6 }}>
             {segData.total > 0 ? Math.round(segData.recurrentes/segData.total*100) : 0}% retención (clientes con ≥2 visitas)
           </div>
+        </div>
+      </>)}
+
+      {cliNuevosMes.some(m => m.count > 0) && (<>
+        <div className="sp-section" style={{ marginTop:20 }}>
+          <span className="sp-section-title">Nuevos clientes por mes</span>
+        </div>
+        <div style={{ margin:'0 16px', padding:'16px', borderRadius:16,
+          background:'var(--card)', boxShadow:'0 2px 14px rgba(0,0,0,0.1)' }}>
+          {(() => {
+            const max = Math.max(...cliNuevosMes.map(m => m.count), 1)
+            return (
+              <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:80 }}>
+                {cliNuevosMes.map((m, i) => {
+                  const isLast = i === cliNuevosMes.length - 1
+                  const pct = m.count / max * 100
+                  return (
+                    <div key={m.mes} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color: isLast ? col : 'var(--text-3)' }}>
+                        {m.count > 0 ? m.count : ''}
+                      </div>
+                      <div style={{ width:'100%', borderRadius:'4px 4px 0 0',
+                        background: isLast ? col : `${col}55`,
+                        height: `${Math.max(pct, 4)}%`, minHeight: m.count > 0 ? 4 : 2,
+                        transition:'height 0.4s',
+                      }} />
+                      <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:600, textTransform:'capitalize' }}>{m.label}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       </>)}
 

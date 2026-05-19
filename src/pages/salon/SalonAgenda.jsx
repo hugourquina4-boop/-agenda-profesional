@@ -820,6 +820,19 @@ export default function SalonAgenda() {
                     {c.estado === 'completada' && (
                       <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, opacity:0.7 }}>🔒</div>
                     )}
+                    {['pendiente','confirmada'].includes(c.estado) && nowOffset !== null && (() => {
+                      const citaMins = parseInt(c.fecha_inicio.substring(11,13)) * 60 + parseInt(c.fecha_inicio.substring(14,16))
+                      const espera = nowOffset - citaMins
+                      if (espera <= 0) return null
+                      return (
+                        <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, fontWeight:700,
+                          color: espera > 15 ? '#ef4444' : '#f59e0b',
+                          background: espera > 15 ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                          borderRadius:4, padding:'1px 4px' }}>
+                          ⏱{espera}m
+                        </div>
+                      )
+                    })()}
                     <div style={{ fontSize:10, fontWeight:800, color: cancelada ? '#71717a' : profClr, lineHeight:1.3 }}>
                       {fmtHora(c.fecha_inicio)}{isStar ? ' ⭐' : ''}{(c.clientes_agenda?.num_visitas ?? 1) <= 1 ? ' ✨' : ''}
                     </div>
