@@ -107,8 +107,12 @@ export default function SalonAgenda() {
   const draggingRef = useRef(null)          // estado de drag sin re-render
   const [ghostPos,  setGhostPos]  = useState(null) // posición visual del ghost
 
-  // Drag & drop en VistaSemana (mover cita a otro día)
-  const [semDragOver, setSemDragOver] = useState(null) // iso del día hover
+  // Drag & drop en VistaSemana (pointer events)
+  const [semDragOver, setSemDragOver] = useState(null)
+  const [semGhost,    setSemGhost]    = useState(null) // { iso, top, height }
+  const semDragRef   = useRef(null)
+  const weekGridRef  = useRef(null)
+  const semGhostRef  = useRef(null)       // espejo de semGhost para evitar stale closure
   const [moviendo,    setMoviendo]    = useState(false)
 
   // Quick-add: click en slot vacío → NuevaCita pre-llenada
@@ -426,8 +430,8 @@ export default function SalonAgenda() {
     const hFin = cita.fecha_fin ? cita.fecha_fin.slice(11, 16) : null
     const newIni = `${isoDestino}T${hIni}:00`
     const newFin = hFin ? `${isoDestino}T${hFin}:00` : null
-    await supabase.from('citas').update({ fecha_inicio: newIni, fecha_fin: newFin }).eq('id', citaId)
-    await cargarCitas()
+    await supabase.from('citas').update({ fecha_inicio: newIni, fecha_fin: newFin }).eq('id', citaId).eq('tenant_id', tenant.id)
+    cargarMes()
     setMoviendo(false)
   }
 
@@ -485,8 +489,51 @@ export default function SalonAgenda() {
       return SLOT_SEM * 2
     }
 
+    function semPointerDown(e, c, iso) {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      semDragRef.current = { citaId: c.id, iso, height: semDur(c) - 2, startX: e.clientX, startY: e.clientY, moved: false, cita: c }
+    }
+    function semPointerMove(e, c) {
+      const dr = semDragRef.current
+      if (!dr || dr.citaId !== c.id) return
+      const dY = e.clientY - dr.startY, dX = e.clientX - dr.startX
+      if (!dr.moved && Math.abs(dY) < 5 && Math.abs(dX) < 5) return
+      semDragRef.current = { ...dr, moved: true }
+      const gridRect = weekGridRef.current?.getBoundingClientRect()
+      if (!gridRect) return
+      const scrollTop  = weekGridRef.current.scrollTop
+      const scrollLeft = weekGridRef.current.scrollLeft
+      const colW   = (gridRect.width - 44) / 7
+      const dayIdx = Math.max(0, Math.min(6, Math.floor((e.clientX - gridRect.left - 44 + scrollLeft) / colW)))
+      const yRel   = e.clientY - gridRect.top + scrollTop - HEADER_H
+      const snapped = Math.round(Math.max(0, yRel) / SLOT_SEM) * SLOT_SEM
+      const top    = Math.max(0, Math.min(TOT_SEM - dr.height, snapped))
+      const ghostData = { iso: diasSemana[dayIdx], top, height: dr.height }
+      semGhostRef.current = ghostData
+      setSemGhost(ghostData)
+      setSemDragOver(diasSemana[dayIdx])
+    }
+    async function semPointerUp(e, c) {
+      const dr = semDragRef.current
+      if (!dr || dr.citaId !== c.id) return
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      semDragRef.current = null
+      const ghost = semGhostRef.current
+      semGhostRef.current = null
+      setSemGhost(null); setSemDragOver(null)
+      if (!dr.moved || !ghost) { setSelCita(c); return }
+      const minsFromStart = (ghost.top / SLOT_SEM) * 30
+      const totalMins = H_S * 60 + minsFromStart
+      const pad = n => String(Math.floor(n)).padStart(2, '0')
+      const newStart = `${ghost.iso}T${pad(totalMins/60)}:${pad(totalMins%60)}:00`
+      const durMin = c.servicios?.duracion_min || 60
+      const newEnd = `${ghost.iso}T${pad((totalMins+durMin)/60)}:${pad((totalMins+durMin)%60)}:00`
+      await supabase.from('citas').update({ fecha_inicio: newStart, fecha_fin: newEnd }).eq('id', c.id).eq('tenant_id', tenant.id)
+      cargarMes()
+    }
+
     return (
-      <div style={{ overflowX:'auto', overflowY:'auto', maxHeight:'calc(100dvh - 180px)', paddingBottom:40 }}>
+      <div ref={weekGridRef} style={{ overflowX:'auto', overflowY:'auto', maxHeight:'calc(100dvh - 180px)', paddingBottom:40 }}>
         <div style={{ display:'flex', minWidth: 44 + 7 * 100 }}>
 
           {/* ── Eje de horas ── */}
@@ -532,13 +579,9 @@ export default function SalonAgenda() {
                 </button>
 
                 {/* Grid de tiempo */}
-                <div
-                  onDragOver={e => { e.preventDefault(); setSemDragOver(iso) }}
-                  onDragLeave={() => setSemDragOver(s => s === iso ? null : s)}
-                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('citaId'); setSemDragOver(null); if (id) moverCitaSemana(id, iso) }}
-                  style={{ position:'relative', height:TOT_SEM,
-                    background: semDragOver === iso ? `${col}10` : 'transparent',
-                    transition:'background 0.15s' }}
+                <div style={{ position:'relative', height:TOT_SEM,
+                  background: semDragOver === iso ? `${col}10` : 'transparent',
+                  transition:'background 0.15s' }}
                 >
                   {/* Líneas de hora */}
                   {Array.from({ length: H_E - H_S }, (_, i) => (
@@ -555,6 +598,12 @@ export default function SalonAgenda() {
                       ? <div style={{ position:'absolute', left:0, right:0, top:np, height:2, background:'#ef4444', zIndex:3, pointerEvents:'none' }} />
                       : null
                   })()}
+                  {/* Ghost de drag */}
+                  {semGhost?.iso === iso && (
+                    <div style={{ position:'absolute', top:semGhost.top, left:2, right:2,
+                      height: semGhost.height, borderRadius:5, pointerEvents:'none', zIndex:5,
+                      border:`2px dashed ${col}`, background:`${col}18` }} />
+                  )}
                   {/* Citas */}
                   {dc.map(c => {
                     const top    = semOff(c.fecha_inicio)
@@ -562,11 +611,12 @@ export default function SalonAgenda() {
                     if (top < 0 || top > TOT_SEM) return null
                     const cancelada = ['cancelada','no_asistio'].includes(c.estado)
                     const clr = PCLR[c.profesionales?.id] || ESTADO_COLOR[c.estado] || col
+                    const isDraggingThis = semDragRef.current?.citaId === c.id && semGhost
                     return (
                       <button key={c.id}
-                        draggable={!cancelada}
-                        onDragStart={e => { e.dataTransfer.setData('citaId', c.id); e.dataTransfer.effectAllowed = 'move' }}
-                        onClick={() => setSelCita(c)}
+                        onPointerDown={e => { if (!cancelada) semPointerDown(e, c, iso) }}
+                        onPointerMove={e => semPointerMove(e, c)}
+                        onPointerUp={e => semPointerUp(e, c)}
                         style={{ position:'absolute', top, left:2, right:2,
                           height: Math.max(18, height - 2), borderRadius:5,
                           background: cancelada ? 'rgba(113,113,122,0.10)' : `${clr}1a`,
@@ -574,7 +624,8 @@ export default function SalonAgenda() {
                           borderLeft:`3px solid ${cancelada ? '#71717a' : clr}`,
                           padding:'2px 4px', cursor: cancelada ? 'pointer' : 'grab',
                           textAlign:'left', overflow:'hidden', zIndex:2,
-                          opacity: cancelada ? 0.6 : 1 }}
+                          touchAction:'none', userSelect:'none',
+                          opacity: isDraggingThis ? 0.25 : cancelada ? 0.6 : 1 }}
                       >
                         <div style={{ fontSize:9, fontWeight:800, color:clr, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                           {fmtHora(c.fecha_inicio)}
@@ -702,39 +753,7 @@ export default function SalonAgenda() {
           </div>
 
           {/* Grid de tiempo */}
-          <div style={{ position:'relative', height:TOTAL_H, touchAction:'none', userSelect:'none' }}
-            onPointerMove={e => {
-              const dr = draggingRef.current
-              if (!dr) return
-              const dY = e.clientY - dr.startY
-              const dX = e.clientX - dr.startX
-              if (!dr.moved && Math.abs(dY) < 6 && Math.abs(dX) < 6) return
-              const snapped = Math.round((dr.origTop + dY) / SLOT_H) * SLOT_H
-              const curTop = Math.max(0, Math.min(TOTAL_H - dr.height, snapped))
-              const curProfIdx = Math.max(0, Math.min(PROFS.length - 1, dr.profIdx + Math.round(dX / COL_W)))
-              const profKey = PROFS[curProfIdx]?.id || PROFS[curProfIdx]?.nombre
-              draggingRef.current = { ...dr, curTop, curProfIdx, moved:true }
-              setGhostPos({ top:curTop, profIdx:curProfIdx, height:dr.height, color:PROF_CLR[profKey]||col })
-            }}
-            onPointerUp={async e => {
-              const dr = draggingRef.current
-              if (!dr) return
-              draggingRef.current = null
-              setGhostPos(null)
-              if (!dr.moved) { setSelCita(dr.cita); return }
-              const minsFromStart = (dr.curTop / SLOT_H) * 30
-              const totalMins = H_START * 60 + minsFromStart
-              const pad = n => String(Math.floor(n)).padStart(2,'0')
-              const newStart = `${selDay}T${pad(totalMins/60)}:${pad(totalMins%60)}:00`
-              const durMin = dr.cita.servicios?.duracion_min || 60
-              const endMins = totalMins + durMin
-              const newEnd = `${selDay}T${pad(endMins/60)}:${pad(endMins%60)}:00`
-              const updates = { fecha_inicio:newStart, fecha_fin:newEnd }
-              if (dr.curProfIdx !== dr.profIdx) updates.profesional_id = PROFS[dr.curProfIdx].id
-              await supabase.from('citas').update(updates).eq('id', dr.cita.id).eq('tenant_id', tenant.id)
-              cargarMes()
-            }}
-          >
+          <div style={{ position:'relative', height:TOTAL_H }}>
             {/* Líneas de hora */}
             {Array.from({ length: H_END - H_START }, (_, i) => (
               <div key={i} style={{ position:'absolute', left:0, right:0, top: i * 2 * SLOT_H, display:'flex' }}>
@@ -868,7 +887,40 @@ export default function SalonAgenda() {
                   onPointerDown={e => {
                     if (cancelada || c.estado === 'completada') return
                     e.stopPropagation()
+                    e.currentTarget.setPointerCapture(e.pointerId)
                     draggingRef.current = { citaId:c.id, profIdx:pi, origTop:top, curTop:top, curProfIdx:pi, height:height-2, startY:e.clientY, startX:e.clientX, moved:false, cita:c }
+                  }}
+                  onPointerMove={e => {
+                    const dr = draggingRef.current
+                    if (!dr || dr.citaId !== c.id) return
+                    const dY = e.clientY - dr.startY
+                    const dX = e.clientX - dr.startX
+                    if (!dr.moved && Math.abs(dY) < 6 && Math.abs(dX) < 6) return
+                    e.preventDefault()
+                    const snapped = Math.round((dr.origTop + dY) / SLOT_H) * SLOT_H
+                    const curTop = Math.max(0, Math.min(TOTAL_H - dr.height, snapped))
+                    const curProfIdx = Math.max(0, Math.min(PROFS.length - 1, dr.profIdx + Math.round(dX / COL_W)))
+                    draggingRef.current = { ...dr, curTop, curProfIdx, moved:true }
+                    setGhostPos({ top:curTop, profIdx:curProfIdx, height:dr.height, color:profClr })
+                  }}
+                  onPointerUp={async e => {
+                    const dr = draggingRef.current
+                    if (!dr || dr.citaId !== c.id) return
+                    e.currentTarget.releasePointerCapture(e.pointerId)
+                    draggingRef.current = null
+                    setGhostPos(null)
+                    if (!dr.moved) { setSelCita(c); return }
+                    const minsFromStart = (dr.curTop / SLOT_H) * 30
+                    const totalMins = H_START * 60 + minsFromStart
+                    const pad = n => String(Math.floor(n)).padStart(2,'0')
+                    const newStart = `${selDay}T${pad(totalMins/60)}:${pad(totalMins%60)}:00`
+                    const durMin = c.servicios?.duracion_min || 60
+                    const endMins = totalMins + durMin
+                    const newEnd = `${selDay}T${pad(endMins/60)}:${pad(endMins%60)}:00`
+                    const updates = { fecha_inicio:newStart, fecha_fin:newEnd }
+                    if (dr.curProfIdx !== dr.profIdx) updates.profesional_id = PROFS[dr.curProfIdx].id
+                    await supabase.from('citas').update(updates).eq('id', c.id).eq('tenant_id', tenant.id)
+                    cargarMes()
                   }}
                   >
                     <div style={{ position:'absolute', top:5, right:5,

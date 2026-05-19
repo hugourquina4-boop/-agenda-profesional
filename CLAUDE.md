@@ -656,6 +656,17 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 
 **SQL aplicado:** v75_puntos_config.sql ✅ · v76_cliente_fuente.sql ✅
 
+## Bloque AF — COMPLETADO (sesión 21 — 2026-05-19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Portal: cancelación self-service desde "Mis citas" | v77 ✅ | ✅ RPC `cancelar_cita_portal` SECURITY DEFINER + botón Cancelar en lista (respeta `horas_cancelacion`) |
+| Citas con `fuente = 'portal'` para trazabilidad | v77 ✅ | ✅ `fuente:'portal'` en insert de `crearReserva` |
+| Config: campo `horas_cancelacion` (default 2h) | v77 ✅ | ✅ Junto a "Política de cancelación" en SalonConfig |
+| Dashboard: stat 🌐 N Portal en hero stats | sin SQL | ✅ Aparece solo cuando hay citas de portal hoy |
+
+**SQL aplicado:** v77_portal_cancelacion.sql ✅ — columna `fuente` en citas + RPC `cancelar_cita_portal`
+
 ## Bloque AE — COMPLETADO (sesión 21 — 2026-05-19)
 
 ### Portal público — Fix blank screen + UX flujo servicio-primero
