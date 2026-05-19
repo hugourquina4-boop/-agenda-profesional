@@ -137,6 +137,13 @@ export default function SalonInventario() {
   const [confirmDel,    setConfirmDel]    = useState(null)
   const [csvModal,      setCsvModal]      = useState(null)
   const [csvImporting,  setCsvImporting]  = useState(false)
+  const [historialProd, setHistorialProd] = useState(null)  // producto seleccionado
+  const [movimientos,   setMovimientos]   = useState([])
+  const [loadMov,       setLoadMov]       = useState(false)
+  const [ajusteTipo,    setAjusteTipo]    = useState('entrada')
+  const [ajusteCant,    setAjusteCant]    = useState('')
+  const [ajusteMotivo,  setAjusteMotivo]  = useState('')
+  const [savingAjuste,  setSavingAjuste]  = useState(false)
   const fileInputRef = useRef(null)
 
   function showToast(msg, ok = true) {
@@ -222,7 +229,64 @@ export default function SalonInventario() {
     if (!prod) return
     const nuevo = Math.max(0, prod.stock + delta)
     await supabase.from('productos_salon').update({ stock: nuevo }).eq('id', id)
+    await supabase.from('movimientos_stock').insert({
+      tenant_id:     tenant.id,
+      producto_id:   id,
+      tipo:          delta > 0 ? 'entrada' : 'salida',
+      cantidad:      Math.abs(delta),
+      stock_antes:   prod.stock,
+      stock_despues: nuevo,
+      motivo:        delta > 0 ? 'Entrada manual' : 'Salida manual',
+    })
     setProductos(ps => ps.map(p => p.id === id ? { ...p, stock: nuevo } : p))
+  }
+
+  async function abrirHistorial(prod) {
+    setHistorialProd(prod)
+    setAjusteTipo('entrada')
+    setAjusteCant('')
+    setAjusteMotivo('')
+    setLoadMov(true)
+    const { data } = await supabase
+      .from('movimientos_stock')
+      .select('*')
+      .eq('producto_id', prod.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    setMovimientos(data || [])
+    setLoadMov(false)
+  }
+
+  async function hacerAjuste() {
+    const cant = parseFloat(ajusteCant)
+    if (!cant || cant <= 0 || !historialProd) return
+    setSavingAjuste(true)
+    const prod = productos.find(p => p.id === historialProd.id) || historialProd
+    const delta = ajusteTipo === 'salida' ? -cant : cant
+    const stockAntes = prod.stock
+    const stockDespues = ajusteTipo === 'ajuste'
+      ? cant
+      : Math.max(0, stockAntes + delta)
+    await supabase.from('productos_salon').update({ stock: stockDespues }).eq('id', prod.id)
+    await supabase.from('movimientos_stock').insert({
+      tenant_id:     tenant.id,
+      producto_id:   prod.id,
+      tipo:          ajusteTipo,
+      cantidad:      cant,
+      stock_antes:   stockAntes,
+      stock_despues: stockDespues,
+      motivo:        ajusteMotivo.trim() || ({ entrada:'Entrada manual', salida:'Salida manual', ajuste:'Ajuste de inventario' })[ajusteTipo],
+    })
+    setProductos(ps => ps.map(p => p.id === prod.id ? { ...p, stock: stockDespues } : p))
+    setHistorialProd(p => p ? { ...p, stock: stockDespues } : p)
+    setAjusteCant('')
+    setAjusteMotivo('')
+    setSavingAjuste(false)
+    // Recargar movimientos
+    const { data } = await supabase.from('movimientos_stock').select('*')
+      .eq('producto_id', prod.id).order('created_at',{ascending:false}).limit(50)
+    setMovimientos(data || [])
+    showToast('Ajuste registrado ✓')
   }
 
   async function eliminar(id) {
@@ -444,6 +508,13 @@ export default function SalonInventario() {
                         width:28, height:28, borderRadius:8, border:'none',
                         background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer', fontSize:16, lineHeight:1,
                       }}>+</button>
+                      <button onClick={() => abrirHistorial(p)} title="Historial" style={{
+                        width:28, height:28, borderRadius:8, border:'none',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>
+                        <Ico d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" size={13} />
+                      </button>
                       <button onClick={() => abrirEditar(p)} style={{
                         width:28, height:28, borderRadius:8, border:'none',
                         background:'rgba(255,255,255,0.08)', color:'var(--text-2)', cursor:'pointer',
@@ -457,6 +528,103 @@ export default function SalonInventario() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── Modal historial de movimientos ── */}
+      {historialProd && (
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'flex-end',
+          background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setHistorialProd(null) }}>
+          <div style={{ width:'100%', maxWidth:520, margin:'0 auto', background:'var(--bg)',
+            borderRadius:'24px 24px 0 0', padding:'20px 20px 40px', maxHeight:'92dvh', overflowY:'auto' }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:'var(--border)', margin:'0 auto 20px' }} />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <div>
+                <h3 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:18, color:'var(--text)', margin:0 }}>
+                  {historialProd.nombre}
+                </h3>
+                <div style={{ fontSize:12, color:'var(--text-3)', marginTop:3 }}>
+                  Stock actual: <strong style={{ color:col }}>{historialProd.stock} {historialProd.unidad}s</strong>
+                </div>
+              </div>
+              <button onClick={() => setHistorialProd(null)} style={{ background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', fontSize:22, lineHeight:1, padding:4 }}>×</button>
+            </div>
+
+            {/* Ajuste manual */}
+            <div style={{ background:'var(--card)', borderRadius:14, padding:'14px 16px', marginBottom:20 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:12 }}>
+                Ajuste manual
+              </div>
+              <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+                {[['entrada','+ Entrada','#22c55e'],['salida','- Salida','#ef4444'],['ajuste','= Ajustar','#f59e0b']].map(([v,l,c])=>(
+                  <button key={v} onClick={() => setAjusteTipo(v)} style={{
+                    flex:1, padding:'8px 4px', borderRadius:9, border:'none', cursor:'pointer', fontSize:11, fontWeight:700,
+                    background: ajusteTipo===v ? `${c}20` : 'rgba(255,255,255,0.06)',
+                    color: ajusteTipo===v ? c : 'var(--text-3)',
+                    border: `1px solid ${ajusteTipo===v ? c+'40' : 'transparent'}`,
+                  }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                <input type="number" value={ajusteCant} onChange={e=>setAjusteCant(e.target.value)}
+                  placeholder={ajusteTipo==='ajuste'?'Nuevo total':'Cantidad'} className="sp-input" style={{ flex:1, fontSize:14 }} />
+                <input type="text" value={ajusteMotivo} onChange={e=>setAjusteMotivo(e.target.value)}
+                  placeholder="Motivo (opcional)" className="sp-input" style={{ flex:2, fontSize:13 }} />
+              </div>
+              <button onClick={hacerAjuste} disabled={!ajusteCant||savingAjuste} style={{
+                width:'100%', padding:'11px', borderRadius:11, border:'none', cursor:'pointer',
+                background: ajusteTipo==='entrada'?'rgba(34,197,94,0.15)':ajusteTipo==='salida'?'rgba(239,68,68,0.15)':'rgba(245,158,11,0.15)',
+                color: ajusteTipo==='entrada'?'#4ade80':ajusteTipo==='salida'?'#f87171':'#fbbf24',
+                fontWeight:700, fontSize:13, opacity:(!ajusteCant||savingAjuste)?0.6:1,
+              }}>
+                {savingAjuste ? '…' : 'Registrar ajuste'}
+              </button>
+            </div>
+
+            {/* Timeline movimientos */}
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', marginBottom:12 }}>
+              Historial de movimientos
+            </div>
+            {loadMov ? (
+              <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}>
+                <div className="sp-spinner" />
+              </div>
+            ) : movimientos.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text-3)', fontSize:13 }}>
+                Sin movimientos registrados
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {movimientos.map(m => {
+                  const esEntrada = m.tipo === 'entrada'
+                  const esAjuste  = m.tipo === 'ajuste'
+                  const color = esAjuste ? '#f59e0b' : esEntrada ? '#22c55e' : '#ef4444'
+                  const icon  = esAjuste ? '=' : esEntrada ? '+' : '−'
+                  return (
+                    <div key={m.id} style={{ display:'flex', gap:12, padding:'10px 14px', borderRadius:12,
+                      background:'var(--card)', boxShadow:'0 1px 6px rgba(0,0,0,0.06)' }}>
+                      <div style={{ width:28, height:28, borderRadius:8, flexShrink:0, background:`${color}18`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontWeight:800, fontSize:14, color }}>
+                        {icon}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>
+                          {m.motivo || m.tipo}
+                          <span style={{ marginLeft:8, fontWeight:800, color }}>{icon}{m.cantidad}</span>
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                          Stock: {m.stock_antes ?? '?'} → <strong style={{ color }}>{m.stock_despues ?? '?'}</strong>
+                          {' · '}{new Date(m.created_at).toLocaleDateString('es-CO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
