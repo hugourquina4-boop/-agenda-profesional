@@ -102,6 +102,10 @@ export default function SalonAgenda() {
   const draggingRef = useRef(null)          // estado de drag sin re-render
   const [ghostPos,  setGhostPos]  = useState(null) // posición visual del ghost
 
+  // Drag & drop en VistaSemana (mover cita a otro día)
+  const [semDragOver, setSemDragOver] = useState(null) // iso del día hover
+  const [moviendo,    setMoviendo]    = useState(false)
+
   useEffect(() => {
     if (!tenant) return
     Promise.all([
@@ -344,6 +348,19 @@ export default function SalonAgenda() {
       .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
   }, [citas, busqAgenda])
 
+  async function moverCitaSemana(citaId, isoDestino) {
+    const cita = citas.find(c => c.id === citaId)
+    if (!cita || cita.fecha_inicio.slice(0, 10) === isoDestino) return
+    setMoviendo(true)
+    const hIni = cita.fecha_inicio.slice(11, 16)
+    const hFin = cita.fecha_fin ? cita.fecha_fin.slice(11, 16) : null
+    const newIni = `${isoDestino}T${hIni}:00`
+    const newFin = hFin ? `${isoDestino}T${hFin}:00` : null
+    await supabase.from('citas').update({ fecha_inicio: newIni, fecha_fin: newFin }).eq('id', citaId)
+    await cargarCitas()
+    setMoviendo(false)
+  }
+
   // ── Helpers de navegación semana/día ─────────────────────────────────
   function shiftDia(n) {
     const d = new Date(selDay + 'T12:00:00')
@@ -388,7 +405,23 @@ export default function SalonAgenda() {
             const diaNom = DIAS[fecha.getDay()]
             const diaNum = fecha.getDate()
             return (
-              <div key={iso} style={{ flex:1, minWidth:78, borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column' }}>
+              <div
+                key={iso}
+                onDragOver={e => { e.preventDefault(); setSemDragOver(iso) }}
+                onDragLeave={() => setSemDragOver(s => s === iso ? null : s)}
+                onDrop={e => {
+                  e.preventDefault()
+                  const id = e.dataTransfer.getData('citaId')
+                  setSemDragOver(null)
+                  if (id) moverCitaSemana(id, iso)
+                }}
+                style={{
+                  flex:1, minWidth:78, borderRight:'1px solid var(--border)',
+                  display:'flex', flexDirection:'column',
+                  background: semDragOver === iso ? `${col}10` : 'transparent',
+                  transition:'background 0.15s',
+                }}
+              >
                 {/* Cabecera del día */}
                 <button
                   onClick={() => { setSelDay(iso); setVistaAgenda('dia') }}
@@ -417,10 +450,15 @@ export default function SalonAgenda() {
                     : dc.slice(0, 7).map(c => {
                         const clr = ESTADO_COLOR[c.estado] || col
                         return (
-                          <button key={c.id} onClick={() => setSelCita(c)} style={{
-                            width:'100%', padding:'5px 4px', borderRadius:6, textAlign:'left',
-                            background:`${clr}18`, border:`1px solid ${clr}40`, cursor:'pointer',
-                          }}>
+                          <button
+                            key={c.id}
+                            draggable
+                            onDragStart={e => { e.dataTransfer.setData('citaId', c.id); e.dataTransfer.effectAllowed = 'move' }}
+                            onClick={() => setSelCita(c)}
+                            style={{
+                              width:'100%', padding:'5px 4px', borderRadius:6, textAlign:'left',
+                              background:`${clr}18`, border:`1px solid ${clr}40`, cursor:'grab',
+                            }}>
                             <div style={{ fontSize:9, fontWeight:800, color:clr, lineHeight:1.2 }}>
                               {fmtHora(c.fecha_inicio)}
                             </div>
