@@ -162,6 +162,84 @@ export default function SalonCaja() {
     URL.revokeObjectURL(url)
   }
 
+  async function descargarCierre() {
+    const { default: jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const now = new Date()
+    const fechaHora = now.toLocaleString('es-CO', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' })
+
+    doc.setFillColor(r,g,b); doc.rect(0,0,210,32,'F')
+    doc.setTextColor(255,255,255)
+    doc.setFontSize(9); doc.setFont('helvetica','normal')
+    doc.text(tenant?.nombre || 'Salón', 14, 11)
+    doc.setFontSize(18); doc.setFont('helvetica','bold')
+    doc.text('CIERRE DE CAJA', 105, 18, { align:'center' })
+    doc.setFontSize(9); doc.setFont('helvetica','normal')
+    doc.text(fechaHora, 105, 26, { align:'center' })
+
+    // Cajas KPI
+    const bY = 40, bH = 22
+    doc.setFillColor(Math.min(255,r+185),Math.min(255,g+185),Math.min(255,b+185))
+    doc.rect(10,bY,57,bH,'F')
+    doc.setTextColor(r,g,b); doc.setFontSize(8); doc.setFont('helvetica','bold')
+    doc.text('INGRESOS',38,bY+6,{align:'center'})
+    doc.setFontSize(14); doc.text(fmtCOP(totalCobrado),38,bY+16,{align:'center'})
+
+    doc.setFillColor(254,226,226); doc.rect(77,bY,57,bH,'F')
+    doc.setTextColor(220,38,38); doc.setFontSize(8)
+    doc.text('EGRESOS',105,bY+6,{align:'center'})
+    doc.setFontSize(14); doc.text(fmtCOP(totalEgresos),105,bY+16,{align:'center'})
+
+    const saldoPos = (totalCobrado-totalEgresos) >= 0
+    doc.setFillColor(saldoPos?220:254, saldoPos?252:226, saldoPos?231:226)
+    doc.rect(144,bY,57,bH,'F')
+    doc.setTextColor(saldoPos?21:220, saldoPos?128:38, saldoPos?61:38)
+    doc.setFontSize(8); doc.text('SALDO NETO',172,bY+6,{align:'center'})
+    doc.setFontSize(14); doc.text(fmtCOP(Math.abs(totalCobrado-totalEgresos)),172,bY+16,{align:'center'})
+
+    let y = bY + bH + 10
+    // Métodos
+    const porM = {}
+    historial.forEach(c => { porM[c.pago.metodo] = (porM[c.pago.metodo]||0)+Number(c.pago.monto) })
+    doc.setFillColor(245,245,245); doc.rect(10,y-5,190,8,'F')
+    doc.setTextColor(0,0,0); doc.setFontSize(9); doc.setFont('helvetica','bold')
+    doc.text('MÉTODO DE PAGO',14,y); doc.text('MONTO',170,y); y+=8
+    doc.setFont('helvetica','normal')
+    Object.entries(porM).forEach(([m,t],i)=>{
+      if(i%2===0){doc.setFillColor(252,252,252);doc.rect(10,y-4,190,7,'F')}
+      doc.setTextColor(0,0,0); doc.text(m.charAt(0).toUpperCase()+m.slice(1),14,y)
+      doc.setTextColor(34,197,94); doc.text(fmtCOPFull(t),170,y); y+=7
+    })
+    // Cobros
+    y+=6
+    if(historial.length>0){
+      doc.setFillColor(r,g,b); doc.rect(10,y,190,8,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold')
+      doc.text(`COBROS DEL DÍA (${historial.length})`,14,y+5.5); y+=14
+      doc.setTextColor(0,0,0)
+      doc.text('Cliente',14,y); doc.text('Servicio',70,y); doc.text('Método',135,y); doc.text('Monto',170,y)
+      y+=7; doc.setFont('helvetica','normal')
+      historial.slice(0,40).forEach((c,i)=>{
+        if(y>268){doc.addPage();y=20}
+        if(i%2===0){doc.setFillColor(252,252,252);doc.rect(10,y-4,190,7,'F')}
+        doc.setTextColor(0,0,0)
+        doc.text((c.clientes_agenda?.nombre||'—').substring(0,22),14,y)
+        doc.text((c.servicios?.nombre||'—').substring(0,22),70,y)
+        doc.text(c.pago.metodo,135,y)
+        doc.setTextColor(34,197,94); doc.text(fmtCOPFull(c.pago.monto),170,y); y+=6
+      })
+    }
+    // Firma
+    if(y>254){doc.addPage();y=20}
+    y+=10
+    doc.setDrawColor(0,0,0); doc.setLineWidth(0.3); doc.line(14,y,90,y)
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
+    doc.text('Firma responsable de caja',14,y+5)
+    doc.text(`Salón Pro · ${fechaHora}`,105,y+5,{align:'center'})
+    doc.save(`cierre-caja-${now.toISOString().slice(0,10)}.pdf`)
+  }
+
   async function descargarPDF() {
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
@@ -465,7 +543,13 @@ export default function SalonCaja() {
                 </div>
               </div>
               {historial.length > 0 && (
-                <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                <div style={{ display:'flex', gap:5, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                  {periodo === 'hoy' && (
+                    <button onClick={descargarCierre} style={{
+                      padding:'8px 11px', borderRadius:10, border:'none', cursor:'pointer',
+                      background:'rgba(99,102,241,0.12)', color:'#818cf8', fontWeight:700, fontSize:11,
+                    }}>Z Cierre</button>
+                  )}
                   <button onClick={descargarPDF} style={{
                     padding:'8px 11px', borderRadius:10, border:'none', cursor:'pointer',
                     background:`${col}20`, color:col, fontWeight:700, fontSize:12,
@@ -500,6 +584,58 @@ export default function SalonCaja() {
               <div className="sp-kpi-sub">{pendientes.length} por cobrar</div>
             </div>
           </div>
+
+          {/* Gráfico semanal ingresos vs egresos */}
+          {periodo === 'semana' && (historial.length > 0 || egresos.length > 0) && (() => {
+            const hoy = new Date()
+            const DIAS7 = ['D','L','M','X','J','V','S']
+            const diasSem = Array.from({length:7}, (_,i) => {
+              const d = new Date(hoy); d.setDate(hoy.getDate()-6+i)
+              return d.toISOString().slice(0,10)
+            })
+            const ingPorDia = {}, egPorDia = {}
+            historial.forEach(c => { const d=(c.pago.created_at||'').slice(0,10); ingPorDia[d]=(ingPorDia[d]||0)+Number(c.pago.monto) })
+            egresos.forEach(g => { const d=(g.fecha||'').slice(0,10); egPorDia[d]=(egPorDia[d]||0)+Number(g.monto) })
+            const maxVal = Math.max(...diasSem.map(d => Math.max(ingPorDia[d]||0, egPorDia[d]||0)), 1)
+            const hoyIso = hoy.toISOString().slice(0,10)
+            return (
+              <div style={{ padding:'14px 16px', borderRadius:16, background:'var(--card)',
+                marginBottom:14, boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase' }}>Esta semana</span>
+                  <div style={{ display:'flex', gap:10, fontSize:10, color:'var(--text-3)' }}>
+                    <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:col }} />Ingresos
+                    </span>
+                    <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ display:'inline-block', width:8, height:8, borderRadius:2, background:'#f87171' }} />Egresos
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:4, alignItems:'flex-end', height:80 }}>
+                  {diasSem.map(d => {
+                    const ing = ingPorDia[d] || 0
+                    const eg  = egPorDia[d]  || 0
+                    const hIng = Math.max(ing>0?4:0, Math.round((ing/maxVal)*70))
+                    const hEg  = Math.max(eg>0?4:0,  Math.round((eg/maxVal)*70))
+                    const esHoy = d === hoyIso
+                    const fecha = new Date(d+'T12:00:00')
+                    return (
+                      <div key={d} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                        <div style={{ width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:70 }}>
+                          <div style={{ flex:1, height:hIng, background:col, borderRadius:'3px 3px 0 0', opacity:esHoy?1:0.5 }} />
+                          <div style={{ flex:1, height:hEg, background:'#f87171', borderRadius:'3px 3px 0 0', opacity:esHoy?0.9:0.4 }} />
+                        </div>
+                        <div style={{ fontSize:9, fontWeight:700, color:esHoy?col:'var(--text-3)' }}>
+                          {DIAS7[fecha.getDay()]}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Breakdown métodos */}
           {historial.length > 0 && (() => {
