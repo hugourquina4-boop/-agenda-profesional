@@ -167,7 +167,7 @@ export default function SalonEquipo() {
     const nextY = m === 12 ? y + 1 : y
     const fin = `${nextY}-${String(nextM).padStart(2,'0')}-01`
     const todayISO = new Date().toISOString().slice(0, 10)
-    const [{ data: profsData }, { data: citasData }, { data: excHoyData }] = await Promise.all([
+    const [{ data: profsData }, { data: citasData }, { data: excHoyData }, { data: noShowData }] = await Promise.all([
       supabase.from('profesionales').select('*').eq('tenant_id', tenant.id).order('nombre'),
       supabase.from('citas')
         .select('profesional_id, precio_cobrado')
@@ -180,13 +180,23 @@ export default function SalonEquipo() {
         .eq('tenant_id', tenant.id)
         .eq('fecha', todayISO)
         .eq('activo', false),
+      supabase.from('citas')
+        .select('profesional_id')
+        .eq('tenant_id', tenant.id)
+        .eq('estado', 'no_asistio')
+        .gte('fecha_inicio', inicio)
+        .lt('fecha_inicio', fin),
     ])
     setProfs(profsData || [])
     const stats = {}
     ;(citasData || []).forEach(c => {
-      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0 }
+      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0, noShows: 0 }
       stats[c.profesional_id].citas++
       stats[c.profesional_id].ingresos += Number(c.precio_cobrado) || 0
+    })
+    ;(noShowData || []).forEach(c => {
+      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0, noShows: 0 }
+      stats[c.profesional_id].noShows = (stats[c.profesional_id].noShows || 0) + 1
     })
     setProfStats(stats)
     setAusentesHoy(new Set((excHoyData || []).map(e => e.profesional_id)))
@@ -650,7 +660,11 @@ export default function SalonEquipo() {
                   {st && st.citas > 0 && (
                     <div style={{ fontSize:11, color:color, marginTop:3, fontWeight:600 }}>
                       {st.citas} cita{st.citas !== 1 ? 's' : ''}
-                      {st.ingresos > 0 ? ` · ${fmtK(st.ingresos)}` : ''} este mes
+                      {st.ingresos > 0 ? ` · ${fmtK(st.ingresos)}` : ''}
+                      {st.citas > 0 && st.ingresos > 0 ? ` · $${Math.round(st.ingresos/st.citas/1000)}K avg` : ''} este mes
+                      {st.noShows > 0 && (
+                        <span style={{ color:'#f87171', marginLeft:6 }}>· {st.noShows} no-show</span>
+                      )}
                     </div>
                   )}
                 </div>
