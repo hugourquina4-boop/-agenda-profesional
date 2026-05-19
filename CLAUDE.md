@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 15)
-> **Versión actual en producción: v1.4-dev** (commit 89272bf)
+> Actualizado: 2026-05-18 (sesión 16)
+> **Versión actual en producción: v1.4-dev** (commit 2155117)
 
 ---
 
@@ -357,6 +357,8 @@ v67_sedes.sql                     ✅ APLICADO (2026-05-18) — tabla sedes + se
 v68_trigger_stock.sql             ✅ APLICADO (2026-05-18) — trigger fn_descontar_insumos_cita activo
 v69_wompi_portal.sql              ✅ APLICADO (2026-05-18) — wompi_public_key + pagos_portal_activo en tenants
 v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_usuario_tenant SECURITY DEFINER
+v71_sedes_horario.sql             ✅ APLICADO (2026-05-18) — hora_apertura + hora_cierre + dias_activos en sedes
+v72_portal_anon_tenants.sql       ⏳ PENDIENTE — corregido (quitó config_vertical inexistente); aplicar en Supabase SQL Editor
 ```
 
 ---
@@ -489,15 +491,37 @@ v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_
 | Dashboard: barras de carga por profesional hoy | sin SQL | ✅ Mini horizontal bars en card — verde/accent/rojo según % |
 | Caja: exportar egresos a CSV | sin SQL | ✅ `descargarEgresosCSV()` + botón "↓ CSV" en tab Egresos |
 
-## Bloque O — Próximo Sprint
+### ✅ Bloque O — COMPLETADO (sesión 16 — 2026-05-18)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Equipo: citas + ingresos del mes por profesional | sin SQL | ✅ Card muestra "X citas · $YK este mes" en color del profesional |
+| Agenda: contador citas por profesional en VistaDia | sin SQL | ✅ Badge numerado bajo el nombre en el header del grid |
+| Clientes: exportar historial individual a PDF | sin SQL | ✅ Botón "↓ PDF" en tab Historial → PDF con tabla completa |
+| Proveedores: dashboard gastos acumulados por proveedor | sin SQL | ✅ Tarjeta con barras horizontales al tope del tab Proveedores |
+| Analytics: tab "Gerencial" con P&L completo | sin SQL | ✅ Estado de Resultados + 6 KPIs + IVA estimado + PDF export |
+| Portal /reservar/slug — fix RLS anon en tenants | v72 ⏳ | ⏳ SQL corregido, pendiente aplicar en Supabase |
+
+## Bloque P — Sprint activo (sesión 17 — 2026-05-18)
+
+### Gaps competitivos vs WeiBook (prioridad alta)
 
 | Feature | SQL necesario | Prioridad |
 | ------- | ------------- | --------- |
-| Equipo: vista resumen de producción (citas + ingresos del mes) | sin SQL | Alta |
-| Agenda: contador de citas por profesional en VistaDia | sin SQL | Media |
-| Clientes: exportar historial de citas individual a PDF | sin SQL | Media |
-| Proveedores: dashboard de gastos acumulados por proveedor | sin SQL | Media |
-| v71: Aplicar SQL sedes horarios en Supabase | v71 pendiente | Alta |
+| Agenda: bloquear horario (marcar no disponible sin crear cita falsa) | sin SQL (usa horarios_excepcion) | 🔴 Alta |
+| Portal: notificación WA al cliente al confirmar reserva | sin SQL (llamar notificacion-cita EF) | 🔴 Alta |
+| Agenda: vista semana con color por estado | sin SQL | 🟡 Media |
+| Agenda: cita recurrente (crear serie semanal/mensual) | sin SQL | 🟡 Media |
+| Comisiones: notificación WA al liquidar | sin SQL | 🟡 Media |
+
+### Features de calidad
+
+| Feature | SQL necesario | Prioridad |
+| ------- | ------------- | --------- |
+| Caja: gráfico de barras ingresos vs egresos por semana | sin SQL | 🟡 Media |
+| Inventario: historial de movimientos de stock | sin SQL | 🟡 Media |
+| Búsqueda global (barra que busca clientes/citas desde cualquier módulo) | sin SQL | 🟡 Media |
+| Caja: cierre del día con PDF de cuadre | sin SQL | 🟡 Media |
 
 ---
 

@@ -86,6 +86,14 @@ export default function SalonAgenda() {
   const [dupFecha,         setDupFecha]         = useState('')
   const [busqAgenda,       setBusqAgenda]       = useState('')
 
+  // Bloquear franja horaria
+  const [bloqueoModal, setBloqueoModal] = useState(false)
+  const [bloqueoProf,  setBloqueoProf]  = useState('')
+  const [bloqueoHIni,  setBloqueoHIni]  = useState('09:00')
+  const [bloqueoHFin,  setBloqueoHFin]  = useState('10:00')
+  const [bloqueoNote,  setBloqueoNote]  = useState('')
+  const [guardandoBlq, setGuardandoBlq] = useState(false)
+
   // Drag & drop en VistaDia
   const draggingRef = useRef(null)          // estado de drag sin re-render
   const [ghostPos,  setGhostPos]  = useState(null) // posición visual del ghost
@@ -240,6 +248,33 @@ export default function SalonAgenda() {
       }
     }
     setGuardandoPago(false)
+  }
+
+  async function crearBloqueo() {
+    if (!bloqueoProf || !bloqueoHIni || !bloqueoHFin) return
+    setGuardandoBlq(true)
+    await supabase.from('citas').insert({
+      tenant_id:      tenant.id,
+      profesional_id: bloqueoProf,
+      fecha_inicio:   `${selDay}T${bloqueoHIni}:00`,
+      fecha_fin:      `${selDay}T${bloqueoHFin}:00`,
+      estado:         'cancelada',
+      notas:          `__bloqueo__${bloqueoNote.trim()}`,
+      precio_cobrado: 0,
+    })
+    setGuardandoBlq(false)
+    setBloqueoModal(false)
+    setBloqueoNote('')
+    cargarMes()
+  }
+
+  async function eliminarBloqueo() {
+    if (!selCita) return
+    setActualizando(true)
+    await supabase.from('citas').delete().eq('id', selCita.id)
+    setActualizando(false)
+    setSelCita(null)
+    cargarMes()
   }
 
   // Mapa día → citas
@@ -519,8 +554,32 @@ export default function SalonAgenda() {
                 const cancelada = ['cancelada','no_asistio'].includes(c.estado)
                 const tags = c.clientes_agenda?.tags || []
                 const isStar = tags.includes('star') || tags.includes('vip')
+                const esBloqueo = c.notas?.startsWith('__bloqueo__')
+                const motiBloqueo = esBloqueo ? c.notas.slice(11) : ''
                 if (top < 0 || top > TOTAL_H) return null
                 const isDragged = ghostPos && draggingRef.current?.citaId === c.id
+
+                if (esBloqueo) return (
+                  <div key={c.id} onClick={() => setSelCita(c)} style={{
+                    position:'absolute',
+                    top, left: 56 + pi * COL_W + 3,
+                    width: COL_W - 6, height: height - 2,
+                    borderRadius:8, cursor:'pointer',
+                    background:'repeating-linear-gradient(45deg,rgba(113,113,122,0.12),rgba(113,113,122,0.12) 4px,rgba(113,113,122,0.04) 4px,rgba(113,113,122,0.04) 10px)',
+                    border:'1.5px solid rgba(113,113,122,0.3)',
+                    borderLeft:'3px solid #71717a',
+                    padding:'4px 7px', overflow:'hidden',
+                    userSelect:'none',
+                  }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:'#71717a' }}>🚫 Bloqueado</div>
+                    {motiBloqueo && height > SLOT_H && (
+                      <div style={{ fontSize:10, color:'#71717a80', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {motiBloqueo}
+                      </div>
+                    )}
+                  </div>
+                )
+
                 return (
                   <div key={c.id} style={{
                     position:'absolute',
@@ -777,6 +836,24 @@ export default function SalonAgenda() {
             ))}
           </div>
         )}
+        {/* Botón bloquear franja — visible en vista día */}
+        <div style={{ display:'flex', justifyContent:'flex-end', padding:'0 16px 8px' }}>
+          <button onClick={() => {
+            setBloqueoProf(profesionales[0]?.id || '')
+            setBloqueoHIni('09:00')
+            setBloqueoHFin('10:00')
+            setBloqueoNote('')
+            setBloqueoModal(true)
+          }} style={{
+            padding:'6px 13px', borderRadius:9, border:'1px solid rgba(113,113,122,0.3)',
+            background:'rgba(113,113,122,0.08)', color:'var(--text-3)',
+            fontSize:12, fontWeight:700, cursor:'pointer',
+            display:'flex', alignItems:'center', gap:5,
+          }}>
+            🚫 Bloquear franja
+          </button>
+        </div>
+
         <VistaDia />
       </>)}
 
@@ -853,7 +930,7 @@ export default function SalonAgenda() {
               </span>
             )}
             <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:8, background:`${col}20`, color:col }}>
-              {citasDia.length} cita{citasDia.length !== 1 ? 's' : ''}
+              {citasDia.filter(c => !c.notas?.startsWith('__bloqueo__')).length} cita{citasDia.filter(c => !c.notas?.startsWith('__bloqueo__')).length !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -862,7 +939,7 @@ export default function SalonAgenda() {
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[1,2,3].map(i => <div key={i} className="sp-skeleton" style={{ height:74, borderRadius:14 }} />)}
           </div>
-        ) : citasDia.length === 0 ? (
+        ) : citasDia.filter(c => !c.notas?.startsWith('__bloqueo__')).length === 0 ? (
           <div className="sp-empty">
             <span className="sp-empty-icon">📅</span>
             <p className="sp-empty-title">Sin citas</p>
@@ -870,7 +947,7 @@ export default function SalonAgenda() {
           </div>
         ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {citasDia.map(c => (
+            {citasDia.filter(c => !c.notas?.startsWith('__bloqueo__')).map(c => (
               <button key={c.id} onClick={() => setSelCita(c)} style={{
                 padding:'14px 16px', borderRadius:14, width:'100%', textAlign:'left',
                 background:`linear-gradient(135deg,${ESTADO_COLOR[c.estado] || col}10,var(--card))`,
@@ -911,7 +988,45 @@ export default function SalonAgenda() {
       </>)}
 
       {/* ── Sheet detalle + cambio de estado ── */}
-      {selCita && (
+      {selCita && selCita.notas?.startsWith('__bloqueo__') && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setSelCita(null)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <p className="sp-sheet-title" style={{ margin:0 }}>Franja bloqueada</p>
+              <button onClick={() => setSelCita(null)} style={{ width:30, height:30, borderRadius:8, border:'none', background:'rgba(255,255,255,0.08)', color:'var(--text-3)', cursor:'pointer', fontSize:18, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
+              <div style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)' }}>
+                <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:2 }}>Profesional</div>
+                <div style={{ fontWeight:700, color:'var(--text)' }}>{selCita.profesionales?.nombre || '—'}</div>
+              </div>
+              <div style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)' }}>
+                <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:2 }}>Horario</div>
+                <div style={{ fontWeight:700, color:'var(--text)' }}>
+                  {selCita.fecha_inicio.substring(11,16)} – {selCita.fecha_fin?.substring(11,16) || '—'}
+                </div>
+              </div>
+              {selCita.notas.slice(11) && (
+                <div style={{ padding:'12px 14px', borderRadius:12, background:'var(--card)' }}>
+                  <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:2 }}>Motivo</div>
+                  <div style={{ fontWeight:600, color:'var(--text)' }}>{selCita.notas.slice(11)}</div>
+                </div>
+              )}
+            </div>
+            <button onClick={eliminarBloqueo} disabled={actualizando} style={{
+              width:'100%', padding:'14px', borderRadius:13, cursor:'pointer', border:'none',
+              background:'rgba(239,68,68,0.1)', color:'#ef4444',
+              fontWeight:700, fontSize:14, opacity: actualizando ? 0.6 : 1,
+            }}>
+              {actualizando ? '…' : '🗑 Eliminar bloqueo'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {selCita && !selCita.notas?.startsWith('__bloqueo__') && (
         <>
           <div className="sp-sheet-overlay" onClick={() => setSelCita(null)} />
           <div className="sp-sheet">
@@ -1240,6 +1355,57 @@ export default function SalonAgenda() {
                 )}
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* ── Modal: bloquear franja horaria ── */}
+      {bloqueoModal && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setBloqueoModal(false)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <p className="sp-sheet-title" style={{ margin:0 }}>Bloquear franja</p>
+              <button onClick={() => setBloqueoModal(false)} style={{ width:30, height:30, borderRadius:8, border:'none', background:'rgba(255,255,255,0.08)', color:'var(--text-3)', cursor:'pointer', fontSize:18, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+            </div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', display:'block', marginBottom:6 }}>
+                Profesional
+              </label>
+              <select value={bloqueoProf} onChange={e => setBloqueoProf(e.target.value)} className="sp-input" style={{ fontSize:14 }}>
+                {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display:'flex', gap:10, marginBottom:14 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', display:'block', marginBottom:6 }}>Desde</label>
+                <input type="time" value={bloqueoHIni} onChange={e => setBloqueoHIni(e.target.value)} className="sp-input" />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', display:'block', marginBottom:6 }}>Hasta</label>
+                <input type="time" value={bloqueoHFin} onChange={e => setBloqueoHFin(e.target.value)} className="sp-input" />
+              </div>
+            </div>
+
+            <div style={{ marginBottom:22 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, textTransform:'uppercase', display:'block', marginBottom:6 }}>
+                Motivo (opcional)
+              </label>
+              <input type="text" value={bloqueoNote} onChange={e => setBloqueoNote(e.target.value)}
+                placeholder="Ej: Almuerzo, Reunión, Capacitación…" className="sp-input" />
+            </div>
+
+            <button onClick={crearBloqueo} disabled={!bloqueoProf || guardandoBlq} style={{
+              width:'100%', padding:'14px', borderRadius:13, border:'none', cursor:'pointer',
+              background:'rgba(113,113,122,0.15)', color:'var(--text)',
+              fontWeight:700, fontSize:14,
+              opacity: (!bloqueoProf || guardandoBlq) ? 0.6 : 1,
+            }}>
+              {guardandoBlq ? '…' : '🚫 Confirmar bloqueo'}
+            </button>
           </div>
         </>
       )}
