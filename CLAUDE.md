@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-19 (sesión 21)
-> **Versión actual en producción: v1.4-dev** (commit b4841bd)
+> Actualizado: 2026-05-19 (sesión 22)
+> **Versión actual en producción: v1.4-dev** (commit e2af217)
 
 ---
 
@@ -52,7 +52,7 @@ Toda query SIEMPRE lleva `.eq('tenant_id', tenant.id)`. Sin excepción. El `tena
 | Agenda Mes / Semana / Día | SalonAgenda.jsx | Toggle 3 vistas, grid por profesional, bloques con color de profesional + candado 🔒 en completadas, STAR/VIP badge, nota auto-save, pago inline |
 | Nueva cita (5 pasos) | SalonNuevaCita.jsx | Horarios, slots, anti-solapamiento, WA confirmación al crear |
 | Portal público | SalonPortal.jsx | Reservas online, precios dinámicos, lista de espera, WA confirmación |
-| Servicios CRUD | SalonServicios.jsx | 4 tabs: Detalles, Precio (base+oferta+duración), Equipo (profesionales asignados), Recordatorio (template WA con preview) |
+| Servicios CRUD | SalonServicios.jsx | 6 tabs: Detalles, Precio (base+oferta+duración), Equipo (profesionales asignados), **Sedes** (asignar a sucursales), Productos (insumos+cantidades), Recordatorio (template WA con preview). Paquetes combos con % OFF. Botón duplicar servicio. |
 | Equipo CRUD + horarios táctiles + calendario excepciones | SalonEquipo.jsx | HorarioGrid drag-to-select, MiniCalendar visual para excepciones por fecha (verde=especial, rojo=ausente). Fix: props ImageUploader corregidas, try/catch en guardar(), color picker |
 | Mensajería WA | SalonMensajeria.jsx | Lista clientes con filtros (todos/mayorista/cumpleaños/sin visita 30d), 6 plantillas con sustitución {{nombre}}/{{negocio}}, wa.me links directos |
 | HorarioGrid (componente reutilizable) | components/HorarioGrid.jsx | Drag-to-select táctil, pointer capture, exports: rangeToSlots, slotsToRange, slotsToFranjas |
@@ -666,6 +666,27 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | Dashboard: stat 🌐 N Portal en hero stats | sin SQL | ✅ Aparece solo cuando hay citas de portal hoy |
 
 **SQL aplicado:** v77_portal_cancelacion.sql ✅ — columna `fuente` en citas + RPC `cancelar_cita_portal`
+
+## Bloque AG — COMPLETADO (sesión 22 — 2026-05-19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Servicios: tab **Sedes** (6° tab) — asignar servicio a sucursales específicas | v78 ⏳ aplicar | ✅ DONE — `sedes_ids UUID[]` en form + toggle visual + null=todas las sedes |
+
+**SQL pendiente aplicar en Supabase:** `sql/v78_servicio_sedes.sql`
+```sql
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS sedes_ids UUID[];
+CREATE INDEX IF NOT EXISTS idx_servicios_sedes ON servicios USING GIN(sedes_ids);
+```
+
+## Próximos pasos sugeridos
+
+| Prioridad | Feature | Tiempo |
+| --------- | ------- | ------ |
+| 🔴 Alta | Deploy edge functions WA: `cumpleanos-clientes` + `resumen-diario` | 5 min |
+| 🔴 Alta | Aplicar v78 en Supabase (SQL Editor) | 2 min |
+| 🟡 Media | Mobile Sprint 5: verificar bottom nav y sidebar colapsable | — |
+| 🟡 Media | POS Facturatech / DIAN — docs en `NEGOCIO/Rest deleite MAR/Facturatech/` | — |
 
 ## Bloque AE — COMPLETADO (sesión 21 — 2026-05-19)
 
