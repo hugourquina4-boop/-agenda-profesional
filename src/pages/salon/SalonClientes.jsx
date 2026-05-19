@@ -104,6 +104,9 @@ export default function SalonClientes() {
   const [puntosForm,   setPuntosForm]   = useState({ tipo:'ganados', puntos:'', motivo:'' })
   const [savingPts,    setSavingPts]    = useState(false)
 
+  // Próxima cita
+  const [proximaCita,   setProximaCita]   = useState(null)
+
   // Préstamos
   const [prestamos,     setPrestamos]     = useState([])
   const [loadPrest,     setLoadPrest]     = useState(false)
@@ -497,7 +500,8 @@ export default function SalonClientes() {
     setFotos([])
     setPrestamos([])
     setLoadHist(true)
-    const [{ data: hist }, { data: sp }] = await Promise.all([
+    setProximaCita(null)
+    const [{ data: hist }, { data: sp }, { data: prox }] = await Promise.all([
       supabase.from('citas')
         .select('id, fecha_inicio, estado, precio_cobrado, servicios(nombre, precio), profesionales(nombre)')
         .eq('cliente_id', cli.id)
@@ -509,9 +513,19 @@ export default function SalonClientes() {
         .eq('tenant_id', tenant.id)
         .eq('cliente_id', cli.id)
         .maybeSingle(),
+      supabase.from('citas')
+        .select('fecha_inicio, servicios(nombre), profesionales(nombre)')
+        .eq('cliente_id', cli.id)
+        .eq('tenant_id', tenant.id)
+        .neq('estado', 'cancelada')
+        .gte('fecha_inicio', new Date().toISOString())
+        .order('fecha_inicio')
+        .limit(1)
+        .maybeSingle(),
     ])
     setHistorial(hist || [])
     setSaldo(sp || null)
+    setProximaCita(prox || null)
     setLoadHist(false)
     cargarFotos(cli.id)
   }
@@ -1005,6 +1019,26 @@ export default function SalonClientes() {
                 )
               })}
             </div>
+
+            {proximaCita && (
+              <div style={{
+                display:'flex', alignItems:'center', gap:8, marginBottom:14,
+                padding:'10px 14px', borderRadius:12,
+                background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.25)',
+              }}>
+                <span style={{ fontSize:16 }}>📅</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:11, color:'#818cf8', fontWeight:700, letterSpacing:0.5, textTransform:'uppercase' }}>Próxima visita</div>
+                  <div style={{ fontSize:13, color:'var(--text)', fontWeight:600, marginTop:2 }}>
+                    {new Date(proximaCita.fecha_inicio).toLocaleDateString('es-CO', { weekday:'short', day:'numeric', month:'short' })}
+                    {' · '}
+                    {new Date(proximaCita.fecha_inicio).toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })}
+                    {proximaCita.servicios?.nombre ? ` · ${proximaCita.servicios.nombre}` : ''}
+                    {proximaCita.profesionales?.nombre ? ` con ${proximaCita.profesionales.nombre}` : ''}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {sel.num_visitas >= 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
