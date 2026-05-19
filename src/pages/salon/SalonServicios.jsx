@@ -28,6 +28,7 @@ export default function SalonServicios() {
 
   const [servicios,    setServicios]    = useState([])
   const [profesionales,setProfesionales]= useState([])
+  const [sedes,        setSedes]        = useState([])
   const [productos,    setProductos]    = useState([])
   const [loading,      setLoading]      = useState(true)
   const [sel,          setSel]          = useState(null)
@@ -64,15 +65,17 @@ export default function SalonServicios() {
     setLoading(true)
     const mesInicio = new Date(); mesInicio.setDate(1); mesInicio.setHours(0,0,0,0)
     const mesFin = new Date(mesInicio.getFullYear(), mesInicio.getMonth() + 1, 1)
-    const [{ data: servs }, { data: profs }, { data: prods }, { data: citasData }] = await Promise.all([
+    const [{ data: servs }, { data: profs }, { data: sedesData }, { data: prods }, { data: citasData }] = await Promise.all([
       supabase.from('servicios').select('*').eq('tenant_id', tenant.id).order('categoria').order('nombre'),
       supabase.from('profesionales').select('id,nombre,color').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+      supabase.from('sedes').select('id,nombre,principal').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
       supabase.from('productos_salon').select('id,nombre,categoria').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
       supabase.from('citas').select('servicio_id').eq('tenant_id', tenant.id)
         .neq('estado', 'cancelada').gte('fecha_inicio', mesInicio.toISOString()).lt('fecha_inicio', mesFin.toISOString()),
     ])
     setServicios(servs || [])
     setProfesionales(profs || [])
+    setSedes(sedesData || [])
     setProductos(prods || [])
     const cMap = {}
     ;(citasData || []).forEach(c => { if (c.servicio_id) cMap[c.servicio_id] = (cMap[c.servicio_id] || 0) + 1 })
@@ -196,6 +199,7 @@ export default function SalonServicios() {
       recordatorio_texto: serv.recordatorio_texto || RECORD_DEFAULT,
       profesionales_ids:  serv.profesionales_ids || [],
       productos_ids:      serv.productos_ids || [],
+      sedes_ids:          serv.sedes_ids || [],
     })
     setNuevo(false)
     setElimConfirm(false)
@@ -208,7 +212,7 @@ export default function SalonServicios() {
       nombre:'', categoria:'', precio:'', precio_oferta:'',
       duracion_min:30, descripcion:'', activo:true,
       recordatorio_texto: RECORD_DEFAULT,
-      profesionales_ids: [], productos_ids: [],
+      profesionales_ids: [], productos_ids: [], sedes_ids: [],
     })
     setNuevo(true)
     setElimConfirm(false)
@@ -218,6 +222,13 @@ export default function SalonServicios() {
     setForm(f => {
       const ids = f.profesionales_ids || []
       return { ...f, profesionales_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
+    })
+  }
+
+  function toggleSede(id) {
+    setForm(f => {
+      const ids = f.sedes_ids || []
+      return { ...f, sedes_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
     })
   }
 
@@ -247,6 +258,7 @@ export default function SalonServicios() {
       recordatorio_texto: form.recordatorio_texto || null,
       profesionales_ids:  form.profesionales_ids?.length ? form.profesionales_ids : null,
       productos_ids:      form.productos_ids?.length ? form.productos_ids : null,
+      sedes_ids:          form.sedes_ids?.length ? form.sedes_ids : null,
     }
     const { data: savedData, error } = nuevo
       ? await supabase.from('servicios').insert({ ...payload, tenant_id: tenant.id }).select('id').single()
@@ -290,6 +302,7 @@ export default function SalonServicios() {
     { key:'detalles',     label:'Detalles' },
     { key:'precio',       label:'Precio' },
     { key:'especialistas',label:'Equipo' },
+    { key:'sedes',        label:'Sedes' },
     { key:'productos',    label:'Productos' },
     { key:'recordatorio', label:'Recordatorio' },
   ]
@@ -822,6 +835,79 @@ export default function SalonServicios() {
                   <button onClick={() => setForm(f => ({...f, profesionales_ids:[]}))}
                     style={{ marginTop:12, fontSize:12, color:'var(--text-3)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
                     Limpiar selección (permitir todos)
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ── Tab: Sedes ── */}
+            {tab === 'sedes' && (
+              <div>
+                <p style={{ fontSize:13, color:'var(--text-3)', marginBottom:16, lineHeight:1.5 }}>
+                  Selecciona en qué sedes se ofrece este servicio. Sin selección = disponible en todas.
+                </p>
+                {sedes.length === 0 ? (
+                  <div style={{ padding:'24px 16px', textAlign:'center', borderRadius:14,
+                    border:'1.5px dashed var(--border)', background:'var(--card)' }}>
+                    <div style={{ fontSize:28, marginBottom:8 }}>🏪</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text-2)', marginBottom:4 }}>Sin sedes configuradas</div>
+                    <div style={{ fontSize:12, color:'var(--text-3)' }}>
+                      Agrega sedes desde el módulo <b>Sedes</b> en el menú lateral.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {sedes.map(sede => {
+                      const activa = (form.sedes_ids || []).includes(sede.id)
+                      return (
+                        <button key={sede.id} onClick={() => toggleSede(sede.id)} style={{
+                          display:'flex', alignItems:'center', gap:12,
+                          padding:'13px 14px', borderRadius:14, width:'100%', textAlign:'left',
+                          background: activa ? `${col}10` : 'var(--card)',
+                          border:`1.5px solid ${activa ? col : 'var(--border)'}`,
+                          cursor:'pointer', transition:'all 0.12s',
+                        }}>
+                          <div style={{
+                            width:34, height:34, borderRadius:10,
+                            background: activa ? `${col}22` : 'var(--bg)',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            fontSize:16, flexShrink:0,
+                          }}>
+                            🏪
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>
+                              {sede.nombre}
+                              {sede.principal && (
+                                <span style={{ marginLeft:6, fontSize:10, fontWeight:700, padding:'2px 6px',
+                                  borderRadius:5, background:'rgba(99,102,241,0.15)', color:'#6366f1' }}>
+                                  Principal
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{
+                            width:22, height:22, borderRadius:6, flexShrink:0,
+                            background: activa ? col : 'var(--card)',
+                            border:`1.5px solid ${activa ? col : 'var(--border)'}`,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                          }}>
+                            {activa && (
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
+                                stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {sedes.length > 0 && (form.sedes_ids?.length > 0) && (
+                  <button onClick={() => setForm(f => ({...f, sedes_ids:[]}))}
+                    style={{ marginTop:12, fontSize:12, color:'var(--text-3)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
+                    Limpiar selección (disponible en todas)
                   </button>
                 )}
               </div>
