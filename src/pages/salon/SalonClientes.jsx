@@ -1051,6 +1051,22 @@ export default function SalonClientes() {
                     {proximaCita.profesionales?.nombre ? ` con ${proximaCita.profesionales.nombre}` : ''}
                   </div>
                 </div>
+                {sel.telefono && (() => {
+                  const tel = sel.telefono.replace(/\D/g, '')
+                  const fecha = new Date(proximaCita.fecha_inicio).toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
+                  const hora  = new Date(proximaCita.fecha_inicio).toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })
+                  const serv  = proximaCita.servicios?.nombre || 'tu cita'
+                  const msg   = encodeURIComponent(`Hola ${sel.nombre} 👋 Te recordamos que tienes ${serv} el ${fecha} a las ${hora} en ${tenant?.nombre || 'el salón'}. ¡Te esperamos! 💇`)
+                  return (
+                    <a href={`https://wa.me/${tel}?text=${msg}`} target="_blank" rel="noreferrer" style={{
+                      padding:'6px 10px', borderRadius:8, background:'#25d366',
+                      color:'#fff', fontSize:11, fontWeight:700, textDecoration:'none',
+                      display:'flex', alignItems:'center', gap:4, flexShrink:0,
+                    }}>
+                      📲 WA
+                    </a>
+                  )
+                })()}
               </div>
             )}
 

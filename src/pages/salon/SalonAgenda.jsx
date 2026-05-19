@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
+import SalonNuevaCita from './SalonNuevaCita'
 
 function Ico({ d, size = 18 }) {
   return (
@@ -109,6 +110,9 @@ export default function SalonAgenda() {
   // Drag & drop en VistaSemana (mover cita a otro día)
   const [semDragOver, setSemDragOver] = useState(null) // iso del día hover
   const [moviendo,    setMoviendo]    = useState(false)
+
+  // Quick-add: click en slot vacío → NuevaCita pre-llenada
+  const [quickCitaPre, setQuickCitaPre] = useState(null)
 
   useEffect(() => {
     if (!tenant) return
@@ -681,6 +685,25 @@ export default function SalonAgenda() {
                 boxShadow:`0 4px 20px ${ghostPos.color}30`,
               }} />
             )}
+
+            {/* Click zones: tap en slot vacío → nueva cita */}
+            {PROFS.map((prof, pi) => (
+              <div key={`zone-${prof.id || pi}`}
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const yOff = e.clientY - rect.top
+                  const totalMins = H_START * 60 + Math.floor(yOff / SLOT_H) * 30
+                  const hh = Math.floor(totalMins / 60)
+                  const mm = totalMins % 60
+                  setQuickCitaPre({ profId: prof.id, fecha: selDay, hora: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}` })
+                }}
+                style={{
+                  position:'absolute', top:0,
+                  left: 56 + pi * COL_W, width: COL_W, height: TOTAL_H,
+                  cursor:'cell',
+                }}
+              />
+            ))}
 
             {/* Bloques de citas */}
             {PROFS.map((prof, pi) => {
@@ -1723,6 +1746,15 @@ export default function SalonAgenda() {
             </button>
           </div>
         </>
+      )}
+
+      {quickCitaPre && (
+        <SalonNuevaCita
+          onClose={() => setQuickCitaPre(null)}
+          onCreada={() => { setQuickCitaPre(null); cargarMes() }}
+          profPreId={quickCitaPre.profId}
+          fechaPre={quickCitaPre.fecha}
+        />
       )}
     </div>
   )
