@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-18 (sesión 18 — cont.)
-> **Versión actual en producción: v1.4-dev** (commit 670c065)
+> Actualizado: 2026-05-19 (sesión 19)
+> **Versión actual en producción: v1.4-dev** (commit f965517)
 
 ---
 
@@ -619,6 +619,30 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 
 - `v75_puntos_config.sql` — ADD COLUMN puntos_por_visita + puntos_canje_min en tenants
 - `v76_cliente_fuente.sql` — ADD COLUMN fuente_captacion en clientes_agenda
+
+## Bloque AA — COMPLETADO (sesión 19 — 2026-05-19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| NuevaCita: textarea "Notas internas" en paso 3 | sin SQL | ✅ DONE |
+| Portal público: campo "Notas para el salón" en paso datos | sin SQL | ✅ DONE |
+
+## Bloque AB — COMPLETADO (sesión 19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Config: sección "Objetivos del mes" — meta_ingresos_mes en config_vertical | sin SQL | ✅ DONE |
+| Caja: barra progreso meta del mes (solo periodo=mes) | sin SQL | ✅ DONE |
+| Dashboard: mini barra meta en sección ingresos del mes | sin SQL | ✅ DONE |
+
+## Bloque AC — COMPLETADO (sesión 19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Servicios: botón duplicar (copia) en cada fila | sin SQL | ✅ DONE |
+| Agenda VistaDia: duración en bloque de cita cuando alto ≥ 2 slots | sin SQL | ✅ DONE |
+| Dashboard: cumpleañeros próximos 7 días con días restantes + links WA diferenciados | sin SQL | ✅ DONE |
+| NuevaCita: badge ⚠ DIFÍCIL y VIP en búsqueda de cliente + nota de alerta visible | sin SQL | ✅ DONE |
 
 ---
 
