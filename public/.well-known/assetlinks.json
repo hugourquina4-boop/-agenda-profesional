@@ -2,9 +2,9 @@
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "com.salonpro.app",
+    "package_name": "co.salonpro.app",
     "sha256_cert_fingerprints": [
-      "REEMPLAZAR_CON_FINGERPRINT_DE_PLAY_CONSOLE"
+      "REEMPLAZAR_CON_SHA256_DE_PWABUILDER"
     ]
   }
 }]

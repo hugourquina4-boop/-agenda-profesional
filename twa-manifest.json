@@ -1,0 +1,35 @@
+{
+  "packageId": "co.salonpro.app",
+  "host": "project-gnyy8.vercel.app",
+  "startUrl": "/salon",
+  "name": "Salón Pro",
+  "launcherName": "Salón Pro",
+  "display": "standalone",
+  "themeColor": "#1a1a1a",
+  "navigationColor": "#1a1a1a",
+  "backgroundColor": "#FAFAF8",
+  "enableNotifications": false,
+  "startUrlFallbackStrategy": "customTabs",
+  "orientation": "portrait",
+  "iconUrl": "https://project-gnyy8.vercel.app/logo512.png",
+  "maskableIconUrl": "https://project-gnyy8.vercel.app/logo512.png",
+  "monochromeIconUrl": "https://project-gnyy8.vercel.app/logo512.png",
+  "minSdkVersion": 23,
+  "targetSdkVersion": 34,
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Nueva cita",
+      "shortName": "Nueva cita",
+      "url": "/salon?pagina=agenda",
+      "icons": [{ "src": "https://project-gnyy8.vercel.app/logo192.png", "sizes": "192x192" }]
+    }
+  ],
+  "splashScreenFadeOutDuration": 300,
+  "enableSiteSettingsShortcut": false,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://project-gnyy8.vercel.app/salon",
+  "fingerprints": []
+}
