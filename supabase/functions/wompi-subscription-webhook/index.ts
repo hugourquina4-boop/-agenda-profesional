@@ -19,12 +19,19 @@ const MESES_POR_PLAN: Record<string, number> = {
 }
 
 // Verifica la firma de integridad de Wompi
-// Wompi firma: SHA-256(id + status + amount_in_cents + currency + events_secret)
+// Wompi firma: SHA-256(concat(signature.properties values from data.transaction) + integrity_secret)
 async function verificarFirma(body: Record<string, unknown>, checksum: string): Promise<boolean> {
-  if (!EVENTS_SECRET) return true // desactivado si no hay secret configurado
+  if (!EVENTS_SECRET) return true // sin secret configurado → skip (solo para desarrollo)
+  const sig = body.signature as Record<string, unknown> | undefined
+  const properties = sig?.properties as string[] | undefined
   const txn = (body.data as Record<string, unknown>)?.transaction as Record<string, unknown>
-  if (!txn) return false
-  const cadena = `${txn.id}${txn.status}${txn.amount_in_cents}${txn.currency}${EVENTS_SECRET}`
+  if (!txn || !properties?.length) return false
+  // Concatenar valores en el orden que Wompi los envía en signature.properties
+  const valores = properties.map(p => {
+    const key = p.replace('transaction.', '')
+    return String(txn[key] ?? '')
+  })
+  const cadena = valores.join('') + EVENTS_SECRET
   const encoded = new TextEncoder().encode(cadena)
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
   const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
