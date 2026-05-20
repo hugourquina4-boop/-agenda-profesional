@@ -4,6 +4,9 @@ import { useTenant } from '../../context/TenantContext'
 import { supabase } from '../../lib/supabase'
 import SalonLogin from './SalonLogin'
 import ErrorBoundary from '../../components/ErrorBoundary'
+import Toaster from '../../components/Toaster'
+import PWAInstallPrompt from '../../components/PWAInstallPrompt'
+import { ToastProvider } from '../../context/ToastContext'
 import '../../salon.css'
 
 const SalonDashboard  = lazy(() => import('./SalonDashboard'))
@@ -544,7 +547,7 @@ function GlobalSearch({ tenant, col, onNavigate, onClose }) {
   )
 }
 
-export default function SalonApp() {
+function SalonApp() {
   const { user, tenant, loading, recargar, todosTenants, seleccionarTenant, esSuperadmin, passwordRecovery, tieneAcceso, suscripcion, rol } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
   const [page,          setPage]          = useState('hoy')
@@ -666,6 +669,17 @@ export default function SalonApp() {
           onClose={() => setSearchOpen(false)}
         />
       )}
+
+      <Toaster />
+      <PWAInstallPrompt />
     </SalonLayout>
+  )
+}
+
+export default function SalonAppWithProviders(props) {
+  return (
+    <ToastProvider>
+      <SalonApp {...props} />
+    </ToastProvider>
   )
 }

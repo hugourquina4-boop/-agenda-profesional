@@ -1,18 +1,35 @@
 {
+  "id": "/salon",
   "name": "Salón Pro",
   "short_name": "Salón Pro",
-  "description": "Gestión profesional para tu salón de belleza",
+  "description": "Gestión profesional para salones de belleza y barberías",
   "start_url": "/salon",
+  "scope": "/salon",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1a7a7a",
+  "background_color": "#0f0f10",
+  "theme_color": "#f43f5e",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "/salon-icon.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any maskable" },
-    { "src": "/logo192.png",    "sizes": "192x192", "type": "image/png",  "purpose": "any" },
-    { "src": "/logo512.png",    "sizes": "512x512", "type": "image/png",  "purpose": "any" },
-    { "src": "/favicon.svg",    "sizes": "any",     "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/logo192.png", "sizes": "192x192", "type": "image/png",     "purpose": "any" },
+    { "src": "/logo512.png", "sizes": "512x512", "type": "image/png",     "purpose": "maskable" },
+    { "src": "/logo512.png", "sizes": "512x512", "type": "image/png",     "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any",     "type": "image/svg+xml", "purpose": "any" }
   ],
   "categories": ["business", "productivity"],
-  "lang": "es-CO"
+  "lang": "es",
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "Nueva cita",
+      "short_name": "Nueva cita",
+      "url": "/salon?pagina=agenda",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ver clientes",
+      "short_name": "Clientes",
+      "url": "/salon?pagina=clientes",
+      "icons": [{ "src": "/logo192.png", "sizes": "192x192" }]
+    }
+  ]
 }
