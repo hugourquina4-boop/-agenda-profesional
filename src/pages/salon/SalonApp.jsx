@@ -23,12 +23,70 @@ const SalonSuperadmin = lazy(() => import('./SalonSuperadmin'))
 const SalonMensajeria  = lazy(() => import('./SalonMensajeria'))
 const SalonProveedores = lazy(() => import('./SalonProveedores'))
 const SalonSedes       = lazy(() => import('./SalonSedes'))
+const SalonBoveda      = lazy(() => import('./SalonBoveda'))
 
 function PageLoader() {
   return (
     <div style={{ display:'flex', justifyContent:'center', padding:'60px 0' }}>
       <div className="sp-spinner" />
     </div>
+  )
+}
+
+function SplashScreen() {
+  return (
+    <>
+      <style>{`
+        @keyframes sp-boot-logo {
+          0%   { opacity:0; transform:scale(0.58) translateY(14px); }
+          65%  { opacity:1; transform:scale(1.05) translateY(0); }
+          100% { opacity:1; transform:scale(1)    translateY(0); }
+        }
+        @keyframes sp-boot-text {
+          from { opacity:0; transform:translateY(10px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes sp-boot-dot {
+          0%, 100% { opacity:0.25; transform:scale(0.75); }
+          50%      { opacity:1;   transform:scale(1); }
+        }
+      `}</style>
+      <div style={{
+        minHeight:'100dvh', background:'var(--bg)',
+        display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center',
+        padding:'max(40px, env(safe-area-inset-top)) 40px max(40px, env(safe-area-inset-bottom))',
+      }}>
+        <img
+          src="/logo192.png" alt="Salón Pro"
+          style={{
+            width:100, height:100, borderRadius:28,
+            objectFit:'contain',
+            animation:'sp-boot-logo 0.6s cubic-bezier(0.34,1.56,0.64,1) both',
+            boxShadow:'0 10px 40px rgba(0,0,0,0.14)',
+          }}
+        />
+        <div style={{
+          fontFamily:'Outfit, sans-serif', fontWeight:900, fontSize:28,
+          color:'var(--text)', letterSpacing:'-0.5px', marginTop:20,
+          animation:'sp-boot-text 0.45s ease-out 0.28s both',
+        }}>
+          Salón <span style={{ color:'var(--accent, #f43f5e)' }}>Pro</span>
+        </div>
+        <div style={{
+          display:'flex', gap:7, marginTop:52,
+          animation:'sp-boot-text 0.4s ease-out 0.5s both',
+        }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width:7, height:7, borderRadius:'50%',
+              background:'var(--text-3, #888)',
+              animation:`sp-boot-dot 1.2s ease-in-out ${i*0.22}s infinite`,
+            }} />
+          ))}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -521,7 +579,7 @@ export default function SalonApp() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  if (loading) return <PageLoader />
+  if (loading) return <SplashScreen />
 
   // Recovery mode — usuario llegó desde el email de recuperación
   if (passwordRecovery) return <SetNewPassword />
@@ -563,6 +621,7 @@ export default function SalonApp() {
       case 'mensajeria':   return <SalonMensajeria />
       case 'proveedores':  return <SalonProveedores />
       case 'sedes':        return <SalonSedes />
+      case 'boveda':       return <SalonBoveda />
       case 'accesos':    return <SalonAccesos />
       case 'config':     return <SalonConfig />
       case 'superadmin': return (
