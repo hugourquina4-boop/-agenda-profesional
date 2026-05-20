@@ -618,20 +618,24 @@ export default function SalonAgenda() {
                         onPointerMove={e => semPointerMove(e, c)}
                         onPointerUp={e => semPointerUp(e, c)}
                         style={{ position:'absolute', top, left:2, right:2,
-                          height: Math.max(18, height - 2), borderRadius:5,
-                          background: cancelada ? 'rgba(113,113,122,0.10)' : `${clr}1a`,
-                          border:`1px solid ${cancelada ? '#71717a44' : clr+'55'}`,
-                          borderLeft:`3px solid ${cancelada ? '#71717a' : clr}`,
-                          padding:'2px 4px', cursor: cancelada ? 'pointer' : 'grab',
+                          height: Math.max(18, height - 2), borderRadius:8,
+                          background: cancelada
+                            ? 'rgba(113,113,122,0.08)'
+                            : `linear-gradient(150deg, ${clr}38 0%, ${clr}16 100%)`,
+                          border:`1px solid ${cancelada ? 'rgba(113,113,122,0.18)' : clr+'48'}`,
+                          boxShadow: cancelada ? 'none' : `0 2px 6px ${clr}18`,
+                          padding:'3px 5px', cursor: cancelada ? 'pointer' : 'grab',
                           textAlign:'left', overflow:'hidden', zIndex:2,
                           touchAction:'none', userSelect:'none',
-                          opacity: isDraggingThis ? 0.25 : cancelada ? 0.6 : 1 }}
+                          opacity: isDraggingThis ? 0.2 : cancelada ? 0.5 : 1 }}
                       >
-                        <div style={{ fontSize:9, fontWeight:800, color:clr, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                        <div style={{ fontSize:9, fontWeight:800, color: cancelada ? '#71717a' : clr,
+                          lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                           {fmtHora(c.fecha_inicio)}
                         </div>
                         {height > SLOT_SEM && (
-                          <div style={{ fontSize:9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.2 }}>
+                          <div style={{ fontSize:9, fontWeight:700, color:'var(--text)',
+                            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.2 }}>
                             {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
                           </div>
                         )}
@@ -852,16 +856,16 @@ export default function SalonAgenda() {
                     position:'absolute',
                     top, left: 56 + pi * COL_W + 3,
                     width: COL_W - 6, height: height - 2,
-                    borderRadius:8, cursor:'pointer',
-                    background:'repeating-linear-gradient(45deg,rgba(113,113,122,0.12),rgba(113,113,122,0.12) 4px,rgba(113,113,122,0.04) 4px,rgba(113,113,122,0.04) 10px)',
-                    border:'1.5px solid rgba(113,113,122,0.3)',
-                    borderLeft:'3px solid #71717a',
-                    padding:'4px 7px', overflow:'hidden',
-                    userSelect:'none',
+                    borderRadius:10, cursor:'pointer',
+                    background:'repeating-linear-gradient(135deg,rgba(113,113,122,0.07),rgba(113,113,122,0.07) 4px,transparent 4px,transparent 10px)',
+                    border:'1px solid rgba(113,113,122,0.22)',
+                    padding:'5px 7px', overflow:'hidden', userSelect:'none',
                   }}>
-                    <div style={{ fontSize:10, fontWeight:800, color:'#71717a' }}>🚫 Bloqueado</div>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', display:'flex', alignItems:'center', gap:3 }}>
+                      <span style={{ fontSize:9 }}>⊘</span> Bloqueado
+                    </div>
                     {motiBloqueo && height > SLOT_H && (
-                      <div style={{ fontSize:10, color:'#71717a80', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      <div style={{ fontSize:10, color:'#9ca3af80', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:2 }}>
                         {motiBloqueo}
                       </div>
                     )}
@@ -873,14 +877,15 @@ export default function SalonAgenda() {
                     position:'absolute',
                     top, left: 56 + pi * COL_W + 3,
                     width: COL_W - 6, height: height - 2,
-                    borderRadius:8,
+                    borderRadius:10,
                     cursor: cancelada || c.estado === 'completada' ? 'pointer' : 'grab',
-                    background: cancelada ? 'rgba(113,113,122,0.10)' : `${profClr}18`,
-                    border:`1.5px solid ${cancelada ? '#71717a44' : profClr + '60'}`,
-                    borderLeft:`3px solid ${cancelada ? '#71717a' : profClr}`,
-                    padding:'4px 7px', overflow:'hidden',
-                    boxShadow:`0 1px 4px ${profClr}20`,
-                    opacity: isDragged ? 0.2 : cancelada ? 0.6 : 1,
+                    background: cancelada
+                      ? 'rgba(113,113,122,0.07)'
+                      : `linear-gradient(150deg, ${profClr}35 0%, ${profClr}14 100%)`,
+                    border:`1px solid ${cancelada ? 'rgba(113,113,122,0.18)' : profClr + '42'}`,
+                    boxShadow: cancelada ? 'none' : `0 2px 8px ${profClr}1e, inset 0 1px 0 rgba(255,255,255,0.25)`,
+                    padding:'5px 8px', overflow:'hidden',
+                    opacity: isDragged ? 0.18 : cancelada ? 0.5 : 1,
                     userSelect:'none', touchAction:'none', zIndex:2,
                   }}
                   onClick={e => e.stopPropagation()}
@@ -923,44 +928,75 @@ export default function SalonAgenda() {
                     cargarMes()
                   }}
                   >
-                    <div style={{ position:'absolute', top:5, right:5,
-                      width:7, height:7, borderRadius:'50%', background:estColor }} />
+                    {/* Indicador de estado — dot top-right */}
+                    <div style={{
+                      position:'absolute', top:6, right:6,
+                      width:6, height:6, borderRadius:'50%',
+                      background: estColor,
+                      boxShadow:`0 0 0 2px ${estColor}30`,
+                    }} />
                     {tieneConflicto && (
-                      <div style={{ position:'absolute', top:3, left:4, fontSize:9, lineHeight:1 }} title="Solapamiento de horario">⚠️</div>
+                      <div style={{ position:'absolute', top:4, right:16, fontSize:9 }} title="Solapamiento">⚠️</div>
                     )}
-                    {c.estado === 'completada' && (
-                      <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, opacity:0.7 }}>🔒</div>
+
+                    {/* Hora */}
+                    <div style={{ fontSize:10, fontWeight:700,
+                      color: cancelada ? '#9ca3af' : profClr,
+                      lineHeight:1.2, marginBottom:1,
+                      paddingRight:14, /* evitar solapamiento con dot */
+                    }}>
+                      {fmtHora(c.fecha_inicio)}
+                      {isStar && <span style={{ marginLeft:3, fontSize:8, opacity:0.8 }}>★</span>}
+                      {(c.clientes_agenda?.num_visitas ?? 1) <= 1 && <span style={{ marginLeft:2, fontSize:8, opacity:0.7 }}>·1ª</span>}
+                    </div>
+
+                    {/* Nombre cliente */}
+                    <div style={{ fontSize:12, fontWeight:700,
+                      color: cancelada ? '#9ca3af' : 'var(--text)',
+                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                      lineHeight:1.25,
+                    }}>
+                      {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
+                    </div>
+
+                    {/* Servicio */}
+                    {height > SLOT_H && (
+                      <div style={{ fontSize:10, fontWeight:500,
+                        color: cancelada ? '#9ca3af80' : 'var(--text-3)',
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                        lineHeight:1.2, marginTop:1,
+                      }}>
+                        {c.servicios?.nombre}
+                      </div>
                     )}
+                    {/* Duración + indicadores inferiores */}
+                    {height > SLOT_H * 2 && c.servicios?.duracion_min && (
+                      <div style={{ fontSize:9, color:'var(--text-3)', opacity:0.65, marginTop:1 }}>
+                        {c.servicios.duracion_min} min
+                      </div>
+                    )}
+
+                    {/* Retraso */}
                     {['pendiente','confirmada'].includes(c.estado) && nowOffset !== null && (() => {
                       const citaMins = parseInt(c.fecha_inicio.substring(11,13)) * 60 + parseInt(c.fecha_inicio.substring(14,16))
                       const espera = nowOffset - citaMins
                       if (espera <= 0) return null
                       return (
-                        <div style={{ position:'absolute', bottom:4, right:5, fontSize:9, fontWeight:700,
+                        <div style={{
+                          position:'absolute', bottom:4, right:6,
+                          fontSize:9, fontWeight:700,
                           color: espera > 15 ? '#ef4444' : '#f59e0b',
-                          background: espera > 15 ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
-                          borderRadius:4, padding:'1px 4px' }}>
-                          ⏱{espera}m
+                          background: espera > 15 ? 'rgba(239,68,68,0.13)' : 'rgba(245,158,11,0.13)',
+                          borderRadius:5, padding:'1px 4px',
+                        }}>
+                          {espera}m
                         </div>
                       )
                     })()}
-                    <div style={{ fontSize:10, fontWeight:800, color: cancelada ? '#71717a' : profClr, lineHeight:1.3 }}>
-                      {fmtHora(c.fecha_inicio)}{isStar ? ' ⭐' : ''}{(c.clientes_agenda?.num_visitas ?? 1) <= 1 ? ' ✨' : ''}
-                    </div>
-                    <div style={{ fontSize:11, fontWeight:600, color:'var(--text)',
-                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
-                    </div>
-                    {height > SLOT_H && (
-                      <div style={{ fontSize:10, color:'var(--text-3)',
-                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {c.servicios?.nombre}
-                      </div>
-                    )}
-                    {height > SLOT_H * 2 && c.servicios?.duracion_min && (
-                      <div style={{ fontSize:9, color:'var(--text-3)', opacity:0.7 }}>
-                        {c.servicios.duracion_min}min
-                      </div>
+
+                    {/* Completada — candado */}
+                    {c.estado === 'completada' && (
+                      <div style={{ position:'absolute', bottom:5, right:6, fontSize:9, opacity:0.5 }}>🔒</div>
                     )}
                   </div>
                 )
