@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTenant } from '../context/TenantContext'
 import { supabase } from '../lib/supabase'
 import '../salon.css'
@@ -60,13 +60,14 @@ const NAV_SISTEMA = [
   { key: 'accesos', label: 'Accesos'        },
   { key: 'config',  label: 'Configuración'  },
 ]
-const NAV_MOBILE = [
-  { key: 'hoy',      label: 'Inicio'   },
-  { key: 'agenda',   label: 'Agenda'   },
-  { key: '__fab__',  label: '', fab: true },
-  { key: 'clientes', label: 'Clientes' },
-  { key: '__mas__',  label: 'Más', mas: true },
-]
+// Tabs por rol — el FAB siempre en posición central (índice 2)
+const NAV_MOBILE_POR_ROL = {
+  admin:       ['hoy', 'agenda', '__fab__', 'caja',      '__mas__'],
+  superadmin:  ['hoy', 'agenda', '__fab__', 'caja',      '__mas__'],
+  contable:    ['hoy', 'caja',   '__fab__', 'analytics', '__mas__'],
+  recepcion:   ['hoy', 'agenda', '__fab__', 'clientes',  '__mas__'],
+  profesional: ['hoy', 'agenda', '__fab__', 'clientes',  '__mas__'],
+}
 const PAGE_LABEL = {
   hoy:'Inicio', agenda:'Agenda', clientes:'Clientes',
   equipo:'Equipo', servicios:'Servicios', caja:'Ingresos',
@@ -75,19 +76,41 @@ const PAGE_LABEL = {
 }
 
 export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, children }) {
-  const { tenant, esSuperadmin, tieneAcceso } = useTenant()
+  const { tenant, rol, esSuperadmin, tieneAcceso } = useTenant()
 
   const navPrincipal = NAV_PRINCIPAL.filter(i => tieneAcceso(i.key))
   const navNegocio   = NAV_NEGOCIO.filter(i => tieneAcceso(i.key))
   const navSistema   = NAV_SISTEMA.filter(i => tieneAcceso(i.key))
-  const navMobile    = NAV_MOBILE.filter(i => i.fab || i.mas || tieneAcceso(i.key))
-  const paginaEnMas  = [...navNegocio, ...navSistema, ...(esSuperadmin ? [{key:'superadmin'}] : [])].some(i => i.key === page)
+
+  // Tabs móviles adaptados al rol
+  const navMobile = (NAV_MOBILE_POR_ROL[rol] || NAV_MOBILE_POR_ROL.recepcion)
+    .map(k => {
+      if (k === '__fab__') return { key: '__fab__', label: '', fab: true }
+      if (k === '__mas__') return { key: '__mas__', label: 'Más', mas: true }
+      return { key: k, label: PAGE_LABEL[k] || k }
+    })
+    .filter(i => i.fab || i.mas || tieneAcceso(i.key))
+
+  const paginaEnMas = [...navNegocio, ...navSistema, ...(esSuperadmin ? [{key:'superadmin'}] : [])].some(i => i.key === page)
 
   const [masOpen,   setMasOpen]   = useState(false)
   const [theme,     setTheme]     = useState(() => localStorage.getItem('sp-theme') || 'light')
   const [notifOpen, setNotifOpen] = useState(false)
   const [citasHoy,  setCitasHoy]  = useState([])
   const notifRef = useRef(null)
+  const navRef   = useRef(null)
+  const pillRef  = useRef(null)
+
+  // Mueve el indicador deslizante al tab activo
+  useEffect(() => {
+    if (!navRef.current || !pillRef.current) return
+    const activeBtn = navRef.current.querySelector('.sp-nav-item.active')
+    if (!activeBtn) return
+    const navRect = navRef.current.getBoundingClientRect()
+    const btnRect = activeBtn.getBoundingClientRect()
+    const cx = btnRect.left - navRect.left + btnRect.width / 2
+    pillRef.current.style.transform = `translateX(calc(${cx}px - 50%))`
+  }, [page, navMobile.length])
 
   useEffect(() => { localStorage.setItem('sp-theme', theme) }, [theme])
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
@@ -395,7 +418,10 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
       )}
 
       {/* ── NAV móvil ─────────────────────────────────────── */}
-      <nav className="sp-nav">
+      <nav className="sp-nav" ref={navRef}>
+        {/* Indicador deslizante — se posiciona sobre el tab activo */}
+        <div ref={pillRef} className="sp-nav-pill" />
+
         {navMobile.map(item => {
           if (item.fab) return (
             <div key="fab" style={{ display:'flex',alignItems:'center',justifyContent:'center',flex:1 }}>
@@ -408,24 +434,23 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
           )
           if (item.mas) return (
             <button key="mas" className={`sp-nav-item ${masOpen || paginaEnMas ? 'active' : ''}`}
-              onClick={() => setMasOpen(o => !o)}
-              style={{ position: 'relative' }}>
-              <span className="sp-nav-icon" style={{ position: 'relative' }}>
+              onClick={() => setMasOpen(o => !o)}>
+              <span className="sp-nav-icon" style={{ position:'relative' }}>
                 <Ico d={IC.menu} size={22} />
                 {paginaEnMas && !masOpen && (
                   <span style={{
-                    position: 'absolute', top: -3, right: -3,
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: 'var(--accent)',
-                    border: '1.5px solid var(--bg)',
+                    position:'absolute', top:-3, right:-3,
+                    width:8, height:8, borderRadius:'50%',
+                    background:'var(--accent)', border:'1.5px solid var(--bg)',
                   }} />
                 )}
               </span>
               <span>Más</span>
             </button>
           )
+          const active = page === item.key
           return (
-            <button key={item.key} className={`sp-nav-item ${page===item.key ? 'active' : ''}`}
+            <button key={item.key} className={`sp-nav-item ${active ? 'active' : ''}`}
               onClick={() => nav(item.key)}>
               <span className="sp-nav-icon"><Ico d={IC[item.key]} size={22} /></span>
               <span>{item.label}</span>

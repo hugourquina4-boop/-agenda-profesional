@@ -205,16 +205,18 @@
 
 .sp-nav-item.active { color: var(--accent); }
 
-.sp-nav-item.active::before {
-  content: '';
+/* Pill deslizante — posición controlada desde JS via transform */
+.sp-nav-pill {
   position: absolute;
-  top: 0;
-  left: 20%;
-  right: 20%;
-  height: 2px;
+  top: 6px;
+  left: 0;
+  width: 44px;
+  height: 4px;
   border-radius: 0 0 4px 4px;
   background: var(--accent);
   box-shadow: 0 0 10px var(--accent-glow);
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
 }
 
 .sp-nav-icon {
@@ -222,6 +224,11 @@
 }
 .sp-nav-item.active .sp-nav-icon {
   transform: translateY(-2px) scale(1.12);
+}
+/* Tap feedback */
+.sp-nav-item:active .sp-nav-icon {
+  transform: scale(0.88);
+  transition: transform 0.1s ease;
 }
 
 /* FAB */
