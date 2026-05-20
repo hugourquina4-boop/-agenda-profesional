@@ -1008,6 +1008,223 @@ export default function SalonAgenda() {
     )
   }
 
+  // ── Vista Horizontal: profesionales en filas, tiempo en X ────────────
+  function VistaHorizontal() {
+    const HR_W  = 80   // px por hora
+    const ROW_H = 72   // px por profesional
+    const LEFT_W = 76  // ancho columna fija (nombres)
+
+    const PROFS_BASE = profesionales.length > 0 ? profesionales
+      : [...new Map(citasDia.map(c => [c.profesionales?.nombre, { id: c.profesionales?.nombre, nombre: c.profesionales?.nombre, color: col }])).values()]
+    const PROFS = filtroProf ? PROFS_BASE.filter(p => p.id === filtroProf) : PROFS_BASE
+
+    // Rango dinámico de horas
+    const horasCitas = citasDia.map(c => parseInt(c.fecha_inicio.substring(11, 13)))
+    const H_START = citasDia.length > 0 ? Math.max(7,  Math.min(...horasCitas) - 1) : 8
+    const H_END   = citasDia.length > 0 ? Math.min(22, Math.max(...horasCitas) + 2) : 20
+    const HOURS   = Array.from({ length: H_END - H_START }, (_, i) => H_START + i)
+    const TOTAL_W = HOURS.length * HR_W
+
+    function timeToX(iso) {
+      const [h, m] = iso.substring(11, 16).split(':').map(Number)
+      return (h - H_START + m / 60) * HR_W
+    }
+    function durW(c) {
+      const min = c.servicios?.duracion_min
+      if (min && min > 0) return Math.max(HR_W / 2, (min / 60) * HR_W)
+      if (c.fecha_fin) {
+        const dur = (new Date(c.fecha_fin) - new Date(c.fecha_inicio)) / 60000
+        if (dur > 0 && dur <= 480) return Math.max(HR_W / 2, (dur / 60) * HR_W)
+      }
+      return HR_W // fallback 60min
+    }
+
+    // Línea del "ahora"
+    const nowX = nowOffset !== null ? ((nowOffset / 60 - H_START) * HR_W) : null
+
+    // Color por profesional
+    const PCLR = {}
+    PROFS.forEach((p, i) => { PCLR[p.id || p.nombre] = p.color || PROF_COLORS[i % PROF_COLORS.length] })
+
+    const HEADER_H = 34
+
+    return (
+      <div style={{ margin:'0 0 8px', position:'relative' }}>
+        {/* Filtro profesional */}
+        {profesionales.length > 1 && (
+          <div style={{ display:'flex', gap:6, padding:'0 16px 10px', overflowX:'auto', overflowY:'clip' }}>
+            <button onClick={() => setFiltroProf(null)} style={{
+              padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+              background: filtroProf === null ? col : 'rgba(255,255,255,0.06)',
+              color: filtroProf === null ? '#fff' : 'var(--text-3)',
+              fontSize:12, fontWeight:700, transition:'all 0.15s',
+            }}>Todos</button>
+            {profesionales.map(p => (
+              <button key={p.id} onClick={() => setFiltroProf(filtroProf === p.id ? null : p.id)} style={{
+                padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                background: filtroProf === p.id ? (p.color || col) : 'rgba(255,255,255,0.06)',
+                color: filtroProf === p.id ? '#fff' : 'var(--text-3)',
+                fontSize:12, fontWeight:700, transition:'all 0.15s',
+              }}>{p.nombre?.split(' ')[0]}</button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display:'flex', overflowX:'auto', overflowY:'auto', maxHeight:'calc(100dvh - 240px)' }}>
+          {/* Columna fija izquierda: nombres profesionales */}
+          <div style={{ flexShrink:0, width:LEFT_W, zIndex:10, position:'sticky', left:0, background:'var(--bg)' }}>
+            {/* Celda esquina vacía (alineada con header de horas) */}
+            <div style={{ height:HEADER_H, borderBottom:'1px solid var(--border)' }} />
+            {PROFS.map((p, pi) => {
+              const clr = PCLR[p.id || p.nombre]
+              return (
+                <div key={p.id || pi} style={{
+                  height:ROW_H, borderBottom:'1px solid var(--border)',
+                  display:'flex', flexDirection:'column', alignItems:'center',
+                  justifyContent:'center', padding:'0 6px', gap:4,
+                }}>
+                  {p.foto_url ? (
+                    <img src={p.foto_url} alt={p.nombre} style={{ width:28, height:28, borderRadius:'50%', objectFit:'cover', border:`2px solid ${clr}` }} />
+                  ) : (
+                    <div style={{ width:28, height:28, borderRadius:'50%', background:`${clr}30`, border:`2px solid ${clr}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:clr }}>
+                      {(p.nombre || '?')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div style={{ fontSize:9, fontWeight:700, color:'var(--text-2)', textAlign:'center', lineHeight:1.2, maxWidth:64, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {p.nombre?.split(' ')[0]}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Área scrollable: horas + bloques */}
+          <div style={{ position:'relative', minWidth:TOTAL_W }}>
+            {/* Header de horas (sticky top) */}
+            <div style={{ position:'sticky', top:0, zIndex:8, display:'flex', background:'var(--bg)', borderBottom:'1px solid var(--border)', height:HEADER_H }}>
+              {HOURS.map(h => (
+                <div key={h} style={{ width:HR_W, flexShrink:0, display:'flex', alignItems:'center', paddingLeft:8, borderLeft:'1px solid var(--border)', fontSize:10, fontWeight:700, color:'var(--text-3)' }}>
+                  {h > 12 ? `${h-12}pm` : h === 12 ? '12pm' : `${h}am`}
+                </div>
+              ))}
+            </div>
+
+            {/* Líneas de cuadrícula verticales por hora */}
+            {HOURS.map(h => (
+              <div key={`gl-${h}`} style={{
+                position:'absolute', top:HEADER_H,
+                left: (h - H_START) * HR_W,
+                width:1, height: PROFS.length * ROW_H,
+                background:'var(--border)', zIndex:1, pointerEvents:'none',
+              }} />
+            ))}
+
+            {/* Línea del ahora */}
+            {nowX !== null && nowX >= 0 && nowX <= TOTAL_W && (
+              <div style={{
+                position:'absolute', top:HEADER_H, left:nowX,
+                width:2, height: PROFS.length * ROW_H,
+                background:'#ef4444', zIndex:7, pointerEvents:'none',
+                boxShadow:'0 0 6px #ef444460',
+              }}>
+                <div style={{ width:8, height:8, borderRadius:'50%', background:'#ef4444', marginLeft:-3, marginTop:-1 }} />
+              </div>
+            )}
+
+            {/* Filas de profesionales */}
+            {PROFS.map((prof, pi) => {
+              const profKey = prof.id || prof.nombre
+              const clr     = PCLR[profKey]
+              const profCitas = citasDia.filter(c =>
+                (c.profesionales?.id || c.profesionales?.nombre) === profKey
+              )
+              return (
+                <div key={profKey} style={{
+                  position:'relative', height:ROW_H, width:TOTAL_W,
+                  borderBottom:'1px solid var(--border)',
+                  background: pi % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)',
+                }}>
+                  {/* Half-hour tick marks */}
+                  {HOURS.map(h => (
+                    <div key={`hh-${h}`} style={{
+                      position:'absolute', top:0,
+                      left: (h - H_START) * HR_W + HR_W / 2,
+                      width:1, height:'100%',
+                      background:'var(--border)', opacity:0.4,
+                      pointerEvents:'none',
+                    }} />
+                  ))}
+
+                  {/* Bloques de citas */}
+                  {profCitas.map(c => {
+                    const left    = timeToX(c.fecha_inicio)
+                    const width   = durW(c)
+                    const cancelada = ['cancelada','no_asistio'].includes(c.estado)
+                    const esBloqueo = c.notas?.startsWith('__bloqueo__')
+                    const estColor  = ESTADO_COLOR[c.estado] || '#71717a'
+
+                    if (left < 0 || left > TOTAL_W) return null
+
+                    if (esBloqueo) return (
+                      <div key={c.id} onClick={() => setSelCita(c)} style={{
+                        position:'absolute',
+                        left: left + 2, top:6,
+                        width: Math.max(24, width - 4), height: ROW_H - 14,
+                        borderRadius:8, cursor:'pointer',
+                        background:'repeating-linear-gradient(135deg,rgba(113,113,122,0.07),rgba(113,113,122,0.07) 4px,transparent 4px,transparent 10px)',
+                        border:'1px solid rgba(113,113,122,0.22)',
+                        display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden',
+                        zIndex:3,
+                      }}>
+                        <span style={{ fontSize:9, fontWeight:700, color:'#9ca3af' }}>⊘</span>
+                      </div>
+                    )
+
+                    return (
+                      <button key={c.id} onClick={() => setSelCita(c)} style={{
+                        position:'absolute',
+                        left: left + 2, top:6,
+                        width: Math.max(24, width - 4), height: ROW_H - 14,
+                        borderRadius:8, cursor:'pointer', border:'none',
+                        background: cancelada
+                          ? 'rgba(113,113,122,0.09)'
+                          : `linear-gradient(150deg, ${clr}38 0%, ${clr}16 100%)`,
+                        border: `1px solid ${cancelada ? 'rgba(113,113,122,0.18)' : clr + '42'}`,
+                        boxShadow: cancelada ? 'none' : `0 2px 8px ${clr}1e, inset 0 1px 0 rgba(255,255,255,0.22)`,
+                        padding:'4px 6px', textAlign:'left', overflow:'hidden',
+                        opacity: cancelada ? 0.55 : 1, zIndex:3,
+                      }}>
+                        {/* Dot estado */}
+                        <div style={{
+                          position:'absolute', top:4, right:4,
+                          width:5, height:5, borderRadius:'50%',
+                          background: estColor, boxShadow:`0 0 0 2px ${estColor}30`,
+                        }} />
+                        <div style={{ fontSize:9, fontWeight:800, color: cancelada ? '#71717a' : clr, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                          {fmtHora(c.fecha_inicio)}
+                        </div>
+                        {width > 50 && (
+                          <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:1 }}>
+                            {c.clientes_agenda?.nombre?.split(' ')[0] || '—'}
+                          </div>
+                        )}
+                        {width > 80 && (
+                          <div style={{ fontSize:8, color:'var(--text-3)', lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {c.servicios?.nombre || '—'}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding:'0 0 16px' }}>
 
@@ -1015,9 +1232,9 @@ export default function SalonAgenda() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', marginBottom:12, gap:6 }}>
         <button
           onClick={() => {
-            if (vistaAgenda === 'mes')    setViewDate(new Date(year, month - 1, 1))
-            if (vistaAgenda === 'semana') shiftDia(-7)
-            if (vistaAgenda === 'dia')    shiftDia(-1)
+            if (vistaAgenda === 'mes')                        setViewDate(new Date(year, month - 1, 1))
+            if (vistaAgenda === 'semana')                     shiftDia(-7)
+            if (vistaAgenda === 'dia' || vistaAgenda === 'horizontal') shiftDia(-1)
           }}
           style={{ width:38, height:38, borderRadius:12, border:'none',
             background:`${col}12`, color:col, cursor:'pointer',
@@ -1028,9 +1245,9 @@ export default function SalonAgenda() {
         <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
           <h2 style={{ fontFamily:'Outfit', fontWeight:800, fontSize:vistaAgenda==='dia'?15:18,
             color:'var(--text)', textAlign:'center', margin:0, lineHeight:1.2 }}>
-            {vistaAgenda === 'mes'    && `${MESES[month]} ${year}`}
-            {vistaAgenda === 'semana' && semanaLabel()}
-            {vistaAgenda === 'dia'    && new Date(selDay+'T12:00:00').toLocaleDateString('es-CO',{ weekday:'long', day:'numeric', month:'long' })}
+            {vistaAgenda === 'mes'        && `${MESES[month]} ${year}`}
+            {vistaAgenda === 'semana'     && semanaLabel()}
+            {(vistaAgenda === 'dia' || vistaAgenda === 'horizontal') && new Date(selDay+'T12:00:00').toLocaleDateString('es-CO',{ weekday:'long', day:'numeric', month:'long' })}
           </h2>
           {/* Botón Hoy — solo si no estamos ya en hoy */}
           {selDay !== today.toISOString().slice(0,10) && (
@@ -1053,9 +1270,9 @@ export default function SalonAgenda() {
 
         <button
           onClick={() => {
-            if (vistaAgenda === 'mes')    setViewDate(new Date(year, month + 1, 1))
-            if (vistaAgenda === 'semana') shiftDia(+7)
-            if (vistaAgenda === 'dia')    shiftDia(+1)
+            if (vistaAgenda === 'mes')                        setViewDate(new Date(year, month + 1, 1))
+            if (vistaAgenda === 'semana')                     shiftDia(+7)
+            if (vistaAgenda === 'dia' || vistaAgenda === 'horizontal') shiftDia(+1)
           }}
           style={{ width:38, height:38, borderRadius:12, border:'none',
             background:`${col}12`, color:col, cursor:'pointer',
@@ -1064,11 +1281,11 @@ export default function SalonAgenda() {
         </button>
       </div>
 
-      {/* ── Toggle Mes / Semana / Día ── */}
+      {/* ── Toggle Mes / Semana / Día / Horiz ── */}
       <div style={{ display:'flex', gap:4, margin:'0 16px 8px',
         background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
-        {[['mes','Mes'],['semana','Sem'],['dia','Día']].map(([v,label]) => (
-          <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia') { setFiltroProf(null); setFiltroSede(null) } }} style={{
+        {[['mes','Mes'],['semana','Sem'],['dia','Día'],['horizontal','↔']].map(([v,label]) => (
+          <button key={v} onClick={() => { setVistaAgenda(v); if (v !== 'dia' && v !== 'horizontal') { setFiltroProf(null); setFiltroSede(null) } }} style={{
             flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
             background: vistaAgenda === v ? col : 'transparent',
             color: vistaAgenda === v ? '#fff' : 'var(--text-3)',
@@ -1145,6 +1362,7 @@ export default function SalonAgenda() {
       {!busqAgenda.trim() && (<>
 
       {vistaAgenda === 'semana' && VistaSemana()}
+      {vistaAgenda === 'horizontal' && VistaHorizontal()}
       {vistaAgenda === 'dia' && (<>
         {/* Filtro de sede — solo visible cuando hay más de una */}
         {sedes.length > 1 && (
