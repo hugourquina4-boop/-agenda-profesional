@@ -300,15 +300,43 @@ function SetNewPassword() {
   )
 }
 
-function AppBloqueada({ suscripcion, onSignOut }) {
+// Links de pago Wompi por plan — configurar en .env.local:
+//   VITE_WOMPI_LINK_STARTER, VITE_WOMPI_LINK_PRO, VITE_WOMPI_LINK_ULTRA
+// Obtener el hash del link en: Wompi Dashboard → Cobros → Links de pago
+const WOMPI_LINKS = {
+  starter: import.meta.env.VITE_WOMPI_LINK_STARTER || '',
+  pro:     import.meta.env.VITE_WOMPI_LINK_PRO     || '',
+  ultra:   import.meta.env.VITE_WOMPI_LINK_ULTRA   || '',
+}
+const PLANES = [
+  { key:'starter', label:'Starter', precio:'$60.000', color:'#6366f1', desc:'Hasta 2 profesionales' },
+  { key:'pro',     label:'Pro',     precio:'$100.000', color:'#16a34a', desc:'Hasta 5 profesionales' },
+  { key:'ultra',   label:'Ultra',   precio:'$140.000', color:'#f43f5e', desc:'Profesionales ilimitados' },
+]
+
+function AppBloqueada({ suscripcion, tenant, onSignOut }) {
+  const [verManuales, setVerManuales] = useState(false)
   const dias = suscripcion?.dias_restantes ?? null
   const diasVencidos = dias !== null ? Math.abs(dias) : '?'
+  const planActual = tenant?.plan || suscripcion?.plan_nombre || 'starter'
+  const slug = tenant?.slug || ''
+
   const metodos = [
     { icon:'📱', label:'Nequi', value:'3155734848', color:'#a855f7' },
     { icon:'💸', label:'Transfiya', value:'3155734848', color:'#3b82f6' },
     { icon:'🏦', label:'Bancolombia', value:'Cta Ahorros 45492209477 · Hugo F. Urquina', color:'#f59e0b' },
   ]
   function copiar(txt) { navigator.clipboard.writeText(txt).catch(() => {}) }
+
+  function urlWompi(planKey) {
+    const hash = WOMPI_LINKS[planKey]
+    if (!hash) return null
+    const yyyymm = new Date().toISOString().slice(0,7).replace('-','')
+    const ref = encodeURIComponent(`${slug}_${planKey}_${yyyymm}`)
+    return `https://checkout.wompi.co/l/${hash}?reference=${ref}`
+  }
+
+  const wompiDisponible = Object.values(WOMPI_LINKS).some(l => l)
 
   return (
     <div style={{
@@ -319,8 +347,10 @@ function AppBloqueada({ suscripcion, onSignOut }) {
         position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
         background:'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(239,68,68,0.12) 0%, transparent 70%)',
       }} />
-      <div style={{ width:'100%', maxWidth:380, position:'relative', zIndex:1 }}>
-        <div style={{ textAlign:'center', marginBottom:28 }}>
+      <div style={{ width:'100%', maxWidth:400, position:'relative', zIndex:1 }}>
+
+        {/* Header */}
+        <div style={{ textAlign:'center', marginBottom:24 }}>
           <div style={{
             width:72, height:72, borderRadius:22,
             background:'linear-gradient(135deg, #ef4444, #dc2626)',
@@ -333,34 +363,123 @@ function AppBloqueada({ suscripcion, onSignOut }) {
           </h1>
           <p style={{ fontSize:14, color:'var(--text-3)', lineHeight:1.6 }}>
             Tu plan venció hace <strong style={{ color:'#ef4444' }}>{diasVencidos} {diasVencidos === 1 ? 'día' : 'días'}</strong>.
-            Renueva tu suscripción para restablecer el acceso.
+            Renueva para restablecer el acceso de inmediato.
           </p>
         </div>
 
-        <div style={{ background:'var(--card)', borderRadius:20, padding:20, marginBottom:16,
-          boxShadow:'0 4px 24px rgba(0,0,0,0.12)' }}>
-          <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
-            textTransform:'uppercase', marginBottom:14 }}>Métodos de pago</p>
-          {metodos.map(m => (
-            <div key={m.label} style={{
-              display:'flex', alignItems:'center', gap:12,
-              padding:'12px 0', borderBottom:'1px solid var(--border)',
-            }}>
-              <span style={{ fontSize:20, flexShrink:0 }}>{m.icon}</span>
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{m.label}</div>
-                <div style={{ fontSize:13, color:'var(--text-3)', fontFamily:'monospace' }}>{m.value}</div>
-              </div>
-              <button onClick={() => copiar(m.value)} style={{
-                padding:'6px 12px', borderRadius:8, border:`1px solid ${m.color}40`,
-                background:`${m.color}12`, color:m.color, fontSize:12, fontWeight:700, cursor:'pointer',
-              }}>Copiar</button>
-            </div>
-          ))}
-          <p style={{ fontSize:12, color:'var(--text-3)', marginTop:14, lineHeight:1.5 }}>
-            Envía el comprobante de pago a tu asesor de Salón Pro para reactivar.
+        {/* Planes con botón Pagar en Wompi */}
+        {wompiDisponible && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+            {PLANES.map(p => {
+              const url = urlWompi(p.key)
+              const esActual = planActual === p.key
+              return (
+                <div key={p.key} style={{
+                  background:'var(--card)', borderRadius:16, padding:'14px 16px',
+                  boxShadow:'0 2px 12px rgba(0,0,0,0.10)',
+                  border: esActual ? `2px solid ${p.color}` : '2px solid transparent',
+                  display:'flex', alignItems:'center', gap:12,
+                }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <span style={{ fontWeight:800, fontSize:15, color:'var(--text)' }}>{p.label}</span>
+                      {esActual && <span style={{ fontSize:10, fontWeight:700, color:p.color,
+                        background:`${p.color}18`, borderRadius:6, padding:'2px 6px' }}>Tu plan</span>}
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--text-3)' }}>{p.desc}</div>
+                  </div>
+                  <div style={{ textAlign:'right', flexShrink:0 }}>
+                    <div style={{ fontWeight:900, fontSize:15, color:'var(--text)', fontFamily:'Outfit' }}>
+                      {p.precio}
+                      <span style={{ fontSize:11, fontWeight:500, color:'var(--text-3)' }}>/mes</span>
+                    </div>
+                    {url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer" style={{
+                        display:'inline-block', marginTop:6, padding:'7px 14px',
+                        borderRadius:10, border:'none', cursor:'pointer',
+                        background:p.color, color:'#fff', fontWeight:700, fontSize:12,
+                        textDecoration:'none', boxShadow:`0 4px 12px ${p.color}40`,
+                      }}>
+                        💳 Pagar
+                      </a>
+                    ) : (
+                      <span style={{ fontSize:11, color:'var(--text-3)' }}>Contáctanos</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Nota reactivación automática */}
+        {wompiDisponible && (
+          <p style={{ fontSize:12, color:'var(--text-3)', textAlign:'center', marginBottom:16, lineHeight:1.6 }}>
+            Tu acceso se reactiva automáticamente al confirmar el pago.
           </p>
-        </div>
+        )}
+
+        {/* Métodos manuales — fallback o toggle */}
+        {!wompiDisponible ? (
+          <div style={{ background:'var(--card)', borderRadius:20, padding:20, marginBottom:16,
+            boxShadow:'0 4px 24px rgba(0,0,0,0.12)' }}>
+            <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
+              textTransform:'uppercase', marginBottom:14 }}>Métodos de pago</p>
+            {metodos.map(m => (
+              <div key={m.label} style={{
+                display:'flex', alignItems:'center', gap:12,
+                padding:'12px 0', borderBottom:'1px solid var(--border)',
+              }}>
+                <span style={{ fontSize:20, flexShrink:0 }}>{m.icon}</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{m.label}</div>
+                  <div style={{ fontSize:13, color:'var(--text-3)', fontFamily:'monospace' }}>{m.value}</div>
+                </div>
+                <button onClick={() => copiar(m.value)} style={{
+                  padding:'6px 12px', borderRadius:8, border:`1px solid ${m.color}40`,
+                  background:`${m.color}12`, color:m.color, fontSize:12, fontWeight:700, cursor:'pointer',
+                }}>Copiar</button>
+              </div>
+            ))}
+            <p style={{ fontSize:12, color:'var(--text-3)', marginTop:14, lineHeight:1.5 }}>
+              Envía el comprobante a tu asesor de Salón Pro para reactivar.
+            </p>
+          </div>
+        ) : (
+          <>
+            <button onClick={() => setVerManuales(v => !v)} style={{
+              width:'100%', padding:'10px', borderRadius:12, border:'1px solid var(--border)',
+              background:'transparent', color:'var(--text-3)', fontSize:13, cursor:'pointer',
+              marginBottom:verManuales ? 0 : 12,
+            }}>
+              {verManuales ? '▲ Ocultar' : '▼ Pagar por transferencia / Nequi'}
+            </button>
+            {verManuales && (
+              <div style={{ background:'var(--card)', borderRadius:16, padding:16, marginBottom:12,
+                boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
+                {metodos.map(m => (
+                  <div key={m.label} style={{
+                    display:'flex', alignItems:'center', gap:12,
+                    padding:'10px 0', borderBottom:'1px solid var(--border)',
+                  }}>
+                    <span style={{ fontSize:18, flexShrink:0 }}>{m.icon}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{m.label}</div>
+                      <div style={{ fontSize:12, color:'var(--text-3)', fontFamily:'monospace' }}>{m.value}</div>
+                    </div>
+                    <button onClick={() => copiar(m.value)} style={{
+                      padding:'5px 10px', borderRadius:7, border:`1px solid ${m.color}40`,
+                      background:`${m.color}12`, color:m.color, fontSize:11, fontWeight:700, cursor:'pointer',
+                    }}>Copiar</button>
+                  </div>
+                ))}
+                <p style={{ fontSize:11, color:'var(--text-3)', marginTop:12, lineHeight:1.5 }}>
+                  Envía el comprobante a tu asesor para activar manualmente.
+                </p>
+              </div>
+            )}
+          </>
+        )}
 
         <button onClick={onSignOut} style={{
           width:'100%', padding:'13px', borderRadius:14, border:'none', cursor:'pointer',
@@ -609,7 +728,7 @@ function SalonApp() {
   // Superadmin siempre tiene acceso para gestionar / desbloquear
   const diasRestantes = suscripcion?.dias_restantes ?? null
   if (!esSuperadmin && rol !== 'superadmin' && diasRestantes !== null && diasRestantes < -1) {
-    return <AppBloqueada suscripcion={suscripcion} onSignOut={() => supabase.auth.signOut()} />
+    return <AppBloqueada suscripcion={suscripcion} tenant={tenant} onSignOut={() => supabase.auth.signOut()} />
   }
 
   function renderPage() {

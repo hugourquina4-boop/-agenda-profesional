@@ -852,28 +852,48 @@ export default function SalonConfig() {
         {(() => {
           const dias = suscripcion?.dias_restantes ?? null
           const limite = suscripcion?.fecha_limite
-          const planNombre = suscripcion?.plan_nombre || tenant?.plan || null
+          const planActual = tenant?.plan || suscripcion?.plan_nombre || 'starter'
+          const slug = tenant?.slug || ''
           const vencido = dias !== null && dias <= 0
           const limiteDate = limite ? new Date(limite + 'T00:00:00') : null
           const diasColor = dias === null ? 'var(--text-3)' : dias <= 2 ? '#f87171' : dias <= 5 ? '#fbbf24' : '#4ade80'
+
+          const WOMPI_LINKS_CFG = {
+            starter: import.meta.env.VITE_WOMPI_LINK_STARTER || '',
+            pro:     import.meta.env.VITE_WOMPI_LINK_PRO     || '',
+            ultra:   import.meta.env.VITE_WOMPI_LINK_ULTRA   || '',
+          }
+          const PLANES_CFG = [
+            { key:'starter', label:'Starter', precio:'$60.000', color:'#6366f1', desc:'Hasta 2 profesionales' },
+            { key:'pro',     label:'Pro',     precio:'$100.000', color:'#16a34a', desc:'Hasta 5 profesionales' },
+            { key:'ultra',   label:'Ultra',   precio:'$140.000', color:'#f43f5e', desc:'Profesionales ilimitados' },
+          ]
+          const wompiActivo = Object.values(WOMPI_LINKS_CFG).some(l => l)
+
+          function urlWompi(planKey) {
+            const hash = WOMPI_LINKS_CFG[planKey]
+            if (!hash) return null
+            const yyyymm = new Date().toISOString().slice(0,7).replace('-','')
+            return `https://checkout.wompi.co/l/${hash}?reference=${encodeURIComponent(`${slug}_${planKey}_${yyyymm}`)}`
+          }
+
           const metodos = [
-            { label:'Nequi',       value:'3155734848',                       color:'#a855f7', icon:'📱' },
-            { label:'Transfiya',   value:'3155734848',                       color:'#3b82f6', icon:'💸' },
+            { label:'Nequi',       value:'3155734848',                              color:'#a855f7', icon:'📱' },
+            { label:'Transfiya',   value:'3155734848',                              color:'#3b82f6', icon:'💸' },
             { label:'Bancolombia', value:'Cta Ahorros 45492209477 · Hugo F. Urquina', color:'#f59e0b', icon:'🏦' },
           ]
+
           return (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               {/* Estado actual */}
               <div style={{ padding:'14px', borderRadius:14, background:'var(--card)',
                 border:`1px solid ${vencido ? '#ef444440' : 'var(--border)'}` }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'var(--text)', marginBottom:8 }}>
-                  Estado actual
-                </div>
+                <div style={{ fontSize:12, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Estado actual</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                  {planNombre && (
+                  {planActual && (
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <span style={{ fontSize:12, color:'var(--text-3)' }}>Plan</span>
-                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text)', textTransform:'capitalize' }}>{planNombre}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text)', textTransform:'capitalize' }}>{planActual}</span>
                     </div>
                   )}
                   {limiteDate && (
@@ -893,17 +913,62 @@ export default function SalonConfig() {
                     </div>
                   )}
                   {!suscripcion && (
-                    <p style={{ fontSize:11, color:'var(--text-3)', margin:0 }}>
-                      Sin suscripción activa registrada.
-                    </p>
+                    <p style={{ fontSize:11, color:'var(--text-3)', margin:0 }}>Sin suscripción activa registrada.</p>
                   )}
                 </div>
               </div>
 
-              {/* Métodos de pago */}
+              {/* Planes con Wompi */}
+              {wompiActivo && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={{ fontSize:12, fontWeight:800, color:'var(--text)' }}>
+                    Renovar o cambiar plan
+                  </div>
+                  {PLANES_CFG.map(p => {
+                    const url = urlWompi(p.key)
+                    const esActual = planActual === p.key
+                    return (
+                      <div key={p.key} style={{
+                        background:'var(--card)', borderRadius:12, padding:'12px 14px',
+                        border: esActual ? `2px solid ${p.color}` : '1px solid var(--border)',
+                        display:'flex', alignItems:'center', gap:10,
+                      }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ fontWeight:800, fontSize:13, color:'var(--text)' }}>{p.label}</span>
+                            {esActual && <span style={{ fontSize:10, fontWeight:700, color:p.color,
+                              background:`${p.color}18`, borderRadius:5, padding:'1px 5px' }}>Actual</span>}
+                          </div>
+                          <div style={{ fontSize:11, color:'var(--text-3)' }}>{p.desc}</div>
+                        </div>
+                        <div style={{ textAlign:'right', flexShrink:0 }}>
+                          <div style={{ fontWeight:900, fontSize:13, color:'var(--text)', fontFamily:'Outfit' }}>
+                            {p.precio}<span style={{ fontSize:10, fontWeight:500, color:'var(--text-3)' }}>/mes</span>
+                          </div>
+                          {url && (
+                            <a href={url} target="_blank" rel="noopener noreferrer" style={{
+                              display:'inline-block', marginTop:5, padding:'6px 12px',
+                              borderRadius:8, background:p.color, color:'#fff',
+                              fontWeight:700, fontSize:11, textDecoration:'none',
+                              boxShadow:`0 3px 10px ${p.color}40`,
+                            }}>
+                              💳 Pagar
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <p style={{ fontSize:11, color:'var(--text-3)', margin:0, lineHeight:1.5 }}>
+                    El acceso se reactiva automáticamente al confirmar el pago.
+                  </p>
+                </div>
+              )}
+
+              {/* Métodos manuales */}
               <div style={{ padding:'14px', borderRadius:14, background:'var(--card)', border:'1px solid var(--border)' }}>
                 <div style={{ fontSize:12, fontWeight:800, color:'var(--text)', marginBottom:10 }}>
-                  Medios de pago para renovación
+                  {wompiActivo ? 'También puedes pagar por transferencia' : 'Medios de pago para renovación'}
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {metodos.map(m => (
@@ -929,9 +994,11 @@ export default function SalonConfig() {
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize:10, color:'var(--text-3)', marginTop:8, marginBottom:0 }}>
-                  Después de tu pago, el administrador activará tu plan. Si tienes dudas, escríbenos.
-                </p>
+                {!wompiActivo && (
+                  <p style={{ fontSize:10, color:'var(--text-3)', marginTop:8, marginBottom:0 }}>
+                    Después de tu pago, el administrador activará tu plan.
+                  </p>
+                )}
               </div>
             </div>
           )
