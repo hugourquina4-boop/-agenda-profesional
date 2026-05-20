@@ -5,6 +5,7 @@ import { TenantProvider, useTenant } from './context/TenantContext'
 import Login from './pages/Login'
 import SalonApp from './pages/salon/SalonApp'
 import SalonRegistroPublico from './pages/salon/SalonRegistroPublico'
+import LandingPage from './pages/public/LandingPage'
 import Registro from './pages/public/Registro'
 import SalonPortal from './pages/public/SalonPortal'
 import TenantLayout from './components/TenantLayout'
@@ -109,7 +110,7 @@ export default function App() {
           <Route path="/reservar/:slug" element={<SalonPortal />} />
           <Route path="/agenda/:slug"   element={<SalonPortal />} />
 
-          <Route path="/" element={<Navigate to="/salon" replace />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="*" element={<Navigate to="/salon" replace />} />
         </Routes>
       </BrowserRouter>
