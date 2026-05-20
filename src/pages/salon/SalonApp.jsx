@@ -41,50 +41,57 @@ function SplashScreen() {
     <>
       <style>{`
         @keyframes sp-boot-logo {
-          0%   { opacity:0; transform:scale(0.58) translateY(14px); }
-          65%  { opacity:1; transform:scale(1.05) translateY(0); }
-          100% { opacity:1; transform:scale(1)    translateY(0); }
+          0%   { opacity:0; transform:scale(0.72) translateY(10px); filter:blur(4px); }
+          70%  { opacity:1; transform:scale(1.04) translateY(0);    filter:blur(0); }
+          100% { opacity:1; transform:scale(1)    translateY(0);    filter:blur(0); }
         }
-        @keyframes sp-boot-text {
-          from { opacity:0; transform:translateY(10px); }
+        @keyframes sp-boot-name {
+          from { opacity:0; transform:translateY(14px); }
           to   { opacity:1; transform:translateY(0); }
         }
-        @keyframes sp-boot-dot {
-          0%, 100% { opacity:0.25; transform:scale(0.75); }
-          50%      { opacity:1;   transform:scale(1); }
+        @keyframes sp-boot-sub {
+          from { opacity:0; }
+          to   { opacity:1; }
+        }
+        @keyframes sp-boot-pulse {
+          0%, 100% { opacity:0.3; transform:scale(0.7); }
+          50%      { opacity:0.8; transform:scale(1); }
         }
       `}</style>
       <div style={{
-        minHeight:'100dvh', background:'var(--bg)',
+        position:'fixed', inset:0, background:'#FAFAF8', zIndex:99999,
         display:'flex', flexDirection:'column',
         alignItems:'center', justifyContent:'center',
-        padding:'max(40px, env(safe-area-inset-top)) 40px max(40px, env(safe-area-inset-bottom))',
+        padding:'max(48px, env(safe-area-inset-top)) 40px max(48px, env(safe-area-inset-bottom))',
       }}>
-        <img
-          src="/logo192.png" alt="Salón Pro"
-          style={{
-            width:100, height:100, borderRadius:28,
-            objectFit:'contain',
-            animation:'sp-boot-logo 0.6s cubic-bezier(0.34,1.56,0.64,1) both',
-            boxShadow:'0 10px 40px rgba(0,0,0,0.14)',
-          }}
-        />
-        <div style={{
-          fontFamily:'Outfit, sans-serif', fontWeight:900, fontSize:28,
-          color:'var(--text)', letterSpacing:'-0.5px', marginTop:20,
-          animation:'sp-boot-text 0.45s ease-out 0.28s both',
-        }}>
-          Salón <span style={{ color:'var(--accent, #f43f5e)' }}>Pro</span>
+        <div style={{ animation:'sp-boot-logo 0.65s cubic-bezier(0.34,1.4,0.64,1) both' }}>
+          <img src="/logo512.png" alt="Salón Pro" style={{
+            width:110, height:110, borderRadius:32, objectFit:'contain',
+            boxShadow:'0 12px 48px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.06)',
+            background:'#fff', padding:4,
+          }} />
         </div>
         <div style={{
-          display:'flex', gap:7, marginTop:52,
-          animation:'sp-boot-text 0.4s ease-out 0.5s both',
+          marginTop:22, display:'flex', alignItems:'baseline', gap:6,
+          animation:'sp-boot-name 0.5s ease-out 0.32s both',
+        }}>
+          <span style={{ fontFamily:'Outfit,sans-serif', fontWeight:900, fontSize:32, letterSpacing:'-1px', color:'#1a1a1a' }}>SALÓN</span>
+          <span style={{ fontFamily:'Outfit,sans-serif', fontWeight:900, fontSize:32, letterSpacing:'-1px', color:'#16a34a' }}>PRO</span>
+        </div>
+        <div style={{
+          marginTop:8, fontSize:13, color:'#6b7280', fontWeight:500,
+          animation:'sp-boot-sub 0.5s ease-out 0.48s both',
+        }}>
+          Gestión profesional para tu salón
+        </div>
+        <div style={{
+          display:'flex', gap:6, marginTop:56,
+          animation:'sp-boot-sub 0.4s ease-out 0.6s both',
         }}>
           {[0,1,2].map(i => (
             <div key={i} style={{
-              width:7, height:7, borderRadius:'50%',
-              background:'var(--text-3, #888)',
-              animation:`sp-boot-dot 1.2s ease-in-out ${i*0.22}s infinite`,
+              width:7, height:7, borderRadius:'50%', background:'#d1d5db',
+              animation:`sp-boot-pulse 1.4s ease-in-out ${i*0.25}s infinite`,
             }} />
           ))}
         </div>
