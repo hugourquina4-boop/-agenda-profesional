@@ -447,79 +447,78 @@ export default function SalonAnalytics() {
 
   async function descargarPDF() {
     const { default: jsPDF } = await import('jspdf')
+    const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
-    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const [r,g,b] = hex2rgb(col)
     const mesLabel = kpi?.mes ? `${MES_LABELS[parseInt(kpi.mes.slice(5,7))-1]} ${kpi.mes.slice(0,4)}` : new Date().toLocaleDateString('es-CO',{month:'long',year:'numeric'})
 
-    doc.setFillColor(r,g,b); doc.rect(0,0,210,28,'F')
-    doc.setTextColor(255,255,255)
-    doc.setFontSize(16); doc.setFont('helvetica','bold')
-    doc.text(tenant?.nombre || 'Salón', 14, 12)
-    doc.setFontSize(10); doc.setFont('helvetica','normal')
-    doc.text(`Reporte Analytics · ${mesLabel}`, 14, 20)
+    let y = drawHeader(doc, { tenant, titulo:'Reporte Analytics', periodo: mesLabel })
+    let pagina = 1
 
-    doc.setTextColor(0,0,0)
-    // KPIs
+    // ── KPIs 3×2 ─────────────────────────────────────────────────────────
+    const kpiW = 58, kpiH = 22, kpiGap = 8
     const kpis = [
-      ['Citas completadas', String(kpi?.completadas ?? '—')],
-      ['Ingresos brutos', `$${(kpi?.ingresos_brutos||0).toLocaleString('es-CO')}`],
-      ['Ticket promedio', `$${(kpi?.avg_ticket||0).toLocaleString('es-CO')}`],
-      ['No-show rate', `${kpi?.no_show_rate ?? '—'}%`],
-      ['Retención', `${retention?.retention_rate ?? '—'}%`],
-      ['Clientes recurrentes', String(retention?.clientes_recurrentes ?? '—')],
+      ['CITAS COMPLETADAS', String(kpi?.completadas??'—')],
+      ['INGRESOS BRUTOS', `$${(kpi?.ingresos_brutos||0).toLocaleString('es-CO')}`],
+      ['TICKET PROMEDIO', `$${(kpi?.avg_ticket||0).toLocaleString('es-CO')}`],
+      ['NO-SHOW RATE', `${kpi?.no_show_rate??'—'}%`],
+      ['RETENCIÓN', `${retention?.retention_rate??'—'}%`],
+      ['CLIENTES RECURRENTES', String(retention?.clientes_recurrentes??'—')],
     ]
-    let x = 14, y = 42
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(r,g,b)
-    doc.text('MÉTRICAS DEL MES', x, y); y += 7
-    kpis.forEach(([label, val], i) => {
-      if (i % 2 === 0 && i > 0) { x = 14; y += 12 }
-      if (i % 2 === 1) x = 110
-      doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100)
-      doc.text(label, x, y)
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
-      doc.setFontSize(12)
-      doc.text(val, x, y + 6)
-      doc.setFontSize(9)
-      if (i % 2 === 0) x = 110
+    kpis.forEach(([lbl,val],i) => {
+      const kx = 10 + (i%3)*(kpiW+kpiGap)
+      const ky = y + Math.floor(i/3)*(kpiH+6)
+      doc.setFillColor(248,249,250); doc.roundedRect(kx,ky,kpiW,kpiH,3,3,'F')
+      doc.setFillColor(r,g,b);       doc.roundedRect(kx,ky,3,kpiH,2,2,'F')
+      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(r,g,b)
+      doc.text(lbl, kx+7, ky+7)
+      doc.setFontSize(12); doc.setTextColor(18,18,18)
+      doc.text(val, kx+7, ky+17)
     })
+    y += 2*(kpiH+6) + 10
 
-    // Historial
-    if (historia.length > 0) {
-      y = 90
-      doc.setFillColor(245,245,245); doc.rect(10, y-5, 190, 9, 'F')
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
-      doc.text('Mes', 14, y); doc.text('Ingresos', 60, y)
-      doc.text('Citas', 110, y); doc.text('No-show', 155, y); y += 8
-      historia.forEach((d, i) => {
-        if (i%2===0) { doc.setFillColor(252,252,252); doc.rect(10,y-4,190,7,'F') }
-        doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
-        doc.text(d.mes||'', 14, y)
-        doc.text(`$${(d.ingresos_brutos||0).toLocaleString('es-CO')}`, 60, y)
-        doc.text(String(d.completadas||0), 110, y)
-        doc.text(`${d.no_show_rate||0}%`, 155, y)
-        y += 7
+    // ── Historial 6 meses ──────────────────────────────────────────────────
+    if(historia.length > 0) {
+      doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','bold')
+      doc.text('HISTORIAL 6 MESES',14,y+5); y+=10
+      doc.setFontSize(7.5); doc.setTextColor(90,90,90)
+      doc.text('MES',14,y); doc.text('INGRESOS',64,y); doc.text('CITAS',120,y); doc.text('NO-SHOW',160,y)
+      y+=6; doc.setFont('helvetica','normal')
+      historia.forEach((d,i) => {
+        if(i%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,7,'F')}
+        doc.setTextColor(40,40,40); doc.text(d.mes||'',14,y)
+        doc.setTextColor(r,g,b); doc.setFont('helvetica','bold')
+        doc.text(`$${(d.ingresos_brutos||0).toLocaleString('es-CO')}`,64,y)
+        doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
+        doc.text(String(d.completadas||0),120,y)
+        doc.text(`${d.no_show_rate||0}%`,160,y); y+=7
+      })
+      y+=8
+    }
+
+    // ── Rendimiento por profesional ─────────────────────────────────────────
+    if(staff.length > 0) {
+      if(y>250){ drawFooter(doc,{tenant,titulo:'Analytics',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Analytics',pagina}) }
+      doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','bold')
+      doc.text('RENDIMIENTO POR PROFESIONAL',14,y+5); y+=10
+      doc.setFontSize(7.5); doc.setTextColor(90,90,90)
+      doc.text('PROFESIONAL',14,y); doc.text('CITAS',82,y); doc.text('INGRESOS',112,y); doc.text('COMISIONES',162,y)
+      y+=6; doc.setFont('helvetica','normal')
+      staff.forEach((s,i) => {
+        if(y>272){ drawFooter(doc,{tenant,titulo:'Analytics',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Analytics',pagina}) }
+        if(i%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,7,'F')}
+        doc.setTextColor(40,40,40); doc.text((s.nombre||'').substring(0,24),14,y)
+        doc.text(String(s.citas_completadas||0),82,y)
+        doc.setTextColor(r,g,b); doc.setFont('helvetica','bold')
+        doc.text(`$${(s.ingresos_brutos||0).toLocaleString('es-CO')}`,112,y)
+        doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
+        doc.text(`$${(s.comisiones_ganadas||0).toLocaleString('es-CO')}`,162,y); y+=7
       })
     }
 
-    // Staff
-    if (staff.length > 0) {
-      y += 10
-      doc.setFillColor(r,g,b,50); doc.rect(10,y-5,190,9,'F')
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
-      doc.text('Profesional', 14, y); doc.text('Citas', 80, y)
-      doc.text('Ingresos', 110, y); doc.text('Comisión', 160, y); y += 8
-      staff.forEach((s, i) => {
-        if (y > 270) { doc.addPage(); y = 20 }
-        if (i%2===0) { doc.setFillColor(252,252,252); doc.rect(10,y-4,190,7,'F') }
-        doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
-        doc.text((s.nombre||'').substring(0,22), 14, y)
-        doc.text(String(s.citas_completadas||0), 80, y)
-        doc.text(`$${(s.ingresos_brutos||0).toLocaleString('es-CO')}`, 110, y)
-        doc.text(`$${(s.comisiones_ganadas||0).toLocaleString('es-CO')}`, 160, y)
-        y += 7
-      })
-    }
-
+    drawFooter(doc,{tenant,titulo:'Analytics',pagina})
     doc.save(`analytics-${mesLabel.replace(' ','-')}.pdf`)
   }
 
@@ -527,31 +526,24 @@ export default function SalonAnalytics() {
     const d = data || gerData
     if (!d) return
     const { default: jsPDF } = await import('jspdf')
+    const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
-    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const [r, g, b] = hex2rgb(col)
     const W = 210, M = 14
-    let y = 0
     const fmtN = n => n >= 0 ? `$${Math.round(n).toLocaleString('es-CO')}` : `($${Math.round(Math.abs(n)).toLocaleString('es-CO')})`
     const pctOf = n => d.ingresos.total > 0 ? `${Math.round(n/d.ingresos.total*100)}%` : '—'
 
-    // ── Header ──
-    doc.setFillColor(r,g,b); doc.rect(0,0,W,34,'F')
-    doc.setTextColor(255,255,255)
-    doc.setFontSize(14); doc.setFont('helvetica','bold')
-    doc.text('INFORME DE GESTIÓN FINANCIERA', M, 13)
-    doc.setFontSize(9); doc.setFont('helvetica','normal')
-    doc.text(tenant?.nombre || 'Salón', M, 21)
-    doc.text(`Período: ${d.periodo.label}`, W-M, 21, { align:'right' })
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, W-M, 28, { align:'right' })
-    y = 44
+    let y = drawHeader(doc, { tenant, titulo:'Informe de Gestión Financiera', subtitulo: d.periodo.label, periodo: new Date().toLocaleDateString('es-CO') })
+    let pagina = 1
 
     function secHdr(title) {
+      if (y > 260) { drawFooter(doc,{tenant,titulo:'Gerencial',pagina}); doc.addPage(); pagina++; y = drawPageHeader(doc,{tenant,titulo:'Gerencial',pagina}) }
       doc.setFillColor(r,g,b); doc.rect(M, y-5, W-M*2, 8, 'F')
       doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold')
       doc.text(title, M+3, y+0.5); y += 9
     }
     function plRow(label, amount, pctStr, bold, indent) {
-      if (y > 272) { doc.addPage(); y = 20 }
+      if (y > 272) { drawFooter(doc,{tenant,titulo:'Gerencial',pagina}); doc.addPage(); pagina++; y = drawPageHeader(doc,{tenant,titulo:'Gerencial',pagina}) }
       if (bold) { doc.setFillColor(245,245,250); doc.rect(M,y-3,W-M*2,7,'F') }
       doc.setFont('helvetica', bold ? 'bold' : 'normal')
       doc.setTextColor(40,40,40); doc.setFontSize(bold ? 9 : 8)
@@ -604,7 +596,7 @@ export default function SalonAnalytics() {
     y += 16
 
     // ── Tablero Gerencial ──
-    if (y > 220) { doc.addPage(); y = 20 }
+    if (y > 220) { drawFooter(doc,{tenant,titulo:'Gerencial',pagina}); doc.addPage(); pagina++; y = drawPageHeader(doc,{tenant,titulo:'Gerencial',pagina}) }
     secHdr('TABLERO GERENCIAL — INDICADORES CLAVE')
     const kpis = [
       ['Margen Bruto',      `${d.kpis.margenBruto}%`],
@@ -630,7 +622,7 @@ export default function SalonAnalytics() {
     y += 18
 
     // ── IVA Estimado ──
-    if (y > 240) { doc.addPage(); y = 20 }
+    if (y > 240) { drawFooter(doc,{tenant,titulo:'Gerencial',pagina}); doc.addPage(); pagina++; y = drawPageHeader(doc,{tenant,titulo:'Gerencial',pagina}) }
     secHdr('IVA ESTIMADO (19%) — SOLO ORIENTATIVO')
     plRow(`IVA Generado (ingresos $${Math.round(d.ingresos.total).toLocaleString('es-CO')} × 19%)`, d.iva.generado, pctOf(d.iva.generado))
     plRow(`IVA Descontable (costos $${Math.round(d.costos.total).toLocaleString('es-CO')} × 19%)`, -d.iva.descontable, pctOf(d.iva.descontable))
@@ -644,6 +636,7 @@ export default function SalonAnalytics() {
     doc.text('* El cálculo de IVA es una estimación. Consulte a su contador para la declaración oficial ante la DIAN.', M+3, y+10)
     doc.text('* Este documento no reemplaza los estados financieros oficiales preparados por un contador público.', M+3, y+15)
 
+    drawFooter(doc,{tenant,titulo:'Gerencial',pagina})
     doc.save(`informe-gerencial-${d.periodo.label.replace(/[\s–\/]/g,'-').toLowerCase()}.pdf`)
   }
 

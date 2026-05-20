@@ -161,236 +161,163 @@ export default function SalonComisiones() {
     setGenerandoPDF('all')
     try {
       const { jsPDF } = await import('jspdf')
+      const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
       const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
       const mesLabel = new Date(mesStr + '-02').toLocaleDateString('es-CO', { month:'long', year:'numeric' })
       const salonNombre = tenant?.nombre || 'Salón Pro'
-      const accentHex = col.startsWith('#') ? col : '#f43f5e'
-      const hex2rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]
-      const [ra,ga,ba] = hex2rgb(accentHex)
+      const [ra,ga,ba] = hex2rgb(col.startsWith('#') ? col : '#f43f5e')
 
-      // === Página header ===
-      doc.setFillColor(ra, ga, ba)
-      doc.rect(0, 0, 210, 28, 'F')
-      doc.setTextColor(255,255,255)
-      doc.setFontSize(16); doc.setFont('helvetica','bold')
-      doc.text('Planilla de Liquidación Colectiva', 14, 12)
-      doc.setFontSize(9); doc.setFont('helvetica','normal')
-      doc.text(`${salonNombre}  ·  ${mesLabel}  ·  ${new Date().toLocaleDateString('es-CO')}`, 14, 22)
+      let y = drawHeader(doc, { tenant, titulo:'Planilla de Liquidación Colectiva', periodo: mesLabel })
+      let pagina = 1
 
-      let y = 36
-      const cols = [14, 80, 116, 152, 175]
-      const hdr  = ['Profesional','Comisiones','Anticipos','Deduc.','Neto a pagar']
-
-      // Tabla header row
-      doc.setFillColor(245,245,245)
-      doc.rect(14, y, 182, 8, 'F')
-      doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(100,100,100)
-      hdr.forEach((h, ci) => doc.text(h, cols[ci] + 2, y + 5.5))
-      y += 10
+      // ── Tabla ─────────────────────────────────────────────────────────
+      const cx = [14, 82, 118, 152, 176]
+      const hdr = ['PROFESIONAL','COMISIONES','ANTICIPOS','DEDUC.','NETO A PAGAR']
+      doc.setFillColor(ra,ga,ba); doc.rect(10,y,190,8,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','bold')
+      hdr.forEach((h,i) => doc.text(h, cx[i]+2, y+5.5)); y+=11
 
       let grandTotal = 0
       profesionales.forEach((prof, pi) => {
-        if (y > 270) { doc.addPage(); y = 20 }
+        if(y>270){ drawFooter(doc,{tenant,titulo:'Planilla Colectiva',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Planilla Colectiva',pagina}) }
         const profCom = comisiones.filter(c => c.profesional_id === prof.id)
         const profAnt = anticipos.filter(a => a.profesional_id === prof.id)
         const totalCom = profCom.reduce((s,c) => s+(c.monto_comision||0), 0)
-        const totalAnt = profAnt.filter(a => a.tipo === 'anticipo').reduce((s,a) => s+a.monto, 0)
-        const totalDed = profAnt.filter(a => a.tipo === 'deduccion').reduce((s,a) => s+a.monto, 0)
+        const totalAnt = profAnt.filter(a => a.tipo==='anticipo').reduce((s,a) => s+a.monto, 0)
+        const totalDed = profAnt.filter(a => a.tipo==='deduccion').reduce((s,a) => s+a.monto, 0)
         const neto     = Math.max(0, totalCom - totalAnt - totalDed)
         grandTotal += neto
-
-        const profColor = PROF_COLORS[pi % PROF_COLORS.length]
-        const [rp,gp,bp] = hex2rgb(profColor)
-        doc.setFillColor(rp, gp, bp, 0.1)
-        doc.rect(14, y, 4, 10, 'F')
-        doc.setFillColor(pi % 2 === 0 ? 252 : 248, 252, 252)
-        doc.rect(18, y, 178, 10, 'F')
-
-        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
-        doc.text(prof.nombre, cols[0] + 2, y + 6.5)
-        doc.setFont('helvetica','normal'); doc.setFontSize(8)
-        doc.setTextColor(60,60,60)
-        doc.text(fmtCOP(totalCom), cols[1] + 2, y + 6.5)
-        doc.setTextColor(245,158,11)
-        doc.text(totalAnt > 0 ? `−${fmtCOP(totalAnt)}` : '—', cols[2] + 2, y + 6.5)
-        doc.setTextColor(239,68,68)
-        doc.text(totalDed > 0 ? `−${fmtCOP(totalDed)}` : '—', cols[3] + 2, y + 6.5)
-        doc.setTextColor(rp, gp, bp); doc.setFont('helvetica','bold')
-        doc.text(fmtCOP(neto), cols[4] + 2, y + 6.5)
-        y += 11
+        const [rp,gp,bp] = hex2rgb(PROF_COLORS[pi % PROF_COLORS.length])
+        if(pi%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-3,190,11,'F')}
+        doc.setFillColor(rp,gp,bp); doc.rect(10,y-3,4,11,'F')
+        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30)
+        doc.text(prof.nombre.substring(0,22), cx[0]+6, y+4)
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5)
+        doc.setTextColor(60,60,60); doc.text(fmtCOP(totalCom), cx[1]+2, y+4)
+        doc.setTextColor(245,158,11); doc.text(totalAnt>0?`−${fmtCOP(totalAnt)}`:'—', cx[2]+2, y+4)
+        doc.setTextColor(239,68,68);  doc.text(totalDed>0?`−${fmtCOP(totalDed)}`:'—', cx[3]+2, y+4)
+        doc.setTextColor(rp,gp,bp); doc.setFont('helvetica','bold')
+        doc.text(fmtCOP(neto), cx[4]+2, y+4); y+=12
       })
 
-      // Total row
-      doc.setDrawColor(ra, ga, ba); doc.setLineWidth(0.5)
-      doc.line(14, y, 196, y)
-      y += 6
-      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(ra, ga, ba)
-      doc.text('TOTAL A PAGAR', cols[0] + 2, y)
-      doc.text(fmtCOP(grandTotal), cols[4] + 2, y)
+      // ── Totales ───────────────────────────────────────────────────────
+      doc.setFillColor(ra,ga,ba); doc.rect(10,y,190,10,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold')
+      doc.text('TOTAL A PAGAR', cx[0]+6, y+6.5)
+      doc.text(fmtCOP(grandTotal), cx[4]+2, y+6.5); y+=18
 
-      y += 14
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
-      doc.text('Firma responsable ___________________________', 14, y)
-      doc.text('Fecha ___________________', 130, y)
+      // ── Firmas ────────────────────────────────────────────────────────
+      if(y>262){ drawFooter(doc,{tenant,titulo:'Planilla Colectiva',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Planilla Colectiva',pagina})+12 }
+      doc.setDrawColor(180,180,180); doc.setLineWidth(0.3)
+      doc.line(14,y,90,y); doc.line(120,y,196,y)
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
+      doc.text('Firma gerente / responsable',14,y+5); doc.text('Fecha de liquidación',120,y+5)
 
+      drawFooter(doc,{tenant,titulo:'Planilla Colectiva',pagina})
       doc.save(`planilla_${salonNombre.replace(/\s+/g,'_')}_${mesStr}.pdf`)
-    } catch(e) {
-      console.error(e)
-    } finally {
-      setGenerandoPDF(null)
-    }
+    } catch(e) { console.error(e) }
+    finally { setGenerandoPDF(null) }
   }
 
   async function descargarPDFProf(d, i) {
     setGenerandoPDF(d.profesional_id)
     try {
       const { jsPDF } = await import('jspdf')
-      const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
-      const color = PROF_COLORS[i % PROF_COLORS.length]
-      const hex2rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]
+      const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
+      const doc  = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
+      const profColor = PROF_COLORS[i % PROF_COLORS.length]
+      const [r,g,b]   = hex2rgb(profColor)
+      const mesLabel  = new Date(mesStr+'-02').toLocaleDateString('es-CO',{month:'long',year:'numeric'})
+      const tenantCol = { ...tenant, color_primario: profColor }
 
-      const mesLabel = new Date(mesStr + '-02').toLocaleDateString('es-CO', { month:'long', year:'numeric' })
-      const salonNombre = tenant?.nombre || 'Salón Pro'
+      let y = drawHeader(doc, { tenant: tenantCol, titulo:'Liquidación de Comisiones', subtitulo: d.nombre || '—', periodo: mesLabel })
+      let pagina = 1
 
-      // Header band
-      const [r,g,b] = hex2rgb(color)
-      doc.setFillColor(r, g, b)
-      doc.rect(0, 0, 210, 32, 'F')
-      doc.setTextColor(255,255,255)
-      doc.setFontSize(18)
-      doc.setFont('helvetica','bold')
-      doc.text('Liquidación de Comisiones', 14, 13)
-      doc.setFontSize(10)
-      doc.setFont('helvetica','normal')
-      doc.text(`${salonNombre}  ·  ${mesLabel}`, 14, 21)
-      doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
+      // ── Nombre + cargo del profesional ────────────────────────────────
+      doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(18,18,18)
+      doc.text(d.nombre || '—', 14, y)
+      if (d.especialidad) {
+        doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100)
+        doc.text(d.especialidad, 14, y+7)
+      }
+      y += 14
 
-      // Professional name
-      doc.setTextColor(40, 40, 40)
-      doc.setFontSize(16)
-      doc.setFont('helvetica','bold')
-      doc.text(d.nombre || '—', 14, 46)
-      doc.setFontSize(10)
-      doc.setFont('helvetica','normal')
-      doc.setTextColor(100,100,100)
-      doc.text(d.especialidad || '—', 14, 53)
-
-      // Divider
-      doc.setDrawColor(220,220,220)
-      doc.line(14, 58, 196, 58)
-
-      // Stats grid (2×2)
-      const stats = [
-        ['Citas completadas', `${d.citas_completadas ?? 0}`],
-        ['Horas trabajadas',  `${d.horas_trabajadas  ?? 0} h`],
-        ['Ingresos generados', fmtCOP(d.ingresos_cobrados ?? 0)],
-        ['Comisión ganada',    fmtCOP(d.comision_ganada   ?? 0)],
+      // ── KPIs 2×2 ──────────────────────────────────────────────────────
+      const kW=93, kH=22, kGap=4
+      const kpis = [
+        ['CITAS COMPLETADAS', `${d.citas_completadas??0}`],
+        ['INGRESOS GENERADOS', fmtCOP(d.ingresos_cobrados??0)],
+        ['COMISIÓN GANADA',    fmtCOP(d.comision_ganada??0)],
+        ['HORAS TRABAJADAS',   `${d.horas_trabajadas??0} h`],
       ]
-      const cellW = 88, cellH = 22
-      const startX = 14, startY = 64
-      stats.forEach(([label, val], idx) => {
-        const col2 = startX + (idx % 2) * (cellW + 8)
-        const row2 = startY + Math.floor(idx / 2) * (cellH + 4)
-        doc.setFillColor(248,248,248)
-        doc.roundedRect(col2, row2, cellW, cellH, 3, 3, 'F')
-        doc.setFontSize(8)
-        doc.setFont('helvetica','normal')
-        doc.setTextColor(120,120,120)
-        doc.text(label.toUpperCase(), col2 + 4, row2 + 7)
-        doc.setFontSize(13)
-        doc.setFont('helvetica','bold')
-        doc.setTextColor(40,40,40)
-        doc.text(val, col2 + 4, row2 + 17)
+      kpis.forEach(([lbl,val],idx) => {
+        const kx = 10 + (idx%2)*(kW+kGap)
+        const ky = y + Math.floor(idx/2)*(kH+kGap)
+        doc.setFillColor(248,249,250); doc.roundedRect(kx,ky,kW,kH,3,3,'F')
+        doc.setFillColor(r,g,b);       doc.roundedRect(kx,ky,3,kH,2,2,'F')
+        doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(r,g,b)
+        doc.text(lbl, kx+7, ky+7)
+        doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(18,18,18)
+        doc.text(val, kx+7, ky+17)
       })
+      y += 2*(kH+kGap) + 8
 
-      // Meta progress (if exists)
+      // ── Barra meta ────────────────────────────────────────────────────
       const meta = rules[d.profesional_id]?.meta_mensual
-      let yPos = startY + 2 * (cellH + 4) + 12
       if (meta && meta > 0) {
-        const pct = Math.min(100, Math.round((d.ingresos_cobrados || 0) / meta * 100))
-        doc.setFontSize(9)
-        doc.setFont('helvetica','bold')
-        doc.setTextColor(80,80,80)
-        doc.text('META MENSUAL', 14, yPos)
-        doc.setFont('helvetica','normal')
-        doc.setTextColor(120,120,120)
-        doc.text(`${pct}%  ·  meta: ${fmtCOP(meta)}`, 60, yPos)
-        yPos += 5
-        // Bar background
-        doc.setFillColor(230,230,230)
-        doc.roundedRect(14, yPos, 182, 5, 2, 2, 'F')
-        // Bar fill
-        const barR = pct >= 100 ? [34,197,94] : pct >= 60 ? hex2rgb(color) : [245,158,11]
-        doc.setFillColor(barR[0], barR[1], barR[2])
-        doc.roundedRect(14, yPos, 182 * pct / 100, 5, 2, 2, 'F')
-        yPos += 14
+        const pct = Math.min(100, Math.round((d.ingresos_cobrados||0)/meta*100))
+        doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(60,60,60)
+        doc.text('META MENSUAL', 14, y)
+        doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120)
+        doc.text(`${pct}% alcanzado  ·  Meta: ${fmtCOP(meta)}`, 55, y); y+=5
+        doc.setFillColor(220,220,220); doc.roundedRect(14,y,182,5,2,2,'F')
+        doc.setFillColor(pct>=100?34:r, pct>=100?197:g, pct>=100?94:b)
+        doc.roundedRect(14,y,Math.max(4,182*pct/100),5,2,2,'F'); y+=14
       }
 
-      // Comisiones individuales table
-      doc.setDrawColor(220,220,220)
-      doc.line(14, yPos, 196, yPos)
-      yPos += 6
-      doc.setFontSize(10)
-      doc.setFont('helvetica','bold')
-      doc.setTextColor(40,40,40)
-      doc.text('Detalle de comisiones pendientes', 14, yPos)
-      yPos += 8
+      // ── Detalle de comisiones ─────────────────────────────────────────
+      doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold')
+      doc.text('DETALLE DE COMISIONES PENDIENTES',14,y+5); y+=10
 
       const propias = comisiones.filter(c => c.profesional_id === d.profesional_id)
       if (propias.length === 0) {
-        doc.setFontSize(9)
-        doc.setFont('helvetica','italic')
-        doc.setTextColor(150,150,150)
-        doc.text('Sin comisiones pendientes', 14, yPos)
+        doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(150,150,150)
+        doc.text('Sin comisiones pendientes en este período', 14, y); y+=10
       } else {
-        // Table header
-        doc.setFillColor(245,245,245)
-        doc.rect(14, yPos - 4, 182, 8, 'F')
-        doc.setFontSize(8)
-        doc.setFont('helvetica','bold')
-        doc.setTextColor(100,100,100)
-        doc.text('FECHA', 16, yPos + 1)
-        doc.text('SERVICIO', 60, yPos + 1)
-        doc.text('COMISIÓN', 160, yPos + 1)
-        yPos += 10
-        propias.forEach(com => {
-          const fecha = new Date(com.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })
-          doc.setFontSize(9)
-          doc.setFont('helvetica','normal')
-          doc.setTextColor(60,60,60)
-          doc.text(fecha, 16, yPos)
-          doc.text(fmtCOP(com.monto_servicio), 60, yPos)
-          doc.setFont('helvetica','bold')
-          doc.text(fmtCOP(com.monto_comision), 160, yPos)
-          yPos += 7
-          if (yPos > 270) { doc.addPage(); yPos = 20 }
+        doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(90,90,90)
+        doc.text('FECHA',14,y); doc.text('SERVICIO',58,y); doc.text('INGRESO',140,y); doc.text('COMISIÓN',175,y)
+        y+=6; doc.setFont('helvetica','normal')
+        propias.forEach((com,ci) => {
+          if(y>272){ drawFooter(doc,{tenant,titulo:'Liquidación',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant:tenantCol,titulo:'Liquidación',pagina}) }
+          if(ci%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,7,'F')}
+          const fecha = new Date(com.created_at).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})
+          doc.setTextColor(60,60,60); doc.text(fecha,14,y)
+          doc.text((com.servicios?.nombre||'—').substring(0,28),58,y)
+          doc.text(fmtCOP(com.monto_servicio||0),140,y)
+          doc.setTextColor(r,g,b); doc.setFont('helvetica','bold')
+          doc.text(fmtCOP(com.monto_comision||0),175,y); doc.setFont('helvetica','normal'); y+=7
         })
-        // Total
-        doc.setDrawColor(220,220,220)
-        doc.line(14, yPos, 196, yPos)
-        yPos += 6
-        const totalCom = propias.reduce((s,c) => s + (c.monto_comision || 0), 0)
-        doc.setFontSize(11)
-        doc.setFont('helvetica','bold')
-        doc.setTextColor(r, g, b)
-        doc.text(`Total a pagar: ${fmtCOP(totalCom)}`, 14, yPos)
+        const totalCom = propias.reduce((s,c)=>s+(c.monto_comision||0),0)
+        doc.setFillColor(r,g,b); doc.rect(10,y,190,9,'F')
+        doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold')
+        doc.text('TOTAL COMISIONES A PAGAR',14,y+6)
+        doc.text(fmtCOP(totalCom),198,y+6,{align:'right'}); y+=17
       }
 
-      // Footer
-      doc.setFontSize(7)
-      doc.setFont('helvetica','normal')
-      doc.setTextColor(180,180,180)
-      doc.text('Salón Pro · salud.vercel.app', 14, 290)
-      doc.text(new Date().toISOString().slice(0,10), 170, 290)
+      // ── Firmas ────────────────────────────────────────────────────────
+      if(y>262){ drawFooter(doc,{tenant,titulo:'Liquidación',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant:tenantCol,titulo:'Liquidación',pagina})+12 }
+      doc.setDrawColor(180,180,180); doc.setLineWidth(0.3)
+      doc.line(14,y,90,y); doc.line(120,y,196,y)
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
+      doc.text('Firma gerente / responsable',14,y+5); doc.text(`Firma ${d.nombre?.split(' ')[0]||'profesional'}`,120,y+5)
 
-      const nombre = (d.nombre || 'profesional').replace(/\s+/g,'-').toLowerCase()
+      drawFooter(doc,{tenant,titulo:'Liquidación',pagina})
+      const nombre = (d.nombre||'profesional').replace(/\s+/g,'-').toLowerCase()
       doc.save(`liquidacion-${nombre}-${mesStr}.pdf`)
     } catch(e) {
-      console.error('[PDF]', e)
-      showToast('Error generando PDF', '#f87171')
-    } finally {
-      setGenerandoPDF(null)
-    }
+      console.error('[PDF]', e); showToast('Error generando PDF','#f87171')
+    } finally { setGenerandoPDF(null) }
   }
 
   async function guardarPorcentaje(profId) {

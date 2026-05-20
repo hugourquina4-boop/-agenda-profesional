@@ -164,165 +164,168 @@ export default function SalonCaja() {
 
   async function descargarCierre() {
     const { default: jsPDF } = await import('jspdf')
+    const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
-    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const [r,g,b] = hex2rgb(col)
     const now = new Date()
     const fechaHora = now.toLocaleString('es-CO', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' })
 
-    doc.setFillColor(r,g,b); doc.rect(0,0,210,32,'F')
-    doc.setTextColor(255,255,255)
-    doc.setFontSize(9); doc.setFont('helvetica','normal')
-    doc.text(tenant?.nombre || 'Salón', 14, 11)
-    doc.setFontSize(18); doc.setFont('helvetica','bold')
-    doc.text('CIERRE DE CAJA', 105, 18, { align:'center' })
-    doc.setFontSize(9); doc.setFont('helvetica','normal')
-    doc.text(fechaHora, 105, 26, { align:'center' })
+    let y = drawHeader(doc, { tenant, titulo:'Cierre de Caja', periodo: fechaHora })
+    let pagina = 1
 
-    // Cajas KPI
-    const bY = 40, bH = 22
-    doc.setFillColor(Math.min(255,r+185),Math.min(255,g+185),Math.min(255,b+185))
-    doc.rect(10,bY,57,bH,'F')
-    doc.setTextColor(r,g,b); doc.setFontSize(8); doc.setFont('helvetica','bold')
-    doc.text('INGRESOS',38,bY+6,{align:'center'})
-    doc.setFontSize(14); doc.text(fmtCOP(totalCobrado),38,bY+16,{align:'center'})
+    // ── KPIs 3 columnas ───────────────────────────────────────────────────
+    const kpiW = 58, kpiH = 22, kpiGap = 8
+    const kpis = [
+      { label:'INGRESOS', val: fmtCOP(totalCobrado), bg:[220,252,231], tc:[21,128,61] },
+      { label:'EGRESOS',  val: fmtCOP(totalEgresos),  bg:[254,226,226], tc:[220,38,38] },
+      { label:'SALDO NETO', val: fmtCOP(Math.abs(totalCobrado-totalEgresos)),
+        bg: totalCobrado-totalEgresos >= 0 ? [220,252,231]:[254,226,226],
+        tc: totalCobrado-totalEgresos >= 0 ? [21,128,61]:[220,38,38] },
+    ]
+    kpis.forEach((k,i) => {
+      const x = 10 + i*(kpiW+kpiGap)
+      doc.setFillColor(...k.bg); doc.roundedRect(x, y, kpiW, kpiH, 3, 3, 'F')
+      doc.setFillColor(r,g,b);   doc.roundedRect(x, y, 3, kpiH, 2, 2, 'F')
+      doc.setFontSize(7);  doc.setFont('helvetica','bold'); doc.setTextColor(...k.tc)
+      doc.text(k.label, x+8, y+7)
+      doc.setFontSize(13); doc.setTextColor(18,18,18)
+      doc.text(k.val, x+8, y+17)
+    })
+    y += kpiH + 10
 
-    doc.setFillColor(254,226,226); doc.rect(77,bY,57,bH,'F')
-    doc.setTextColor(220,38,38); doc.setFontSize(8)
-    doc.text('EGRESOS',105,bY+6,{align:'center'})
-    doc.setFontSize(14); doc.text(fmtCOP(totalEgresos),105,bY+16,{align:'center'})
-
-    const saldoPos = (totalCobrado-totalEgresos) >= 0
-    doc.setFillColor(saldoPos?220:254, saldoPos?252:226, saldoPos?231:226)
-    doc.rect(144,bY,57,bH,'F')
-    doc.setTextColor(saldoPos?21:220, saldoPos?128:38, saldoPos?61:38)
-    doc.setFontSize(8); doc.text('SALDO NETO',172,bY+6,{align:'center'})
-    doc.setFontSize(14); doc.text(fmtCOP(Math.abs(totalCobrado-totalEgresos)),172,bY+16,{align:'center'})
-
-    let y = bY + bH + 10
-    // Métodos
+    // ── Métodos de pago ───────────────────────────────────────────────────
     const porM = {}
     historial.forEach(c => { porM[c.pago.metodo] = (porM[c.pago.metodo]||0)+Number(c.pago.monto) })
-    doc.setFillColor(245,245,245); doc.rect(10,y-5,190,8,'F')
-    doc.setTextColor(0,0,0); doc.setFontSize(9); doc.setFont('helvetica','bold')
-    doc.text('MÉTODO DE PAGO',14,y); doc.text('MONTO',170,y); y+=8
+    doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+    doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold')
+    doc.text('MÉTODO DE PAGO',14,y+5); doc.text('MONTO',180,y+5,{align:'right'}); y+=9
     doc.setFont('helvetica','normal')
     Object.entries(porM).forEach(([m,t],i)=>{
-      if(i%2===0){doc.setFillColor(252,252,252);doc.rect(10,y-4,190,7,'F')}
-      doc.setTextColor(0,0,0); doc.text(m.charAt(0).toUpperCase()+m.slice(1),14,y)
-      doc.setTextColor(34,197,94); doc.text(fmtCOPFull(t),170,y); y+=7
+      if(i%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,7,'F')}
+      doc.setTextColor(40,40,40); doc.text(m.charAt(0).toUpperCase()+m.slice(1),14,y)
+      doc.setTextColor(34,197,94); doc.text(fmtCOPFull(t),198,y,{align:'right'}); y+=7
     })
-    // Cobros
-    y+=6
+    y+=8
+
+    // ── Cobros del día ────────────────────────────────────────────────────
     if(historial.length>0){
-      doc.setFillColor(r,g,b); doc.rect(10,y,190,8,'F')
-      doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold')
-      doc.text(`COBROS DEL DÍA (${historial.length})`,14,y+5.5); y+=14
-      doc.setTextColor(0,0,0)
-      doc.text('Cliente',14,y); doc.text('Servicio',70,y); doc.text('Método',135,y); doc.text('Monto',170,y)
-      y+=7; doc.setFont('helvetica','normal')
-      historial.slice(0,40).forEach((c,i)=>{
-        if(y>268){doc.addPage();y=20}
-        if(i%2===0){doc.setFillColor(252,252,252);doc.rect(10,y-4,190,7,'F')}
-        doc.setTextColor(0,0,0)
-        doc.text((c.clientes_agenda?.nombre||'—').substring(0,22),14,y)
-        doc.text((c.servicios?.nombre||'—').substring(0,22),70,y)
-        doc.text(c.pago.metodo,135,y)
-        doc.setTextColor(34,197,94); doc.text(fmtCOPFull(c.pago.monto),170,y); y+=6
+      doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+      doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold')
+      doc.text(`COBROS DEL DÍA  (${historial.length})`,14,y+5); y+=10
+      doc.setFontSize(7.5); doc.setTextColor(90,90,90)
+      doc.text('Cliente',14,y); doc.text('Servicio',72,y); doc.text('Método',138,y); doc.text('Monto',198,y,{align:'right'})
+      y+=6; doc.setFont('helvetica','normal')
+      historial.slice(0,50).forEach((c,i)=>{
+        if(y>272){ drawFooter(doc,{tenant,titulo:'Cierre de Caja',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Cierre de Caja',pagina}) }
+        if(i%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,7,'F')}
+        doc.setTextColor(30,30,30)
+        doc.text((c.clientes_agenda?.nombre||'—').substring(0,24),14,y)
+        doc.text((c.servicios?.nombre||'—').substring(0,22),72,y)
+        doc.text(c.pago.metodo,138,y)
+        doc.setTextColor(34,197,94); doc.text(fmtCOPFull(c.pago.monto),198,y,{align:'right'}); y+=6
       })
     }
-    // Firma
-    if(y>254){doc.addPage();y=20}
-    y+=10
-    doc.setDrawColor(0,0,0); doc.setLineWidth(0.3); doc.line(14,y,90,y)
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
+
+    // ── Firma ─────────────────────────────────────────────────────────────
+    if(y>262){ drawFooter(doc,{tenant,titulo:'Cierre de Caja',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Cierre de Caja',pagina})+8 }
+    y+=12
+    doc.setDrawColor(180,180,180); doc.setLineWidth(0.3)
+    doc.line(14,y,100,y); doc.line(120,y,196,y)
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150)
     doc.text('Firma responsable de caja',14,y+5)
-    doc.text(`Salón Pro · ${fechaHora}`,105,y+5,{align:'center'})
+    doc.text('Recibido conforme',120,y+5)
+    drawFooter(doc,{tenant,titulo:'Cierre de Caja',pagina})
     doc.save(`cierre-caja-${now.toISOString().slice(0,10)}.pdf`)
   }
 
   async function descargarPDF() {
     const { default: jsPDF } = await import('jspdf')
+    const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
-    const [r, g, b] = [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
+    const [r,g,b] = hex2rgb(col)
+    const periodoLabel = PERIODOS.find(p => p.key === periodo)?.label || periodo
+    const fechaGen = new Date().toLocaleDateString('es-CO',{dateStyle:'long'})
 
-    doc.setFillColor(r, g, b)
-    doc.rect(0, 0, 210, 28, 'F')
-    doc.setTextColor(255,255,255)
-    doc.setFontSize(16); doc.setFont('helvetica','bold')
-    doc.text(tenant?.nombre || 'Salón', 14, 12)
-    doc.setFontSize(10); doc.setFont('helvetica','normal')
-    doc.text(`Reporte de Caja · ${PERIODOS.find(p => p.key === periodo)?.label} · ${new Date().toLocaleDateString('es-CO',{dateStyle:'long'})}`, 14, 20)
+    let y = drawHeader(doc, { tenant, titulo:'Reporte de Caja', subtitulo: periodoLabel, periodo: fechaGen })
+    let pagina = 1
 
-    doc.setTextColor(0,0,0)
-    doc.setFontSize(22); doc.setFont('helvetica','bold')
-    doc.text(`Ingresos: ${fmtCOPFull(totalCobrado)}`, 14, 44)
-    doc.setFontSize(14)
-    doc.text(`Egresos: ${fmtCOPFull(totalEgresos)}`, 14, 54)
-    doc.setTextColor(r,g,b)
-    doc.text(`Saldo: ${fmtCOPFull(totalCobrado - totalEgresos)}`, 14, 64)
-    doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100)
-    doc.text(`${historial.length} cobros`, 14, 72)
+    // ── Resumen financiero ────────────────────────────────────────────────
+    const kpiW = 58, kpiH = 24, gap = 8
+    const saldoPos = totalCobrado - totalEgresos >= 0
+    const kpis = [
+      { label:'INGRESOS BRUTOS', val: fmtCOPFull(totalCobrado), bg:[220,252,231], tc:[21,128,61] },
+      { label:'EGRESOS',          val: fmtCOPFull(totalEgresos),  bg:[254,226,226], tc:[220,38,38] },
+      { label:'SALDO NETO',       val: fmtCOPFull(Math.abs(totalCobrado-totalEgresos)),
+        bg: saldoPos ? [220,252,231]:[254,226,226], tc: saldoPos ? [21,128,61]:[220,38,38] },
+    ]
+    kpis.forEach((k,i) => {
+      const x = 10 + i*(kpiW+gap)
+      doc.setFillColor(...k.bg); doc.roundedRect(x, y, kpiW, kpiH, 3, 3, 'F')
+      doc.setFillColor(r,g,b);   doc.roundedRect(x, y, 3, kpiH, 2, 2, 'F')
+      doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(...k.tc)
+      doc.text(k.label, x+7, y+7)
+      doc.setFontSize(12); doc.setTextColor(18,18,18)
+      doc.text(k.val, x+7, y+17)
+    })
+    y += kpiH + 8
 
+    // Sub-stats: conteo + métodos
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90)
     const porMetodo = {}
     historial.forEach(c => { porMetodo[c.pago.metodo] = (porMetodo[c.pago.metodo]||0) + Number(c.pago.monto) })
     let xm = 14
-    Object.entries(porMetodo).forEach(([m, t]) => {
-      doc.setTextColor(r,g,b); doc.setFont('helvetica','bold')
-      doc.text(`${m}: ${fmtCOPFull(t)}`, xm, 80); xm += 55
+    doc.setFont('helvetica','bold'); doc.setTextColor(r,g,b)
+    doc.text(`${historial.length} cobros`, xm, y); xm += 30
+    Object.entries(porMetodo).forEach(([m,t]) => {
+      doc.setTextColor(60,60,60)
+      doc.text(`${m.charAt(0).toUpperCase()+m.slice(1)}: `, xm, y); xm += 22
+      doc.setTextColor(r,g,b)
+      doc.text(fmtCOPFull(t), xm, y); xm += 38
+    })
+    y += 10
+
+    // ── Detalle cobros ────────────────────────────────────────────────────
+    doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+    doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold')
+    doc.text('DETALLE DE COBROS',14,y+5); y+=10
+    doc.setFontSize(7.5); doc.setTextColor(90,90,90)
+    doc.text('Cliente',14,y); doc.text('Servicio',72,y); doc.text('Método',136,y); doc.text('Monto',198,y,{align:'right'})
+    y+=6; doc.setFont('helvetica','normal')
+    historial.forEach((c,i) => {
+      if(y>272){ drawFooter(doc,{tenant,titulo:'Reporte de Caja',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Reporte de Caja',pagina}) }
+      if(i%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,7,'F')}
+      doc.setTextColor(30,30,30)
+      doc.text((c.clientes_agenda?.nombre||'—').substring(0,24),14,y)
+      doc.text((c.servicios?.nombre||'—').substring(0,22),72,y)
+      doc.text(c.pago.metodo,136,y)
+      doc.setTextColor(34,197,94); doc.text(fmtCOPFull(c.pago.monto),198,y,{align:'right'}); y+=7
     })
 
-    let y = 94
-    doc.setFillColor(245,245,245); doc.rect(10, y-5, 190, 9, 'F')
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
-    doc.text('Cliente', 14, y); doc.text('Servicio', 68, y)
-    doc.text('Método', 130, y); doc.text('Monto', 170, y); y += 8
-
-    doc.setFont('helvetica','normal')
-    historial.forEach((c, i) => {
-      if (y > 270) { doc.addPage(); y = 20 }
-      if (i % 2 === 0) { doc.setFillColor(252,252,252); doc.rect(10, y-4, 190, 7, 'F') }
-      doc.setTextColor(0,0,0)
-      doc.text((c.clientes_agenda?.nombre||'—').substring(0,24), 14, y)
-      doc.text((c.servicios?.nombre||'—').substring(0,22), 68, y)
-      doc.text(c.pago.metodo, 130, y)
-      doc.setTextColor(34,197,94)
-      doc.text(fmtCOPFull(c.pago.monto), 170, y); y += 7
-    })
-
-    // Sección egresos
+    // ── Egresos por categoría ─────────────────────────────────────────────
     if (egresos.length > 0) {
-      y += 8
-      if (y > 250) { doc.addPage(); y = 20 }
-      doc.setFillColor(239,68,68)
-      doc.rect(10, y, 190, 8, 'F')
-      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255)
-      doc.text(`Egresos del período: ${fmtCOPFull(totalEgresos)}`, 14, y+5.5)
-      y += 14
-
+      y+=8
+      if(y>252){ drawFooter(doc,{tenant,titulo:'Reporte de Caja',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Reporte de Caja',pagina}) }
+      doc.setFillColor(239,68,68); doc.rect(10,y,190,7,'F')
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255)
+      doc.text(`EGRESOS DEL PERÍODO  —  ${fmtCOPFull(totalEgresos)}`,14,y+5); y+=10
       const porCat = {}
-      egresos.forEach(g => { porCat[g.categoria] = (porCat[g.categoria]||0) + Number(g.monto) })
-      doc.setFont('helvetica','normal'); doc.setFontSize(9)
-      Object.entries(porCat).sort((a,b)=>b[1]-a[1]).forEach(([cat, tot], i) => {
-        if (y > 270) { doc.addPage(); y = 20 }
-        if (i % 2 === 0) { doc.setFillColor(254,242,242); doc.rect(10, y-4, 190, 7, 'F') }
-        doc.setTextColor(0,0,0); doc.text(cat, 14, y)
-        doc.setTextColor(239,68,68); doc.text(fmtCOPFull(tot), 170, y)
-        y += 7
+      egresos.forEach(g => { porCat[g.categoria] = (porCat[g.categoria]||0)+Number(g.monto) })
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5)
+      Object.entries(porCat).sort((a,b)=>b[1]-a[1]).forEach(([cat,tot],i) => {
+        if(y>272){ drawFooter(doc,{tenant,titulo:'Reporte de Caja',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Reporte de Caja',pagina}) }
+        if(i%2===0){doc.setFillColor(254,242,242);doc.rect(10,y-4,190,7,'F')}
+        doc.setTextColor(40,40,40); doc.text(cat,14,y)
+        doc.setTextColor(239,68,68); doc.text(fmtCOPFull(tot),198,y,{align:'right'}); y+=7
       })
-
-      y += 4
-      if (y < 270) {
-        doc.setDrawColor(239,68,68); doc.setLineWidth(0.2)
-        doc.line(10, y, 200, y)
-        y += 6
-        doc.setFont('helvetica','bold'); doc.setFontSize(10)
-        doc.setTextColor(0,0,0); doc.text('Saldo neto:', 14, y)
-        const saldoColor = totalCobrado - totalEgresos >= 0 ? [34,197,94] : [239,68,68]
-        doc.setTextColor(...saldoColor)
-        doc.text(fmtCOPFull(totalCobrado - totalEgresos), 170, y)
-      }
+      y+=4
+      doc.setDrawColor(180,180,180); doc.setLineWidth(0.2); doc.line(10,y,200,y); y+=6
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(18,18,18)
+      doc.text('Saldo neto del período:',14,y)
+      doc.setTextColor(saldoPos?34:239, saldoPos?197:68, saldoPos?94:68)
+      doc.text(fmtCOPFull(totalCobrado-totalEgresos),198,y,{align:'right'})
     }
 
+    drawFooter(doc,{tenant,titulo:'Reporte de Caja',pagina})
     const label = periodo === 'rango' ? `${rangoDesde}_${rangoHasta}` : periodo
     doc.save(`caja-${label}-${new Date().toISOString().slice(0,10)}.pdf`)
   }

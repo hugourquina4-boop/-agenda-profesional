@@ -215,66 +215,58 @@ export default function SalonClientes() {
   async function exportarHistorialPDF() {
     if (!sel || historial.length === 0) return
     const { default: jsPDF } = await import('jspdf')
+    const { drawHeader, drawFooter, drawPageHeader, hex2rgb } = await import('../../lib/pdfBrand')
     const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' })
-    const [r, g, b] = col.length === 7
-      ? [parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16)]
-      : [244, 63, 94]
-    const W = 210, M = 16
-    let y = 20
-
-    // Header
-    doc.setFillColor(r, g, b)
-    doc.roundedRect(M, y - 8, W - M*2, 22, 3, 3, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(14); doc.setFont(undefined, 'bold')
-    doc.text('Historial de Citas', M + 8, y + 2)
-    doc.setFontSize(9); doc.setFont(undefined, 'normal')
-    doc.text(tenant?.nombre || '', W - M - 2, y + 2, { align:'right' })
-    y += 22
-
-    // Client info
-    doc.setTextColor(60, 60, 60)
-    doc.setFontSize(13); doc.setFont(undefined, 'bold')
-    doc.text(sel.nombre, M, y + 6)
-    doc.setFontSize(9); doc.setFont(undefined, 'normal')
-    if (sel.telefono) doc.text(`Tel: ${sel.telefono}`, M, y + 12)
-    if (sel.email)    doc.text(`Email: ${sel.email}`, M + 60, y + 12)
-    doc.text(`Visitas: ${sel.num_visitas || historial.length}   Total: $${Number(sel.total_gastado || 0).toLocaleString('es-CO')}`, M, y + 18)
-    y += 26
-
-    // Table header
-    doc.setFillColor(r, g, b)
-    doc.rect(M, y, W - M*2, 8, 'F')
-    doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont(undefined, 'bold')
-    doc.text('Fecha',         M + 3, y + 5.5)
-    doc.text('Servicio',      M + 35, y + 5.5)
-    doc.text('Profesional',   M + 95, y + 5.5)
-    doc.text('Estado',        M + 130, y + 5.5)
-    doc.text('Cobrado',       M + 155, y + 5.5)
-    y += 9
-
+    const [r,g,b] = hex2rgb(col)
     const ESTADO_ES = { completada:'Completada', confirmada:'Confirmada', pendiente:'Pendiente', cancelada:'Cancelada', no_asistio:'No asistió' }
-    historial.forEach((c, i) => {
-      if (y > 270) { doc.addPage(); y = 20 }
-      if (i % 2 === 0) { doc.setFillColor(248, 248, 252); doc.rect(M, y, W - M*2, 8, 'F') }
-      doc.setTextColor(60, 60, 60); doc.setFontSize(8); doc.setFont(undefined, 'normal')
-      const fecha = new Date(c.fecha_inicio).toLocaleDateString('es-CO', { day:'numeric', month:'short', year:'2-digit' })
-      doc.text(fecha,                         M + 3, y + 5.5)
-      doc.text((c.servicios?.nombre || '—').slice(0, 30), M + 35, y + 5.5)
-      doc.text((c.profesionales?.nombre?.split(' ')[0] || '—').slice(0, 18), M + 95, y + 5.5)
-      doc.text(ESTADO_ES[c.estado] || c.estado, M + 130, y + 5.5)
-      if (c.precio_cobrado > 0) doc.text(`$${Number(c.precio_cobrado).toLocaleString('es-CO')}`, M + 155, y + 5.5)
-      y += 8
+
+    let y = drawHeader(doc, { tenant, titulo:'Historial de Cliente', subtitulo: sel.nombre })
+    let pagina = 1
+
+    // ── Ficha del cliente ─────────────────────────────────────────────────
+    doc.setFillColor(248,249,250); doc.roundedRect(10,y,190,24,3,3,'F')
+    doc.setFillColor(r,g,b);       doc.roundedRect(10,y,4,24,2,2,'F')
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(18,18,18)
+    doc.text(sel.nombre, 20, y+8)
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80)
+    const ficha = [
+      sel.telefono && `Tel: ${sel.telefono}`,
+      sel.email    && `Email: ${sel.email}`,
+      sel.cumpleanos && `Cumpleaños: ${sel.cumpleanos}`,
+    ].filter(Boolean).join('   ·   ')
+    if (ficha) doc.text(ficha, 20, y+15)
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(r,g,b)
+    const totalHist = historial.reduce((s,c) => s+(Number(c.precio_cobrado)||0), 0)
+    doc.text(`${sel.num_visitas||historial.length} visitas  ·  $${totalHist.toLocaleString('es-CO')} total`, 20, y+22)
+    y += 32
+
+    // ── Tabla historial ────────────────────────────────────────────────────
+    doc.setFillColor(r,g,b); doc.rect(10,y,190,7,'F')
+    doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','bold')
+    doc.text('FECHA',14,y+5); doc.text('SERVICIO',46,y+5)
+    doc.text('PROFESIONAL',114,y+5); doc.text('ESTADO',152,y+5); doc.text('COBRADO',192,y+5,{align:'right'})
+    y+=9; doc.setFont('helvetica','normal')
+
+    historial.forEach((c,i) => {
+      if(y>272){ drawFooter(doc,{tenant,titulo:'Historial de Cliente',pagina}); doc.addPage(); pagina++; y=drawPageHeader(doc,{tenant,titulo:'Historial de Cliente',pagina}) }
+      if(i%2===0){doc.setFillColor(248,249,250);doc.rect(10,y-4,190,8,'F')}
+      const fecha = new Date(c.fecha_inicio).toLocaleDateString('es-CO',{day:'numeric',month:'short',year:'2-digit'})
+      doc.setFontSize(8); doc.setTextColor(50,50,50)
+      doc.text(fecha,14,y)
+      doc.text((c.servicios?.nombre||'—').slice(0,28),46,y)
+      doc.text((c.profesionales?.nombre?.split(' ')[0]||'—').slice(0,16),114,y)
+      const ec = c.estado==='completada'?[34,197,94]:c.estado==='cancelada'?[239,68,68]:[100,100,100]
+      doc.setTextColor(...ec); doc.text(ESTADO_ES[c.estado]||c.estado,152,y)
+      if(c.precio_cobrado>0){doc.setTextColor(34,197,94); doc.setFont('helvetica','bold'); doc.text(`$${Number(c.precio_cobrado).toLocaleString('es-CO')}`,198,y,{align:'right'}); doc.setFont('helvetica','normal')}
+      y+=8
     })
 
-    // Total
-    const totalHist = historial.reduce((s, c) => s + (Number(c.precio_cobrado) || 0), 0)
-    y += 4
-    doc.setFillColor(r, g, b)
-    doc.rect(M + 130, y, W - M - 130, 8, 'F')
-    doc.setTextColor(255,255,255); doc.setFont(undefined,'bold')
-    doc.text(`Total: $${totalHist.toLocaleString('es-CO')}`, M + 135, y + 5.5)
+    // Total final
+    doc.setFillColor(r,g,b); doc.rect(10,y,190,9,'F')
+    doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold')
+    doc.text(`TOTAL HISTÓRICO`,14,y+6); doc.text(`$${totalHist.toLocaleString('es-CO')}`,198,y+6,{align:'right'})
 
+    drawFooter(doc,{tenant,titulo:'Historial de Cliente',pagina})
     doc.save(`historial-${sel.nombre.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`)
   }
 
