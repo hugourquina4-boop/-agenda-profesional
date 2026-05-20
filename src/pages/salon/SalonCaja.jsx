@@ -695,7 +695,7 @@ export default function SalonCaja() {
           })()}
 
           {/* Tabs */}
-          <div style={{ display:'flex', gap:4, marginBottom:14,
+          <div className="sp-tabs-scroll" style={{ gap:4, marginBottom:14,
             background:'var(--card)', borderRadius:14, padding:4, boxShadow:'0 1px 8px rgba(0,0,0,0.1)' }}>
             {[
               { key:'cobrar',    label:`Por cobrar${pendientes.length > 0 ? ` (${pendientes.length})` : ''}` },

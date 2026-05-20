@@ -1710,4 +1710,51 @@ textarea.sp-input { min-height: 80px; resize: vertical; }
   background: rgba(255,255,255,0.025);
   margin-bottom: 3px;
 }
+
+/* ════════════════════════════════════════════════════════
+   MOBILE SPRINT 5 — optimizaciones táctiles
+   ════════════════════════════════════════════════════════ */
+
+/* Carrusel horizontal de tabs — usar en cualquier módulo con muchos tabs */
+.sp-tabs-scroll {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: clip;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 0;
+}
+.sp-tabs-scroll::-webkit-scrollbar { display: none; }
+.sp-tabs-scroll > button,
+.sp-tabs-scroll > [role="tab"] {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Font ligera mayor en mobile para mejor legibilidad */
+@media (max-width: 767px) {
+  body, .sp-root {
+    font-size: 15px;
+  }
+  /* Celdas de tabla: scroll horizontal en lugar de overflow oculto */
+  .sp-tbl-row {
+    min-width: 0;
+  }
+  /* Botones de acción dentro de tarjetas: al menos 40px de alto */
+  .sp-tbl-row button {
+    min-height: 40px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  /* Drawer "Más" — título de página activa visible */
+  .sp-sheet .sp-mas-active-label {
+    display: block;
+  }
+  /* Reducir padding lateral en mobile para más espacio */
+  .sp-page > * {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
 .sp-root.sp-light .sp-stat-row { background: rgba(0,0,0,0.02); }

@@ -667,7 +667,7 @@ export default function SalonAnalytics() {
       )}
 
       {/* ── Tabs ── */}
-      <div style={{ padding:'16px 16px 0', display:'flex', gap:8, overflowX:'auto', overflowY:'clip', scrollbarWidth:'none' }}>
+      <div className="sp-tabs-scroll" style={{ padding:'16px 16px 0', gap:8, scrollbarWidth:'none' }}>
         {[['resumen','Resumen'],['ventas','Ventas'],['citas','Citas'],['finanzas','Finanzas'],['gerencial','Gerencial']].map(([t,label]) => (
           <button key={t} onClick={() => setTabA(t)} style={{
             flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',

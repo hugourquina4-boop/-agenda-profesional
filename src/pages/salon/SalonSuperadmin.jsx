@@ -1022,10 +1022,10 @@ export default function SalonSuperadmin({ onGestionar }) {
         )}
 
         {/* ── Tab bar (scrollable en móvil) ─────────────────────── */}
-        <div style={{
-          display: 'flex', gap: 0, margin: '16px 16px 0',
+        <div className="sp-tabs-scroll" style={{
+          gap: 0, margin: '16px 16px 0',
           borderBottom: '2px solid var(--border)',
-          overflowX: 'auto', overflowY: 'clip', scrollbarWidth: 'none',
+          scrollbarWidth: 'none',
         }}>
           {[
             ['negocios',  'Negocios'],

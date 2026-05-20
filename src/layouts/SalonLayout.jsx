@@ -79,6 +79,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
   const navNegocio   = NAV_NEGOCIO.filter(i => tieneAcceso(i.key))
   const navSistema   = NAV_SISTEMA.filter(i => tieneAcceso(i.key))
   const navMobile    = NAV_MOBILE.filter(i => i.fab || i.mas || tieneAcceso(i.key))
+  const paginaEnMas  = [...navNegocio, ...navSistema, ...(esSuperadmin ? [{key:'superadmin'}] : [])].some(i => i.key === page)
 
   const [masOpen,   setMasOpen]   = useState(false)
   const [theme,     setTheme]     = useState(() => localStorage.getItem('sp-theme') || 'light')
@@ -404,9 +405,20 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
             </div>
           )
           if (item.mas) return (
-            <button key="mas" className={`sp-nav-item ${masOpen ? 'active' : ''}`}
-              onClick={() => setMasOpen(o => !o)}>
-              <span className="sp-nav-icon"><Ico d={IC.menu} size={22} /></span>
+            <button key="mas" className={`sp-nav-item ${masOpen || paginaEnMas ? 'active' : ''}`}
+              onClick={() => setMasOpen(o => !o)}
+              style={{ position: 'relative' }}>
+              <span className="sp-nav-icon" style={{ position: 'relative' }}>
+                <Ico d={IC.menu} size={22} />
+                {paginaEnMas && !masOpen && (
+                  <span style={{
+                    position: 'absolute', top: -3, right: -3,
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: 'var(--accent)',
+                    border: '1.5px solid var(--bg)',
+                  }} />
+                )}
+              </span>
               <span>Más</span>
             </button>
           )

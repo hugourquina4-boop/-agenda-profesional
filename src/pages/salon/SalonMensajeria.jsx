@@ -268,9 +268,9 @@ export default function SalonMensajeria() {
       </div>
 
       {/* Filtros */}
-      <div style={{
-        display: 'flex', gap: 8, padding: '0 16px 10px',
-        overflowX: 'auto', overflowY: 'clip', scrollbarWidth: 'none',
+      <div className="sp-tabs-scroll" style={{
+        gap: 8, padding: '0 16px 10px',
+        scrollbarWidth: 'none',
       }}>
         {FILTROS.map(f => {
           const count = contarFiltro(f.key)
