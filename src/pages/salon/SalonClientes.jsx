@@ -126,6 +126,11 @@ export default function SalonClientes() {
   const [importData,    setImportData]    = useState([])
   const [importando,    setImportando]    = useState(false)
 
+  const [hayMas,        setHayMas]        = useState(false)
+  const [cargandoMas,   setCargandoMas]   = useState(false)
+  const offsetRef = useRef(0)
+  const PAGE_SIZE = 50
+
   function parseCSVRow(line) {
     const result = []; let cur = ''; let inQ = false
     for (let i = 0; i < line.length; i++) {
@@ -273,24 +278,28 @@ export default function SalonClientes() {
     doc.save(`historial-${sel.nombre.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`)
   }
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (append = false) => {
     if (!tenant) { setLoading(false); return }
-    setLoading(true)
+    if (!append) { setLoading(true); offsetRef.current = 0 }
+    else setCargandoMas(true)
+
+    const offset = offsetRef.current
     const q = supabase.from('clientes_agenda')
       .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags, fuente_captacion')
       .eq('tenant_id', tenant.id)
       .order('nombre')
+      .range(offset, offset + PAGE_SIZE - 1)
     if (busq.trim()) {
       const s = busq.trim().replace(/[%_]/g, '\\$&')
       q.or(`nombre.ilike.%${s}%,telefono.ilike.%${s}%,email.ilike.%${s}%`)
     }
     const [res, resPrest] = await Promise.all([
-      q.limit(100),
+      q,
       supabase.from('prestamos_cliente').select('cliente_id, tipo, monto').eq('tenant_id', tenant.id),
     ])
     if (res.error) {
       showToast('Error al cargar: ' + res.error.message, false)
-      setLoading(false)
+      setLoading(false); setCargandoMas(false)
       return
     }
     const saldoMap = {}
@@ -298,8 +307,10 @@ export default function SalonClientes() {
       saldoMap[p.cliente_id] = (saldoMap[p.cliente_id] || 0) + (p.tipo === 'prestamo' ? p.monto : -p.monto)
     })
     const merged = (res.data || []).map(c => ({ ...c, saldo_prestamos: saldoMap[c.id] || 0 }))
-    setClientes(merged)
-    setLoading(false)
+    setClientes(prev => append ? [...prev, ...merged] : merged)
+    offsetRef.current = offset + merged.length
+    setHayMas(merged.length === PAGE_SIZE)
+    setLoading(false); setCargandoMas(false)
   }, [tenant, busq])
 
   useEffect(() => { cargar() }, [cargar])
@@ -953,6 +964,24 @@ export default function SalonClientes() {
               </div>
             )
           })}
+
+          {hayMas && (
+            <button
+              onClick={() => cargar(true)}
+              disabled={cargandoMas}
+              style={{
+                width:'100%', padding:'13px', borderRadius:14, border:'1px solid var(--border)',
+                background:'transparent', color:'var(--text-2)', fontWeight:600, fontSize:13,
+                cursor:'pointer', fontFamily:'inherit', marginTop:4,
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                opacity: cargandoMas ? 0.6 : 1,
+              }}
+            >
+              {cargandoMas
+                ? <><span style={{ width:16,height:16,borderRadius:'50%',border:'2px solid var(--border)',borderTopColor:'var(--text-2)',animation:'sp-spin 0.7s linear infinite', display:'inline-block' }} /> Cargando…</>
+                : 'Cargar más clientes'}
+            </button>
+          )}
         </div>
       )}
 

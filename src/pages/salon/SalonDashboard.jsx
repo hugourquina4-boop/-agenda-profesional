@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
+import SkeletonBox from '../../components/SkeletonBox'
 
 function Ico({ d, size = 18 }) {
   return (
@@ -442,9 +443,47 @@ export default function SalonDashboard({ onNavigate }) {
   const ocupPct   = capMin > 0 ? Math.min(100, Math.round(totalMin / capMin * 100)) : 0
 
   if (loading) return (
-    <div className="sp-loader">
-      <div className="sp-spinner" style={{ borderTopColor:col }} />
-      <p className="sp-loader-label">Cargando</p>
+    <div style={{ padding:'12px 16px', display:'flex', flexDirection:'column', gap:14 }}>
+      {/* Saludo */}
+      <SkeletonBox h={28} w={200} r={8} />
+      {/* KPI cards 2×2 */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ borderRadius:16, padding:'14px 16px',
+            background:'var(--card)', border:'1px solid var(--border)',
+            display:'flex', flexDirection:'column', gap:8 }}>
+            <SkeletonBox h={12} w={70} r={6} />
+            <SkeletonBox h={26} w={90} r={8} />
+          </div>
+        ))}
+      </div>
+      {/* Timeline */}
+      <div style={{ borderRadius:16, background:'var(--card)', border:'1px solid var(--border)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}>
+        <SkeletonBox h={14} w={120} r={6} />
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <SkeletonBox h={40} w={40} r={10} />
+            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
+              <SkeletonBox h={13} w='60%' r={6} />
+              <SkeletonBox h={11} w='40%' r={5} />
+            </div>
+            <SkeletonBox h={24} w={60} r={7} />
+          </div>
+        ))}
+      </div>
+      {/* Equipo */}
+      <div style={{ borderRadius:16, background:'var(--card)', border:'1px solid var(--border)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}>
+        <SkeletonBox h={14} w={100} r={6} />
+        {[0,1].map(i => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <SkeletonBox h={36} w={36} r={18} />
+            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
+              <SkeletonBox h={13} w='50%' r={6} />
+              <SkeletonBox h={8} w='80%' r={4} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
