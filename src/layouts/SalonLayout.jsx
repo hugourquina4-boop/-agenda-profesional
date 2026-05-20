@@ -376,8 +376,8 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
           </div>
         </header>
 
-        {/* Contenido */}
-        <div className="sp-page">{children}</div>
+        {/* Contenido — key fuerza remount en cada cambio de página → dispara animación */}
+        <div key={page} className="sp-page">{children}</div>
       </div>
 
       {/* ── SHEET "Más" móvil ─────────────────────────────── */}
