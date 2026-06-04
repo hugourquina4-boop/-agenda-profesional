@@ -6,8 +6,11 @@ import Login from './pages/Login'
 import SalonApp from './pages/salon/SalonApp'
 import SalonRegistroPublico from './pages/salon/SalonRegistroPublico'
 import LandingPage from './pages/public/LandingPage'
+import PropuestaPage from './pages/public/PropuestaPage'
 import Registro from './pages/public/Registro'
 import SalonPortal from './pages/public/SalonPortal'
+import NpsPage from './pages/public/NpsPage'
+import SalonPromoPage from './pages/public/SalonPromoPage'
 import TenantLayout from './components/TenantLayout'
 import TenantDashboard from './pages/tenant/Dashboard'
 import Profesionales from './pages/tenant/Profesionales'
@@ -21,6 +24,8 @@ import MiAgenda from './pages/tenant/MiAgenda'
 import Ingresos from './pages/tenant/Ingresos'
 import Accesos from './pages/tenant/Accesos'
 import Configuracion from './pages/tenant/Configuracion'
+import OfflineBanner from './components/OfflineBanner'
+
 
 function Spinner() {
   return (
@@ -110,10 +115,16 @@ export default function App() {
           <Route path="/reservar/:slug" element={<SalonPortal />} />
           <Route path="/agenda/:slug"   element={<SalonPortal />} />
 
+          {/* Encuesta NPS post-visita */}
+          <Route path="/nps/:token"  element={<NpsPage />} />
+          <Route path="/promo/:slug" element={<SalonPromoPage />} />
+
           <Route path="/" element={<LandingPage />} />
+          <Route path="/propuesta" element={<PropuestaPage />} />
           <Route path="*" element={<Navigate to="/salon" replace />} />
         </Routes>
       </BrowserRouter>
+      <OfflineBanner />
     </TenantProvider>
   )
 }

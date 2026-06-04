@@ -41,7 +41,7 @@ function Campo({ label, children }) {
   )
 }
 
-export default function SalonConfig() {
+export default function SalonConfig({ onNavigate }) {
   const { tenant, recargar, suscripcion } = useTenant()
   const [form,   setForm]   = useState(null)
   const [saving, setSaving] = useState(false)
@@ -105,7 +105,8 @@ export default function SalonConfig() {
       hora_cierre:         tenant.config_vertical?.hora_cierre         || '20:00',
       duracion_slot_min:   tenant.config_vertical?.duracion_slot_min   || 30,
       anticipacion_horas:  tenant.config_vertical?.anticipacion_horas  || 2,
-      politica_cancelacion:tenant.config_vertical?.politica_cancelacion|| '',
+      politica_cancelacion:  tenant.config_vertical?.politica_cancelacion  || '',
+      consentimiento_texto:  tenant.config_vertical?.consentimiento_texto  || '',
       horas_cancelacion:   tenant.config_vertical?.horas_cancelacion   ?? 2,
       wompi_public_key:    tenant.wompi_public_key    || '',
       pagos_portal_activo: tenant.pagos_portal_activo ?? false,
@@ -114,6 +115,14 @@ export default function SalonConfig() {
       puntos_canje_min:    tenant.puntos_canje_min    ?? 50,
       meta_ingresos_mes:   tenant.config_vertical?.meta_ingresos_mes ?? 0,
       link_google_reviews: tenant.config_vertical?.link_google_reviews || '',
+      nps_activo:          tenant.config_vertical?.nps_activo          ?? false,
+      nps_horas_espera:    tenant.config_vertical?.nps_horas_espera    ?? 2,
+      tiquetera_activa:  tenant.tiquetera_activa  ?? false,
+      tiquetera_meta:    tenant.tiquetera_meta    ?? 10,
+      tiquetera_premio:  tenant.tiquetera_premio  || 'Servicio gratis a elegir',
+      tiquetera_lat:     tenant.tiquetera_lat     ?? '',
+      tiquetera_lng:     tenant.tiquetera_lng     ?? '',
+      tiquetera_radio_m: tenant.tiquetera_radio_m ?? 300,
     })
   }, [tenant])
 
@@ -143,6 +152,12 @@ export default function SalonConfig() {
       pagos_portal_activo:  form.pagos_portal_activo,
       puntos_por_visita:    Number(form.puntos_por_visita) || 10,
       puntos_canje_min:     Number(form.puntos_canje_min)  || 50,
+      tiquetera_activa:  form.tiquetera_activa,
+      tiquetera_meta:    Number(form.tiquetera_meta)    || 10,
+      tiquetera_premio:  form.tiquetera_premio.trim()   || 'Servicio gratis a elegir',
+      tiquetera_lat:     form.tiquetera_lat  !== '' ? Number(form.tiquetera_lat)  : null,
+      tiquetera_lng:     form.tiquetera_lng  !== '' ? Number(form.tiquetera_lng)  : null,
+      tiquetera_radio_m: Number(form.tiquetera_radio_m) || 300,
       config_vertical: {
         ...(tenant.config_vertical || {}),
         fotos_galeria:        form.fotos_galeria.filter(Boolean),
@@ -153,10 +168,13 @@ export default function SalonConfig() {
         hora_cierre:          form.hora_cierre,
         duracion_slot_min:    Number(form.duracion_slot_min),
         anticipacion_horas:   Number(form.anticipacion_horas),
-        politica_cancelacion: form.politica_cancelacion.trim() || null,
+        politica_cancelacion:  form.politica_cancelacion.trim()  || null,
+        consentimiento_texto:  form.consentimiento_texto.trim()  || null,
         horas_cancelacion:    Number(form.horas_cancelacion) ?? 2,
         meta_ingresos_mes:    Number(form.meta_ingresos_mes) || 0,
         link_google_reviews:  form.link_google_reviews.trim() || null,
+        nps_activo:           form.nps_activo,
+        nps_horas_espera:     Number(form.nps_horas_espera) || 2,
       },
     }).eq('id', tenant.id)
     setSaving(false)
@@ -338,6 +356,32 @@ export default function SalonConfig() {
           </div>
         </div>
 
+        {/* Link de promoción */}
+        <div style={{ padding:'14px 16px', borderRadius:14, background:'rgba(245,158,11,0.06)',
+          border:'1px solid rgba(245,158,11,0.22)' }}>
+          <div style={{ fontSize:11, color:'#d97706', fontWeight:700, marginBottom:6 }}>
+            📣 TU PÁGINA DE PROMOCIÓN (auto-actualizada)
+          </div>
+          <div style={{ fontSize:12, color:'var(--text-3)', marginBottom:8, lineHeight:1.5 }}>
+            Página pública con tus servicios, ofertas, paquetes e info del negocio. Se actualiza automáticamente.
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:13, color:'var(--text-2)', flex:1, minWidth:0,
+              overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+              fontFamily:'monospace' }}>
+              {window.location.origin}/promo/{tenant?.slug}
+            </span>
+            <button onClick={() => {
+              navigator.clipboard?.writeText(`${window.location.origin}/promo/${tenant?.slug}`)
+              showToast('Link copiado')
+            }} style={{ padding:'7px 14px', borderRadius:9, border:'1px solid rgba(245,158,11,0.3)',
+              background:'rgba(245,158,11,0.14)', color:'#d97706', fontWeight:700, fontSize:12,
+              cursor:'pointer', flexShrink:0 }}>
+              Copiar
+            </button>
+          </div>
+        </div>
+
         {/* Instrucciones WhatsApp */}
         {!form.whatsapp && (
           <div style={{ padding:'12px 14px', borderRadius:12,
@@ -401,6 +445,19 @@ export default function SalonConfig() {
             value={form.horas_cancelacion}
             onChange={e => set('horas_cancelacion', e.target.value)} />
         </Campo>
+        <Campo label="Consentimiento digital (se muestra como checkbox al reservar)">
+          <textarea className="sp-input" rows={3}
+            placeholder="Ej: Autorizo el tratamiento de mis datos personales según la Ley 1581 de 2012 y acepto la política de cancelación del salón."
+            value={form.consentimiento_texto}
+            onChange={e => set('consentimiento_texto', e.target.value)}
+            style={{ resize:'none' }} />
+          {form.consentimiento_texto && (
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:6, display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ width:14, height:14, borderRadius:3, border:'1.5px solid var(--text-3)', display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0 }}>✓</span>
+              Vista previa: "{form.consentimiento_texto.slice(0, 60)}{form.consentimiento_texto.length > 60 ? '…' : ''}"
+            </div>
+          )}
+        </Campo>
       </Seccion>
 
       {/* ── Programa de puntos ── */}
@@ -420,6 +477,76 @@ export default function SalonConfig() {
         <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
           Los clientes acumulan puntos automáticamente al completar cada cita. El mínimo para canjear controla cuántos puntos se necesitan para un canje.
         </div>
+      </Seccion>
+
+      {/* ── Tiquetera Virtual ── */}
+      <Seccion titulo="Tiquetera Virtual 🎟️">
+        <Campo label="">
+          <label style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }}>
+            <div onClick={() => set('tiquetera_activa', !form.tiquetera_activa)}
+              style={{
+                width:44, height:26, borderRadius:99, flexShrink:0,
+                background: form.tiquetera_activa ? col : 'var(--border)',
+                position:'relative', transition:'background 0.2s',
+              }}>
+              <div style={{
+                position:'absolute', top:3, left: form.tiquetera_activa ? 21 : 3,
+                width:20, height:20, borderRadius:99, background:'#fff',
+                boxShadow:'0 1px 4px rgba(0,0,0,0.25)', transition:'left 0.2s',
+              }} />
+            </div>
+            <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
+              {form.tiquetera_activa ? 'Activada — visible en el portal del cliente' : 'Desactivada'}
+            </span>
+          </label>
+        </Campo>
+
+        {form.tiquetera_activa && (
+          <>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <Campo label="Visitas para el premio">
+                <input className="sp-input" type="number" min="2" max="50"
+                  value={form.tiquetera_meta}
+                  onChange={e => set('tiquetera_meta', e.target.value)} />
+              </Campo>
+              <Campo label="Radio de proximidad (m)">
+                <input className="sp-input" type="number" min="50" max="5000" step="50"
+                  value={form.tiquetera_radio_m}
+                  onChange={e => set('tiquetera_radio_m', e.target.value)} />
+              </Campo>
+            </div>
+
+            <Campo label="Descripción del premio">
+              <input className="sp-input"
+                placeholder="Ej: Servicio gratis a elegir, Mechas gratis…"
+                value={form.tiquetera_premio}
+                onChange={e => set('tiquetera_premio', e.target.value)} />
+            </Campo>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <Campo label="Latitud del negocio">
+                <input className="sp-input" type="number" step="0.0000001"
+                  placeholder="Ej: 3.4516"
+                  value={form.tiquetera_lat}
+                  onChange={e => set('tiquetera_lat', e.target.value)} />
+              </Campo>
+              <Campo label="Longitud del negocio">
+                <input className="sp-input" type="number" step="0.0000001"
+                  placeholder="Ej: -76.5319"
+                  value={form.tiquetera_lng}
+                  onChange={e => set('tiquetera_lng', e.target.value)} />
+              </Campo>
+            </div>
+
+            <div style={{ padding:'12px 14px', borderRadius:12,
+              background:`${col}0d`, border:`1px solid ${col}25`,
+              fontSize:12, color:'var(--text-3)', lineHeight:1.6 }}>
+              La <strong>latitud/longitud</strong> permite sugerir el canje cuando el cliente está cerca del salón.
+              Puedes obtenerlas desde Google Maps → click derecho → "¿Qué hay aquí?".
+              El <strong>radio</strong> es cuántos metros de distancia se consideran "cerca".
+            </div>
+          </>
+        )}
       </Seccion>
 
       {/* ── Objetivos del mes ── */}
@@ -671,6 +798,41 @@ export default function SalonConfig() {
           background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.2)',
           fontSize:11, color:'#93c5fd', lineHeight:1.6 }}>
           Para activar: ve a Supabase → Edge Functions → Schedules y crea un cron para cada función según el horario indicado. Requiere WHATSAPP_TOKEN y WHATSAPP_PHONE_ID en los secrets.
+        </div>
+
+        {/* NPS post-visita */}
+        <div style={{ borderTop:'1px solid var(--border)', paddingTop:16, marginTop:4 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
+            Encuesta NPS post-visita
+          </div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+            <span style={{ fontSize:12, color:'var(--text-3)' }}>
+              Generar enlace WA de encuesta al completar una cita
+            </span>
+            <button onClick={() => set('nps_activo', !form.nps_activo)} style={{
+              padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer',
+              fontWeight:700, fontSize:12,
+              background: form.nps_activo ? 'rgba(34,197,94,0.15)' : 'var(--border)',
+              color:       form.nps_activo ? '#4ade80'              : 'var(--text-3)',
+            }}>
+              {form.nps_activo ? 'Activo' : 'Inactivo'}
+            </button>
+          </div>
+          {form.nps_activo && (
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:12, color:'var(--text-3)', whiteSpace:'nowrap' }}>Mostrar en agenda al completar (horas después)</span>
+              <input className="sp-input" type="number" min="0" max="48"
+                value={form.nps_horas_espera}
+                onChange={e => set('nps_horas_espera', e.target.value)}
+                style={{ width:70 }} />
+            </div>
+          )}
+          {form.nps_activo && !form.link_google_reviews && (
+            <div style={{ marginTop:8, fontSize:11, color:'#fbbf24', padding:'8px 12px',
+              borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              Agrega el enlace de Google Reviews arriba para que la encuesta incluya el link.
+            </div>
+          )}
         </div>
       </Seccion>
 
@@ -1004,6 +1166,33 @@ export default function SalonConfig() {
           )
         })()}
       </Seccion>
+
+      {/* ── Bóveda — solo plan Ultra ─────────────────────── */}
+      {tenant?.plan === 'ultra' && onNavigate && (
+        <Seccion titulo="Bóveda de contraseñas 🔐">
+          <div style={{
+            padding:'16px', borderRadius:14,
+            background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.2)',
+            display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+          }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:3 }}>
+                Contraseñas cifradas del negocio
+              </div>
+              <div style={{ fontSize:12, color:'var(--text-3)', lineHeight:1.5 }}>
+                WiFi, redes sociales, proveedores. Cifrado AES-GCM local — solo tú tienes acceso.
+              </div>
+            </div>
+            <button type="button" onClick={() => onNavigate('boveda')} style={{
+              padding:'9px 18px', borderRadius:10, border:'1px solid rgba(99,102,241,0.35)',
+              background:'rgba(99,102,241,0.1)', color:'#818cf8',
+              fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
+            }}>
+              Abrir →
+            </button>
+          </div>
+        </Seccion>
+      )}
 
       {/* ── Seguridad — cambiar contraseña ──────────────── */}
       <Seccion titulo="Seguridad">

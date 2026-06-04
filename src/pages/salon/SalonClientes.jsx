@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 import SalonNuevaCita from './SalonNuevaCita'
+import TiqueteraCard from '../../components/TiqueteraCard'
 
 function Ico({ d, size = 18 }) {
   return (
@@ -71,7 +72,7 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
-const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'', tipo_precio:'normal', fuente_captacion:'' }
+const FORM_VACIO = { nombre:'', telefono:'', email:'', fecha_nacimiento:'', servicios_interes:'', notas:'', tipo_precio:'normal', fuente_captacion:'', barrio:'' }
 
 export default function SalonClientes() {
   const { tenant } = useTenant()
@@ -117,9 +118,30 @@ export default function SalonClientes() {
   const [sheetPrest,    setSheetPrest]    = useState(false)
   const [formPrest,     setFormPrest]     = useState({ tipo:'prestamo', monto:'', concepto:'', fecha: new Date().toISOString().slice(0,10) })
   const [savingPrest,   setSavingPrest]   = useState(false)
+
+  // Paquetes prepagados
+  const [paquetesCli,   setPaquetesCli]   = useState([])
+  const [loadPaq,       setLoadPaq]       = useState(false)
+  const [sheetPaq,      setSheetPaq]      = useState(false)
+  const [formPaq,       setFormPaq]       = useState({ nombre:'', servicio_id:'', sesiones_total:'4', precio_total:'', vencimiento:'', notas:'' })
+  const [savingPaq,     setSavingPaq]     = useState(false)
+  const [serviciosList, setServiciosList] = useState([])
   const [subiendoFoto,setSubiendoFoto]= useState(false)
   const [tipoFoto,    setTipoFoto]    = useState('resultado')
   const fotoInputRef  = useRef(null)
+
+  // Tiquetera virtual
+  const [tiqueteraData, setTiqueteraData] = useState(null)
+  const [loadTiquetera, setLoadTiquetera] = useState(false)
+  const [canjeando,     setCanjeando]     = useState(false)
+
+  // Consentimiento digital
+  const [consentData,    setConsentData]    = useState(null)
+  const [loadConsent,    setLoadConsent]    = useState(false)
+  const [consentModal,   setConsentModal]   = useState(false)
+  const [consentNombre,  setConsentNombre]  = useState('')
+  const [consentTipo,    setConsentTipo]    = useState('servicio')
+  const [savingConsent,  setSavingConsent]  = useState(false)
   const csvInputRef   = useRef(null)
 
   const [importModal,   setImportModal]   = useState(false)
@@ -277,7 +299,7 @@ export default function SalonClientes() {
 
     const offset = offsetRef.current
     const q = supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags, fuente_captacion')
+      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags, fuente_captacion, barrio')
       .eq('tenant_id', tenant.id)
       .order('nombre')
       .range(offset, offset + PAGE_SIZE - 1)
@@ -347,6 +369,7 @@ export default function SalonClientes() {
       puntos_fidelizacion:  0,
       tipo_precio:          nuevoForm.tipo_precio || 'normal',
       fuente_captacion:     nuevoForm.fuente_captacion || null,
+      barrio:               nuevoForm.barrio.trim() || null,
     })
     setGuardando(false)
     if (error) { showToast('Error al crear cliente', false); return }
@@ -500,6 +523,141 @@ export default function SalonClientes() {
     await supabase.from('prestamos_cliente').delete().eq('id', id).eq('tenant_id', tenant.id)
     showToast('Eliminado')
     cargarPrestamos(sel.id)
+  }
+
+  async function cargarTiquetera(clienteId) {
+    if (!tenant) return
+    setLoadTiquetera(true)
+    setTiqueteraData(null)
+    const { data, error } = await supabase.rpc('tiquetera_cliente', {
+      p_tenant_id:  tenant.id,
+      p_cliente_id: clienteId,
+    })
+    setLoadTiquetera(false)
+    if (!error && data) setTiqueteraData(data)
+  }
+
+  async function canjearTiquetera() {
+    if (!sel || !tiqueteraData?.listo || !tenant) return
+    setCanjeando(true)
+    const { error } = await supabase.from('tiquetera_premios').insert({
+      tenant_id:    tenant.id,
+      cliente_id:   sel.id,
+      visitas_base: tiqueteraData.total,
+      premio:       tiqueteraData.premio,
+    })
+    setCanjeando(false)
+    if (error) { showToast('Error al registrar canje', false); return }
+    showToast('Premio canjeado ✓')
+    cargarTiquetera(sel.id)
+  }
+
+  async function cargarConsentimiento(clienteId) {
+    if (!tenant) return
+    setLoadConsent(true)
+    setConsentData(null)
+    const { data } = await supabase.from('consentimientos')
+      .select('*').eq('cliente_id', clienteId).eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: false })
+    setLoadConsent(false)
+    setConsentData(data || [])
+  }
+
+  async function registrarConsentimiento() {
+    if (!consentNombre.trim()) { showToast('Escribe el nombre del firmante', false); return }
+    if (!sel || !tenant) return
+    setSavingConsent(true)
+    const textoDefault = tenant.texto_consentimiento ||
+      `Yo, el/la cliente, autorizo a ${tenant.nombre} a prestar los servicios solicitados, ` +
+      `al tratamiento de mis datos personales conforme a la ley 1581/2012, y a la toma de fotografías ` +
+      `con fines de seguimiento del servicio. He sido informado/a sobre los procedimientos, productos ` +
+      `y posibles reacciones.`
+
+    const existing = consentData?.find(c => c.tipo === consentTipo)
+    const payload = {
+      tenant_id:      tenant.id,
+      cliente_id:     sel.id,
+      tipo:           consentTipo,
+      texto_version:  textoDefault,
+      nombre_firmante: consentNombre.trim(),
+      aceptado_en:    new Date().toISOString(),
+      revocado_en:    null,
+    }
+
+    const { error } = existing
+      ? await supabase.from('consentimientos').update(payload).eq('id', existing.id)
+      : await supabase.from('consentimientos').insert(payload)
+
+    setSavingConsent(false)
+    if (error) { showToast('Error al registrar: ' + error.message, false); return }
+    showToast('Consentimiento registrado ✓')
+    setConsentModal(false)
+    setConsentNombre('')
+    cargarConsentimiento(sel.id)
+  }
+
+  async function revocarConsentimiento(id) {
+    if (!confirm('¿Revocar este consentimiento?')) return
+    await supabase.from('consentimientos').update({ revocado_en: new Date().toISOString() }).eq('id', id)
+    showToast('Consentimiento revocado')
+    cargarConsentimiento(sel.id)
+  }
+
+  async function cargarPaquetes(clienteId) {
+    if (!tenant) return
+    setLoadPaq(true)
+    const [{ data: paqData }, { data: servsData }] = await Promise.all([
+      supabase.from('paquetes_cliente')
+        .select('*, servicios(nombre)')
+        .eq('cliente_id', clienteId).eq('tenant_id', tenant.id)
+        .order('created_at', { ascending: false }),
+      supabase.from('servicios')
+        .select('id, nombre').eq('tenant_id', tenant.id).eq('activo', true).order('nombre'),
+    ])
+    setPaquetesCli(paqData || [])
+    setServiciosList(servsData || [])
+    setLoadPaq(false)
+  }
+
+  async function guardarPaquete() {
+    if (!formPaq.nombre.trim()) { showToast('Nombre requerido', false); return }
+    const sesTot = parseInt(formPaq.sesiones_total)
+    if (!sesTot || sesTot < 1) { showToast('Sesiones inválidas', false); return }
+    setSavingPaq(true)
+    const { error } = await supabase.from('paquetes_cliente').insert({
+      tenant_id:      tenant.id,
+      cliente_id:     sel.id,
+      servicio_id:    formPaq.servicio_id || null,
+      nombre:         formPaq.nombre.trim(),
+      sesiones_total: sesTot,
+      sesiones_usadas: 0,
+      precio_total:   formPaq.precio_total ? Number(formPaq.precio_total) : null,
+      vencimiento:    formPaq.vencimiento || null,
+      notas:          formPaq.notas || null,
+      activo:         true,
+    })
+    setSavingPaq(false)
+    if (error) { showToast('Error al guardar', false); return }
+    setSheetPaq(false)
+    setFormPaq({ nombre:'', servicio_id:'', sesiones_total:'4', precio_total:'', vencimiento:'', notas:'' })
+    showToast('Plan creado ✓')
+    cargarPaquetes(sel.id)
+  }
+
+  async function usarSesion(paq) {
+    if (paq.sesiones_usadas >= paq.sesiones_total) { showToast('Plan agotado', false); return }
+    const { error } = await supabase.from('paquetes_cliente')
+      .update({ sesiones_usadas: paq.sesiones_usadas + 1 })
+      .eq('id', paq.id).eq('tenant_id', tenant.id)
+    if (error) { showToast('Error', false); return }
+    showToast('Sesión registrada ✓')
+    cargarPaquetes(sel.id)
+  }
+
+  async function cancelarPaquete(id) {
+    await supabase.from('paquetes_cliente').update({ activo: false }).eq('id', id).eq('tenant_id', tenant.id)
+    showToast('Plan cancelado')
+    cargarPaquetes(sel.id)
   }
 
   async function abrirCliente(cli) {
@@ -727,6 +885,13 @@ export default function SalonClientes() {
 
               {nuevoTab === 'notas' && <>
                 <div>
+                  <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
+                    BARRIO / ZONA
+                  </label>
+                  <input className="sp-input" placeholder="Ej: Laureles, Centro, Chapinero…"
+                    value={nuevoForm.barrio}
+                    onChange={e => setNuevoForm(p => ({ ...p, barrio: e.target.value }))}
+                    style={{ marginBottom:14 }} />
                   <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>
                     ¿CÓMO NOS CONOCISTE?
                   </label>
@@ -1172,6 +1337,12 @@ export default function SalonClientes() {
                   <span style={{ lineHeight:1.5 }}>{sel.servicios_interes}</span>
                 </div>
               )}
+              {sel.barrio && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color:'var(--text-3)' }}>
+                  <span style={{ fontSize:15 }}>📍</span>
+                  {sel.barrio}
+                </div>
+              )}
               {sel.fuente_captacion && (
                 <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color:'var(--text-3)' }}>
                   <span style={{ fontSize:15 }}>
@@ -1247,16 +1418,19 @@ export default function SalonClientes() {
             {/* ── Tabs Historial / Fotos ── */}
             <div style={{ display:'flex', gap:4, marginBottom:14,
               background:'var(--card)', boxShadow:'0 1px 8px rgba(0,0,0,0.1)', borderRadius:12, padding:4 }}>
-              {[['historial','Historial'],['fotos','Fotos 📷'],['credito','Crédito'],['puntos','Puntos ⭐']].map(([t, label]) => (
+              {[['historial','Historial'],['fotos','Fotos 📷'],['credito','Crédito'],['puntos','⭐'],['paquetes','🎟️ Planes'],['tiquetera','🏷️ Sello'],['consentimiento','📋 Consent.']].map(([t, label]) => (
                 <button key={t} onClick={() => {
                   setTabCliente(t)
-                  if (t === 'credito' && sel?.id) cargarPrestamos(sel.id)
-                  if (t === 'puntos' && sel?.id) cargarPuntos(sel.id)
+                  if (t === 'credito'       && sel?.id) cargarPrestamos(sel.id)
+                  if (t === 'puntos'        && sel?.id) cargarPuntos(sel.id)
+                  if (t === 'paquetes'      && sel?.id) cargarPaquetes(sel.id)
+                  if (t === 'tiquetera'     && sel?.id) cargarTiquetera(sel.id)
+                  if (t === 'consentimiento'&& sel?.id) cargarConsentimiento(sel.id)
                 }} style={{
                   flex:1, padding:'8px 0', borderRadius:8, cursor:'pointer', border:'none',
                   background: tabCliente === t ? col : 'transparent',
                   color: tabCliente === t ? '#fff' : 'var(--text-3)',
-                  fontWeight:700, fontSize:13, transition:'all 0.15s',
+                  fontWeight:700, fontSize:12, transition:'all 0.15s',
                 }}>{label}</button>
               ))}
             </div>
@@ -1558,8 +1732,326 @@ export default function SalonClientes() {
               )
             })()}
 
+            {tabCliente === 'paquetes' && (() => {
+              const activos  = paquetesCli.filter(p => p.activo)
+              const inactivos = paquetesCli.filter(p => !p.activo)
+              return (
+                <>
+                  {/* Resumen */}
+                  {activos.length > 0 && (
+                    <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                      <div style={{ flex:1, background:'var(--card)', borderRadius:12, padding:'10px 14px', border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Planes activos</div>
+                        <div style={{ fontSize:20, fontWeight:800, color:'var(--text)', fontFamily:'Outfit' }}>{activos.length}</div>
+                      </div>
+                      <div style={{ flex:1, background:'var(--card)', borderRadius:12, padding:'10px 14px', border:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Sesiones disponibles</div>
+                        <div style={{ fontSize:20, fontWeight:800, color:col, fontFamily:'Outfit' }}>
+                          {activos.reduce((s, p) => s + (p.sesiones_total - p.sesiones_usadas), 0)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botón nuevo plan */}
+                  <button onClick={async () => {
+                    if (!serviciosList.length && tenant) {
+                      const { data } = await supabase.from('servicios').select('id,nombre').eq('tenant_id', tenant.id).eq('activo', true).order('nombre')
+                      setServiciosList(data || [])
+                    }
+                    setFormPaq({ nombre:'', servicio_id:'', sesiones_total:'4', precio_total:'', vencimiento:'', notas:'' })
+                    setSheetPaq(true)
+                  }} style={{
+                    width:'100%', padding:'10px', borderRadius:12, border:`1.5px dashed ${col}66`,
+                    background:'transparent', color:col, fontWeight:700, fontSize:13, cursor:'pointer',
+                    marginBottom:12,
+                  }}>
+                    + Nuevo plan
+                  </button>
+
+                  {loadPaq ? (
+                    <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}>
+                      <div className="sp-spinner" style={{ borderTopColor:col }} />
+                    </div>
+                  ) : activos.length === 0 && inactivos.length === 0 ? (
+                    <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>
+                      Sin planes prepagados aún
+                    </p>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      {[...activos, ...inactivos].map(paq => {
+                        const pct   = Math.min(100, Math.round(paq.sesiones_usadas / paq.sesiones_total * 100))
+                        const resta = paq.sesiones_total - paq.sesiones_usadas
+                        const venc  = paq.vencimiento ? new Date(paq.vencimiento + 'T12:00:00') : null
+                        const vencida = venc && venc < new Date()
+                        const barColor = !paq.activo || vencida ? '#6b7280' : resta === 0 ? '#f87171' : col
+                        return (
+                          <div key={paq.id} style={{
+                            background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:'14px',
+                            opacity: paq.activo && !vencida ? 1 : 0.55,
+                          }}>
+                            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
+                              <div>
+                                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', lineHeight:1.2 }}>{paq.nombre}</div>
+                                {paq.servicio_id && serviciosList.find(s => s.id === paq.servicio_id) && (
+                                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                                    {serviciosList.find(s => s.id === paq.servicio_id)?.nombre}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ textAlign:'right', flexShrink:0, marginLeft:10 }}>
+                                <div style={{ fontSize:18, fontWeight:800, color: barColor, fontFamily:'Outfit' }}>
+                                  {resta}
+                                  <span style={{ fontSize:11, fontWeight:500, color:'var(--text-3)' }}>/{paq.sesiones_total}</span>
+                                </div>
+                                <div style={{ fontSize:10, color:'var(--text-3)' }}>sesiones</div>
+                              </div>
+                            </div>
+
+                            {/* Barra de progreso */}
+                            <div style={{ height:6, borderRadius:6, background:'var(--border)', marginBottom:8 }}>
+                              <div style={{ height:6, borderRadius:6, background:barColor, width:`${pct}%`, transition:'width 0.3s' }} />
+                            </div>
+
+                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:6 }}>
+                              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                                {paq.precio_total && (
+                                  <span style={{ fontSize:11, color:'var(--text-3)' }}>
+                                    ${Number(paq.precio_total).toLocaleString('es-CO')}
+                                  </span>
+                                )}
+                                {venc && (
+                                  <span style={{ fontSize:11, color: vencida ? '#f87171' : 'var(--text-3)' }}>
+                                    {vencida ? 'Vencida' : `Vence ${venc.toLocaleDateString('es-CO')}`}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display:'flex', gap:6 }}>
+                                {paq.activo && !vencida && resta > 0 && (
+                                  <button onClick={() => usarSesion(paq)} style={{
+                                    padding:'5px 12px', borderRadius:8, border:`1px solid ${col}55`,
+                                    background:`${col}15`, color:col, fontSize:11, fontWeight:700, cursor:'pointer',
+                                  }}>
+                                    Usar sesión
+                                  </button>
+                                )}
+                                {paq.activo && (
+                                  <button onClick={() => cancelarPaquete(paq.id)} style={{
+                                    padding:'5px 10px', borderRadius:8, border:'1px solid var(--border)',
+                                    background:'transparent', color:'var(--text-3)', fontSize:11, cursor:'pointer',
+                                  }}>
+                                    Cancelar
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+
+            {tabCliente === 'tiquetera' && (() => {
+              const tq = tiqueteraData
+              return (
+                <>
+                  {loadTiquetera ? (
+                    <div style={{ display:'flex', justifyContent:'center', padding:'24px 0' }}>
+                      <div className="sp-spinner" style={{ borderTopColor:col }} />
+                    </div>
+                  ) : !tq ? (
+                    <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>
+                      Sin datos de tiquetera
+                    </p>
+                  ) : !tq.activa ? (
+                    <div style={{ padding:'16px', borderRadius:14,
+                      background:'var(--card)', border:'1px solid var(--border)',
+                      textAlign:'center' }}>
+                      <div style={{ fontSize:32, marginBottom:8 }}>🎟️</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--text-3)' }}>
+                        La tiquetera virtual no está activada para este negocio
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--text-3)', marginTop:6 }}>
+                        Actívala en Configuración → Tiquetera Virtual
+                      </div>
+                    </div>
+                  ) : (
+                    <TiqueteraCard
+                      progreso={tq.progreso ?? 0}
+                      meta={tq.meta ?? 10}
+                      premio={tq.premio ?? 'Servicio gratis'}
+                      canjeados={tq.canjeados ?? 0}
+                      listo={tq.listo ?? false}
+                      color={col}
+                      onCanjear={canjearTiquetera}
+                      canjeando={canjeando}
+                    />
+                  )}
+                </>
+              )
+            })()}
+
+            {tabCliente === 'consentimiento' && (() => {
+              const firmado = consentData?.find(c => c.activo)
+              const historial = consentData || []
+              const fmtFecha = (iso) => {
+                if (!iso) return '—'
+                const d = new Date(iso)
+                return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }) +
+                  ' ' + d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })
+              }
+              return (
+                <>
+                  {loadConsent ? (
+                    <div style={{ display:'flex', justifyContent:'center', padding:'24px 0' }}>
+                      <div className="sp-spinner" style={{ borderTopColor:col }} />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Estado actual */}
+                      <div style={{ padding:'16px 18px', borderRadius:14, marginBottom:16,
+                        background: firmado ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)',
+                        border: `1px solid ${firmado ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                          <span style={{ fontSize:22 }}>{firmado ? '✅' : '⚠️'}</span>
+                          <div>
+                            <div style={{ fontWeight:700, fontSize:14,
+                              color: firmado ? '#16a34a' : '#d97706' }}>
+                              {firmado ? 'Consentimiento firmado' : 'Sin consentimiento registrado'}
+                            </div>
+                            {firmado && (
+                              <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
+                                Firmado por <strong style={{ color:'var(--text)' }}>{firmado.nombre_firmante}</strong>
+                                {' · '}{fmtFecha(firmado.aceptado_en)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Acciones */}
+                      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+                        <button onClick={() => {
+                            setConsentTipo('servicio')
+                            setConsentNombre(firmado?.nombre_firmante || sel?.nombre || '')
+                            setConsentModal(true)
+                          }}
+                          style={{ flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer',
+                            background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+                            fontWeight:700, fontSize:13 }}>
+                          {firmado ? '🔄 Actualizar firma' : '✍️ Registrar consentimiento'}
+                        </button>
+                        {firmado && (
+                          <button onClick={() => revocarConsentimiento(firmado.id)}
+                            style={{ padding:'10px 14px', borderRadius:10, border:'1px solid rgba(239,68,68,0.3)',
+                              background:'rgba(239,68,68,0.06)', color:'#ef4444', cursor:'pointer', fontSize:13 }}>
+                            Revocar
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Historial */}
+                      {historial.length > 0 && (
+                        <>
+                          <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)',
+                            textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Historial</div>
+                          {historial.map(c => (
+                            <div key={c.id} style={{ padding:'10px 14px', borderRadius:10, marginBottom:6,
+                              background:'var(--card)', border:'1px solid var(--border)',
+                              fontSize:13, color:'var(--text-2)' }}>
+                              <span style={{ fontWeight:600, color:'var(--text)', marginRight:8 }}>
+                                {c.activo ? '✅' : '❌'} {c.nombre_firmante}
+                              </span>
+                              {fmtFecha(c.aceptado_en)}
+                              {c.revocado_en && <span style={{ color:'#ef4444', marginLeft:8 }}>— Revocado {fmtFecha(c.revocado_en)}</span>}
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
+              )
+            })()}
+
           </div>
         </>
+      )}
+
+      {/* Sheet: nuevo plan prepagado */}
+      {sheetPaq && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'flex-end', background:'rgba(0,0,0,0.45)' }}
+          onClick={e => { if (e.target === e.currentTarget) setSheetPaq(false) }}>
+          <div style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'var(--bg)', borderRadius:'20px 20px 0 0', padding:'24px 20px 32px', maxHeight:'90vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+              <h3 style={{ margin:0, fontSize:16, fontWeight:800, color:'var(--text)' }}>Nuevo plan prepagado</h3>
+              <button onClick={() => setSheetPaq(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'var(--text-3)' }}>×</button>
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div>
+                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Nombre del plan *</label>
+                <input className="sp-input" placeholder="Ej: Pack 10 cortes" value={formPaq.nombre}
+                  onChange={e => setFormPaq(f => ({...f, nombre:e.target.value}))}
+                  style={{ marginTop:4, width:'100%' }} />
+              </div>
+
+              <div>
+                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Servicio (opcional)</label>
+                <select className="sp-input" value={formPaq.servicio_id}
+                  onChange={e => setFormPaq(f => ({...f, servicio_id:e.target.value}))}
+                  style={{ marginTop:4, width:'100%' }}>
+                  <option value="">— Cualquier servicio —</option>
+                  {serviciosList.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+              </div>
+
+              <div style={{ display:'flex', gap:10 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Sesiones</label>
+                  <input className="sp-input" type="number" min="1" placeholder="4"
+                    value={formPaq.sesiones_total}
+                    onChange={e => setFormPaq(f => ({...f, sesiones_total:e.target.value}))}
+                    style={{ marginTop:4, width:'100%' }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Precio total</label>
+                  <input className="sp-input" type="number" min="0" placeholder="0"
+                    value={formPaq.precio_total}
+                    onChange={e => setFormPaq(f => ({...f, precio_total:e.target.value}))}
+                    style={{ marginTop:4, width:'100%' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Vencimiento (opcional)</label>
+                <input className="sp-input" type="date"
+                  value={formPaq.vencimiento}
+                  onChange={e => setFormPaq(f => ({...f, vencimiento:e.target.value}))}
+                  style={{ marginTop:4, width:'100%' }} />
+              </div>
+
+              <div>
+                <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Notas</label>
+                <textarea className="sp-input" rows={2} placeholder="Observaciones…"
+                  value={formPaq.notas}
+                  onChange={e => setFormPaq(f => ({...f, notas:e.target.value}))}
+                  style={{ marginTop:4, width:'100%', resize:'vertical' }} />
+              </div>
+
+              <button disabled={savingPaq} onClick={guardarPaquete} style={{
+                width:'100%', padding:'13px', borderRadius:12, border:'none', cursor:'pointer',
+                background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+                fontWeight:700, fontSize:14, marginTop:4, opacity: savingPaq ? 0.7 : 1,
+              }}>
+                {savingPaq ? 'Guardando…' : 'Guardar plan'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showAgendarCita && sel && (
@@ -1569,6 +2061,61 @@ export default function SalonClientes() {
           clientePreId={sel.id}
           clientePreNombre={sel.nombre}
         />
+      )}
+
+      {/* Modal: registrar consentimiento */}
+      {consentModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:400, display:'flex', alignItems:'flex-end',
+          background:'rgba(0,0,0,0.5)' }}
+          onClick={e => { if (e.target === e.currentTarget) setConsentModal(false) }}>
+          <div style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'var(--bg)',
+            borderRadius:'20px 20px 0 0', padding:'28px 24px 40px', maxHeight:'90vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <h3 style={{ margin:0, fontSize:17, fontWeight:800, color:'var(--text)' }}>Consentimiento informado</h3>
+              <button onClick={() => setConsentModal(false)}
+                style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'var(--text-3)' }}>×</button>
+            </div>
+
+            <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12,
+              padding:'14px 16px', marginBottom:18, fontSize:12, color:'var(--text-2)', lineHeight:1.6 }}>
+              Yo, el/la cliente, autorizo a <strong style={{ color:'var(--text)' }}>{tenant?.nombre}</strong> a prestar
+              los servicios solicitados, al tratamiento de mis datos personales conforme a la ley 1581/2012,
+              y a la toma de fotografías con fines de seguimiento del servicio. He sido informado/a sobre
+              los procedimientos, productos y posibles reacciones.
+            </div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase',
+                letterSpacing:0.5, display:'block', marginBottom:6 }}>Nombre completo del firmante *</label>
+              <input className="sp-input" placeholder="Nombre del cliente"
+                value={consentNombre}
+                onChange={e => setConsentNombre(e.target.value)}
+                style={{ width:'100%' }} />
+            </div>
+
+            <div style={{ marginBottom:20 }}>
+              <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase',
+                letterSpacing:0.5, display:'block', marginBottom:6 }}>Tipo de consentimiento</label>
+              <select className="sp-input" value={consentTipo} onChange={e => setConsentTipo(e.target.value)}
+                style={{ width:'100%' }}>
+                <option value="servicio">Servicios de belleza / estética</option>
+                <option value="datos">Tratamiento de datos personales</option>
+                <option value="foto">Fotografías y uso de imagen</option>
+                <option value="general">General (todos los anteriores)</option>
+              </select>
+            </div>
+
+            <button disabled={savingConsent} onClick={registrarConsentimiento}
+              style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', cursor:'pointer',
+                background:`linear-gradient(135deg,${col},${col}bb)`, color:'#fff',
+                fontWeight:700, fontSize:14, opacity: savingConsent ? 0.7 : 1 }}>
+              {savingConsent ? 'Guardando…' : '✍️ Confirmar firma digital'}
+            </button>
+            <p style={{ fontSize:11, color:'var(--text-3)', textAlign:'center', marginTop:10 }}>
+              Al confirmar, se registra fecha, hora y nombre como firma digital
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )
