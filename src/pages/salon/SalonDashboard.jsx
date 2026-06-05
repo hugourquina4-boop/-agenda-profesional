@@ -136,6 +136,98 @@ function LinkReservas({ slug, col, showToast }) {
   )
 }
 
+// ─── Configuración de widgets del dashboard ───────────────────────────────────
+const WIDGETS_DEF = [
+  { id: 'link_reservas', label: 'Link de reservas',        group: 'Accesos'     },
+  { id: 'chip_wa',       label: 'Estado WhatsApp',         group: 'Accesos'     },
+  { id: 'campanas',      label: 'Campañas activas',        group: 'Marketing'   },
+  { id: 'equipo',        label: 'Carga del equipo',        group: 'Equipo'      },
+  { id: 'prof_top',      label: 'Profesional top del mes', group: 'Equipo'      },
+  { id: 'lista_espera',  label: 'Lista de espera',         group: 'Agenda'      },
+  { id: 'proximos_7',    label: 'Próximos 7 días',         group: 'Agenda'      },
+  { id: 'ingresos_mes',  label: 'Resumen financiero',      group: 'Finanzas'    },
+  { id: 'meta',          label: 'Meta de ingresos',        group: 'Finanzas'    },
+  { id: 'tendencia',     label: 'Tendencia semanal',       group: 'Finanzas'    },
+  { id: 'ticket_prom',   label: 'Ticket promedio',         group: 'Finanzas'    },
+  { id: 'analytics',     label: 'Analytics del mes',       group: 'Finanzas'    },
+  { id: 'top_clientes',  label: 'Top clientes del mes',    group: 'Clientes'    },
+  { id: 'cumpleaneros',  label: 'Cumpleañeros próximos',   group: 'Clientes'    },
+  { id: 'retencion',     label: 'Retención vs. nuevos',    group: 'Clientes'    },
+  { id: 'riesgo',        label: 'Clientes en riesgo',      group: 'Clientes'    },
+  { id: 'stock_bajo',    label: 'Alertas de stock bajo',   group: 'Inventario'  },
+  { id: 'por_vencer',    label: 'Productos por vencer',    group: 'Inventario'  },
+  { id: 'sin_cobrar',    label: 'Citas sin cobrar',        group: 'Operaciones' },
+  { id: 'hora_pico',     label: 'Hora pico del negocio',   group: 'Operaciones' },
+  { id: 'cancelaciones', label: 'Tasa de cancelaciones',   group: 'Operaciones' },
+]
+
+function PersonalizarModal({ prefs, onChange, onClose, col }) {
+  const groups = [...new Set(WIDGETS_DEF.map(w => w.group))]
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:9999,
+      background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)',
+      display:'flex', alignItems:'flex-end', justifyContent:'center',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background:'var(--bg)', borderRadius:'20px 20px 0 0',
+        width:'100%', maxWidth:480, maxHeight:'85dvh',
+        overflow:'auto', padding:'0 0 32px',
+        boxShadow:'0 -8px 40px rgba(0,0,0,0.3)',
+      }}>
+        <div style={{ position:'sticky', top:0, background:'var(--bg)', zIndex:1,
+          padding:'16px 20px 12px', borderBottom:'1px solid var(--border)',
+          display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <div style={{ fontWeight:800, fontSize:16 }}>Personalizar dashboard</div>
+            <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>Activa o desactiva cada sección</div>
+          </div>
+          <button onClick={onClose} style={{ background:'var(--card)', border:'none', borderRadius:8,
+            width:32, height:32, cursor:'pointer', fontSize:18, color:'var(--text-2)' }}>×</button>
+        </div>
+        <div style={{ padding:'16px 20px' }}>
+          {groups.map(g => (
+            <div key={g} style={{ marginBottom:20 }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'var(--text-3)', letterSpacing:1.2,
+                textTransform:'uppercase', marginBottom:8 }}>{g}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {WIDGETS_DEF.filter(w => w.group === g).map(w => {
+                  const on = prefs[w.id] !== false
+                  return (
+                    <div key={w.id}
+                      style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding:'11px 14px', borderRadius:12, background:'var(--card)',
+                        border:`1px solid ${on ? col+'30' : 'var(--border)'}`,
+                        cursor:'pointer', transition:'border-color 0.15s' }}
+                      onClick={() => onChange(w.id, !on)}>
+                      <span style={{ fontSize:14, color:'var(--text)', fontWeight: on ? 500 : 400 }}>{w.label}</span>
+                      <div style={{ width:40, height:22, borderRadius:11, flexShrink:0,
+                        background: on ? col : 'var(--border)', position:'relative',
+                        transition:'background 0.2s' }}>
+                        <div style={{ position:'absolute', top:2,
+                          left: on ? 20 : 2, width:18, height:18,
+                          borderRadius:'50%', background:'#fff',
+                          transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.25)' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => { onChange('__reset__'); onClose() }}
+            style={{ width:'100%', padding:'10px', borderRadius:10, marginTop:4,
+              border:'1px dashed var(--border)', background:'transparent',
+              color:'var(--text-3)', fontSize:13, cursor:'pointer' }}>
+            Restaurar configuración por defecto
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SalonDashboard({ onNavigate, onNuevaCita }) {
   const { tenant, suscripcion, esSuperadmin } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
@@ -172,6 +264,50 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
   const [showRecordManana, setShowRecordManana] = useState(false)
   const [waCitasCount,   setWaCitasCount]   = useState(isDemo ? 42 : 0)
 
+  // Nuevos widgets
+  const [campanasActivas,  setCampanasActivas]  = useState(isDemo ? [
+    { id:'1', nombre:'Bienvenida nuevos clientes', segmento:'todos' },
+    { id:'2', nombre:'Descuento cumpleaños 20%',   segmento:'cumpleanos_mes' },
+  ] : [])
+  const [productosVencer,  setProductosVencer]  = useState([])
+  const [ticketProm,       setTicketProm]       = useState(isDemo ? 52000 : 0)
+  const [retencionData,    setRetencionData]    = useState(isDemo ? { recurrentes:18, nuevos:7, perdidos:3 } : null)
+  const [clientesRiesgoN,  setClientesRiesgoN]  = useState(isDemo ? 5 : 0)
+  const [horaPico,         setHoraPico]         = useState(isDemo ? [{ hora:'10:00', count:8 },{ hora:'14:00', count:6 },{ hora:'09:00', count:5 }] : [])
+  const [tasaCancelacion,  setTasaCancelacion]  = useState(isDemo ? 8 : 0)
+
+  // Personalización dashboard
+  const [dashPrefs,        setDashPrefs]        = useState({})
+  const [showPersonalizar, setShowPersonalizar] = useState(false)
+
+  const PREFS_KEY = tenant ? `sp_dash_prefs_${tenant.id}` : null
+
+  useEffect(() => {
+    if (!PREFS_KEY) return
+    try {
+      const stored = localStorage.getItem(PREFS_KEY)
+      if (stored) setDashPrefs(JSON.parse(stored))
+    } catch {}
+  }, [PREFS_KEY])
+
+  function updatePref(id, val) {
+    if (id === '__reset__') {
+      setDashPrefs({})
+      if (PREFS_KEY) localStorage.removeItem(PREFS_KEY)
+      return
+    }
+    setDashPrefs(prev => {
+      const next = { ...prev, [id]: val }
+      if (PREFS_KEY) localStorage.setItem(PREFS_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  function isVisible(id) {
+    if (dashPrefs[id] === false) return false
+    return true
+  }
+
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
   const showToast = (msg, color='#22c55e') => {
@@ -192,8 +328,14 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
         const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10)
       })()
 
-      const hace14iso = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
-      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes, pagosHoyRes, portalHoyRes] = await Promise.all([
+      const hace14iso  = (() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0,10) })()
+      const hace30iso  = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0,10) })()
+      const hace90iso  = (() => { const d = new Date(); d.setDate(d.getDate() - 90); return d.toISOString().slice(0,10) })()
+      const en30iso    = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10) })()
+      const mesAntInicio = (() => { const d = new Date(mesInicio); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,10) })()
+      const mesAntFin    = (() => { const d = new Date(mesInicio); d.setDate(0); return d.toISOString().slice(0,10) })()
+
+      const [citasRes, equipoRes, stockRes, servRes, gastosRes, ingresosMesRes, citasMananaRes, cumplRes, analyticsMesRes, pagos14Res, esperaRes, pagosCltRes, pagosHoyRes, portalHoyRes, campanasRes, productosVencerRes, pagosAntRes, citasRiesgoRes] = await Promise.all([
         supabase.from('citas')
           .select('id,fecha_inicio,fecha_fin,estado,clientes_agenda(nombre,telefono),servicios(nombre,precio,duracion_min),profesionales(id,nombre,foto_url)')
           .eq('tenant_id', tenant.id)
@@ -258,6 +400,34 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
           .eq('fuente', 'portal')
           .gte('fecha_inicio', `${fecha}T00:00:00`)
           .lte('fecha_inicio', `${fecha}T23:59:59`),
+        // Query 15: campañas activas
+        supabase.from('campanas_marketing')
+          .select('id, nombre, segmento, activo')
+          .eq('tenant_id', tenant.id)
+          .eq('activo', true)
+          .limit(3),
+        // Query 16: productos por vencer próximos 30 días
+        supabase.from('productos_salon')
+          .select('id, nombre, stock, fecha_vencimiento')
+          .eq('tenant_id', tenant.id)
+          .eq('activo', true)
+          .gte('fecha_vencimiento', fecha)
+          .lte('fecha_vencimiento', en30iso)
+          .order('fecha_vencimiento').limit(10),
+        // Query 17: pagos mes anterior (para retención)
+        supabase.from('pagos')
+          .select('monto, citas(clientes_agenda(id))')
+          .eq('tenant_id', tenant.id)
+          .eq('estado', 'pagado')
+          .gte('created_at', `${mesAntInicio}T00:00:00`)
+          .lte('created_at', `${mesAntFin}T23:59:59`),
+        // Query 18: clientes en riesgo (última cita 30–90d atrás)
+        supabase.from('citas')
+          .select('clientes_agenda(id, nombre)')
+          .eq('tenant_id', tenant.id)
+          .in('estado', ['completada'])
+          .gte('fecha_inicio', `${hace90iso}T00:00:00`)
+          .lte('fecha_inicio', `${hace30iso}T23:59:59`),
       ])
       const citasList  = citasRes.data  || []
       const equipoList = equipoRes.data || []
@@ -349,6 +519,56 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
         const d = new Date(hace14base); d.setDate(hace14base.getDate() + i); return d.toISOString().slice(0, 10)
       })
       setTendencia14(dias14.map(d => porDia14[d] || 0))
+
+      // Campañas activas
+      if (!isDemo) setCampanasActivas(campanasRes.data || [])
+
+      // Productos por vencer
+      if (!isDemo) setProductosVencer(productosVencerRes.data || [])
+
+      // Ticket promedio del mes
+      const citasCobradas = citasMes.filter(c => c.estado === 'completada')
+      if (!isDemo && citasCobradas.length > 0) {
+        setTicketProm(Math.round(totalIngresos / citasCobradas.length))
+      }
+
+      // Hora pico (top 3 horas con más citas)
+      if (!isDemo) {
+        const horaMap = {}
+        citasMes.forEach(c => {
+          if (!c.fecha_inicio) return
+          const h = c.fecha_inicio.substring(11, 16)
+          horaMap[h] = (horaMap[h] || 0) + 1
+        })
+        setHoraPico(Object.entries(horaMap).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([hora, count]) => ({ hora, count })))
+      }
+
+      // Tasa de cancelaciones del mes
+      if (!isDemo) {
+        const totalCitas = citasMes.length
+        const canceladas = citasMes.filter(c => c.estado === 'cancelada').length
+        setTasaCancelacion(totalCitas > 0 ? Math.round((canceladas / totalCitas) * 100) : 0)
+      }
+
+      // Retención: clientes que también compraron el mes anterior
+      if (!isDemo) {
+        const idsAnteriores = new Set(
+          (pagosAntRes.data || []).map(p => p.citas?.clientes_agenda?.id).filter(Boolean)
+        )
+        const idsActuales = new Set(
+          (pagosCltRes.data || []).map(p => p.citas?.clientes_agenda?.id).filter(Boolean)
+        )
+        const recurrentes = [...idsActuales].filter(id => idsAnteriores.has(id)).length
+        const nuevos = [...idsActuales].filter(id => !idsAnteriores.has(id)).length
+        setRetencionData({ recurrentes, nuevos, total: idsActuales.size })
+      }
+
+      // Clientes en riesgo (30-90d sin visitar, sin visita en los últimos 30d)
+      if (!isDemo) {
+        const idsRiesgo = new Set((citasRiesgoRes.data || []).map(c => c.clientes_agenda?.id).filter(Boolean))
+        const idsRecientes = new Set(citasMes.map(c => c.clientes_agenda?.id).filter(Boolean))
+        setClientesRiesgoN([...idsRiesgo].filter(id => !idsRecientes.has(id)).length)
+      }
     } catch(e) {
       console.error('[SalonDashboard]', e)
     } finally {
@@ -777,7 +997,7 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
       {/* ── Chip WA ─────────────────────────────────────── */}
       {!isDemo && (
         <button onClick={() => onNavigate('config')} style={{
-          margin:'8px 16px 0', padding:'10px 14px', borderRadius:12, width:'calc(100% - 32px)',
+          margin:'16px 16px 0', padding:'10px 14px', borderRadius:12, width:'calc(100% - 32px)',
           display:'flex', alignItems:'center', gap:10, cursor:'pointer',
           background: tenant?.whatsapp ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)',
           border: `1px solid ${tenant?.whatsapp ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}`,
@@ -804,6 +1024,19 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
           <Ico d="M9 5l7 7-7 7" size={14} />
         </button>
       )}
+
+      {/* ── Botón personalizar (acceso flotante móvil) ── */}
+      <div style={{ margin:'12px 16px 0', display:'flex', justifyContent:'flex-end' }}>
+        <button onClick={() => setShowPersonalizar(true)} style={{
+          display:'flex', alignItems:'center', gap:5,
+          padding:'6px 12px', borderRadius:20, fontSize:11, fontWeight:700,
+          background:'var(--card)', border:'1px solid var(--border)', color:'var(--text-2)',
+          cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.08)',
+        }}>
+          <Ico d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" size={13} />
+          Personalizar
+        </button>
+      </div>
 
       {/* ── Hero ─────────────────────────────────────────── */}
       <div className="sp-hero" style={{ background:`linear-gradient(135deg,${col}ee,${col}77)` }}>
@@ -1196,6 +1429,177 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
             </div>
           </div>
 
+        {/* ── Ticket promedio + Tasa cancelaciones ─────── */}
+        {(ticketProm > 0 || tasaCancelacion > 0) && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            {ticketProm > 0 && (
+              <div className="sp-kpi-card" style={{ padding:'14px', textAlign:'center' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>
+                  Ticket promedio
+                </div>
+                <div style={{ fontSize:22, fontWeight:800, fontFamily:'Outfit', color:col }}>{fmtCOP(ticketProm)}</div>
+                <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>por servicio cobrado</div>
+              </div>
+            )}
+            {tasaCancelacion >= 0 && (
+              <div className="sp-kpi-card" style={{ padding:'14px', textAlign:'center' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:6, textTransform:'uppercase', letterSpacing:0.5 }}>
+                  Cancelaciones
+                </div>
+                <div style={{ fontSize:22, fontWeight:800, fontFamily:'Outfit', color: tasaCancelacion > 15 ? '#f87171' : tasaCancelacion > 8 ? '#fbbf24' : '#4ade80' }}>
+                  {tasaCancelacion}%
+                </div>
+                <div style={{ fontSize:11, color:'var(--text-3)', marginTop:3 }}>del total de citas</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Retención ─────────────────────────────────── */}
+        {retencionData && (retencionData.recurrentes > 0 || retencionData.nuevos > 0) && (
+          <div className="sp-kpi-card" style={{ padding:'14px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>
+              Retención de clientes
+            </div>
+            {[
+              { label:'Recurrentes', val: retencionData.recurrentes, color:'#4ade80' },
+              { label:'Nuevos',      val: retencionData.nuevos,      color:col },
+            ].map(row => {
+              const max = Math.max(retencionData.recurrentes, retencionData.nuevos, 1)
+              return (
+                <div key={row.label} style={{ marginBottom:8 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--text-2)' }}>{row.label}</span>
+                    <span style={{ fontSize:10, fontWeight:800, color:row.color }}>{row.val}</span>
+                  </div>
+                  <div style={{ height:4, borderRadius:2, background:'var(--border)' }}>
+                    <div style={{ height:'100%', width:`${(row.val/max)*100}%`, background:row.color, borderRadius:2, transition:'width 0.5s' }} />
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ fontSize:10, color:'var(--text-3)', marginTop:4 }}>
+              {retencionData.total > 0
+                ? `${Math.round(retencionData.recurrentes/retencionData.total*100)}% de retención este mes`
+                : 'Aún sin datos suficientes'}
+            </div>
+          </div>
+        )}
+
+        {/* ── Clientes en riesgo ────────────────────────── */}
+        {clientesRiesgoN > 0 && (
+          <button onClick={() => onNavigate('clientes')} style={{
+            width:'100%', textAlign:'left', cursor:'pointer',
+            padding:'12px 14px', borderRadius:14,
+            background:'rgba(251,113,133,0.08)', border:'1px solid rgba(251,113,133,0.25)',
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>⚠️</span>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:'#fb7185' }}>
+                  {clientesRiesgoN} cliente{clientesRiesgoN !== 1 ? 's' : ''} en riesgo de perder
+                </div>
+                <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
+                  No han visitado en 30–90 días · Toca para ver clientes
+                </div>
+              </div>
+            </div>
+          </button>
+        )}
+
+        {/* ── Hora pico ─────────────────────────────────── */}
+        {horaPico.length > 0 && (
+          <div className="sp-kpi-card" style={{ padding:'14px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', marginBottom:10, textTransform:'uppercase', letterSpacing:0.5 }}>
+              Horas pico este mes
+            </div>
+            {horaPico.map((hp, i) => {
+              const max = horaPico[0]?.count || 1
+              const medals = ['🥇','🥈','🥉']
+              return (
+                <div key={hp.hora} style={{ display:'flex', alignItems:'center', gap:8, marginBottom: i < horaPico.length-1 ? 7 : 0 }}>
+                  <span style={{ fontSize:12, flexShrink:0 }}>{medals[i]}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--text-2)', width:44, flexShrink:0 }}>{hp.hora}</span>
+                  <div style={{ flex:1, height:5, borderRadius:3, background:'var(--border)' }}>
+                    <div style={{ height:'100%', width:`${hp.count/max*100}%`, background:col, borderRadius:3, transition:'width 0.5s' }} />
+                  </div>
+                  <span style={{ fontSize:10, fontWeight:700, color:col, width:26, textAlign:'right', flexShrink:0 }}>{hp.count}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+      </div>
+      )}
+
+      {/* ── Campañas activas ─────────────────────────────── */}
+      {campanasActivas.length > 0 && (
+        <div style={{ margin:'10px 16px 0' }}>
+          <div className="sp-kpi-card" style={{ padding:'14px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:0.5 }}>
+                Campañas activas
+              </div>
+              <button onClick={() => onNavigate('marketing')} style={{
+                fontSize:11, fontWeight:700, color:col, background:'none', border:'none', cursor:'pointer', padding:0,
+              }}>Ver todas →</button>
+            </div>
+            {campanasActivas.map(c => (
+              <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, padding:'7px 10px',
+                background:'var(--bg)', borderRadius:10, border:'1px solid var(--border)' }}>
+                <span style={{ fontSize:14 }}>📢</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {c.nombre}
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text-3)', marginTop:1 }}>
+                    {c.segmento === 'todos' ? 'Todos los clientes' :
+                     c.segmento === 'cumpleanos_mes' ? 'Cumpleaños del mes' :
+                     c.segmento === 'sin_visita' ? 'Sin visita reciente' :
+                     c.segmento === 'con_tag' ? 'Por etiqueta' : c.segmento}
+                  </div>
+                </div>
+                <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6,
+                  background:'rgba(34,197,94,0.12)', color:'#4ade80' }}>
+                  Activa
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Productos por vencer ─────────────────────────── */}
+      {productosVencer.length > 0 && (
+        <div style={{ margin:'10px 16px 0' }}>
+          <div className="sp-kpi-card" style={{ padding:'14px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#fbbf24', textTransform:'uppercase', letterSpacing:0.5 }}>
+                ⚠️ Productos por vencer (≤30 días)
+              </div>
+              <button onClick={() => onNavigate('inventario')} style={{
+                fontSize:11, fontWeight:700, color:col, background:'none', border:'none', cursor:'pointer', padding:0,
+              }}>Ver inventario →</button>
+            </div>
+            {productosVencer.slice(0,5).map(p => {
+              const diasRestantes = Math.ceil((new Date(p.fecha_vencimiento) - new Date()) / (1000*60*60*24))
+              return (
+                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {p.nombre}
+                    </div>
+                    <div style={{ fontSize:10, color:'var(--text-3)', marginTop:1 }}>Stock: {p.stock}</div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, flexShrink:0,
+                    color: diasRestantes <= 7 ? '#f87171' : '#fbbf24' }}>
+                    {diasRestantes}d
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -1574,6 +1978,16 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
       )}
 
       <div style={{ height:20 }} />
+
+      {/* ── Modal personalizar dashboard ─────────────────── */}
+      {showPersonalizar && (
+        <PersonalizarModal
+          prefs={dashPrefs}
+          onChange={updatePref}
+          onClose={() => setShowPersonalizar(false)}
+          col={col}
+        />
+      )}
     </>
   )
 }
