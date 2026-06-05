@@ -26,6 +26,7 @@ const IC = {
   proveedores:'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
   sedes:      'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
   mensajeria: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z',
+  marketing:  'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z',
   accesos:    'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z',
   boveda:     'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
   config:     'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
@@ -46,19 +47,20 @@ const NAV_PRINCIPAL = [
 const NAV_NEGOCIO = [
   { key: 'equipo',      label: 'Equipo'      },
   { key: 'servicios',   label: 'Servicios'   },
-  { key: 'ordenes',     label: 'Órdenes'     },
+  { key: 'ordenes',     label: 'Walk-in'     },
   { key: 'inventario',  label: 'Inventario'  },
   { key: 'proveedores', label: 'Proveedores' },
   { key: 'caja',        label: 'Ingresos'    },
   { key: 'comisiones',  label: 'Comisiones'  },
   { key: 'mensajeria',  label: 'Mensajería'  },
+  { key: 'marketing',   label: 'Marketing'   },
   { key: 'analytics',   label: 'Analytics'   },
-  { key: 'sedes',       label: 'Sedes'        },
 ]
 const NAV_SISTEMA = [
-  { key: 'boveda',  label: 'Bóveda'         },
+  { key: 'sedes',   label: 'Sedes'          },   // configuración de sucursales
   { key: 'accesos', label: 'Accesos'        },
   { key: 'config',  label: 'Configuración'  },
+  // boveda: accesible desde Configuración → solo plan Ultra
 ]
 // Tabs por rol — el FAB siempre en posición central (índice 2)
 const NAV_MOBILE_POR_ROL = {
@@ -71,8 +73,8 @@ const NAV_MOBILE_POR_ROL = {
 const PAGE_LABEL = {
   hoy:'Inicio', agenda:'Agenda', clientes:'Clientes',
   equipo:'Equipo', servicios:'Servicios', caja:'Ingresos',
-  ordenes:'Órdenes', inventario:'Inventario', comisiones:'Comisiones', analytics:'Analytics',
-  proveedores:'Proveedores', mensajeria:'Mensajería', sedes:'Sedes', boveda:'Bóveda', accesos:'Accesos', config:'Configuración', superadmin:'Plataforma',
+  ordenes:'Walk-in', inventario:'Inventario', comisiones:'Comisiones', analytics:'Analytics',
+  proveedores:'Proveedores', mensajeria:'Mensajería', marketing:'Marketing', sedes:'Sedes', boveda:'Bóveda', accesos:'Accesos', config:'Configuración', superadmin:'Plataforma',
 }
 
 export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, children }) {
@@ -387,30 +389,57 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
           <div className="sp-sheet">
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Menú</p>
-            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16 }}>
-              {[...navNegocio,...navSistema,...(esSuperadmin ? [{key:'superadmin',label:'Plataforma'}] : [])].map(item => (
-                <button key={item.key} onClick={() => nav(item.key)} style={{
-                  display:'flex',alignItems:'center',gap:10,
-                  padding:'14px 16px',borderRadius:14,cursor:'pointer',textAlign:'left',
-                  background: page===item.key ? `${col}18` : 'rgba(128,128,128,0.06)',
-                  border:`1px solid ${page===item.key ? col+'50' : 'rgba(128,128,128,0.12)'}`,
-                  color: page===item.key ? col : 'var(--text-2)',
-                  fontSize:14,fontWeight:600,fontFamily:'Plus Jakarta Sans,sans-serif',
-                }}>
-                  <Ico d={IC[item.key]} size={17} />
-                  {item.label}
+
+            {/* Sección Negocio */}
+            {navNegocio.length > 0 && (
+              <>
+                <p className="sp-mas-section">Negocio</p>
+                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16 }}>
+                  {navNegocio.map(item => (
+                    <button key={item.key} className={`sp-mas-btn${page===item.key?' sp-mas-btn--active':''}`}
+                      onClick={() => nav(item.key)}
+                      style={page===item.key ? { background:`${col}18`, border:`1px solid ${col}50`, color:col } : {}}>
+                      <Ico d={IC[item.key]} size={16} />
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Sección Sistema */}
+            {navSistema.length > 0 && (
+              <>
+                <p className="sp-mas-section">Sistema</p>
+                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16 }}>
+                  {navSistema.map(item => (
+                    <button key={item.key} className={`sp-mas-btn${page===item.key?' sp-mas-btn--active':''}`}
+                      onClick={() => nav(item.key)}
+                      style={page===item.key ? { background:`${col}18`, border:`1px solid ${col}50`, color:col } : {}}>
+                      <Ico d={IC[item.key]} size={16} />
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Superadmin */}
+            {esSuperadmin && (
+              <div style={{ marginBottom:16 }}>
+                <p className="sp-mas-section">Administración</p>
+                <button onClick={() => nav('superadmin')}
+                  className={`sp-mas-btn sp-mas-btn--full${page==='superadmin'?' sp-mas-btn--active':''}`}
+                  style={page==='superadmin' ? { background:`${col}18`, border:`1px solid ${col}50`, color:col } : {}}>
+                  <Ico d={IC.superadmin} size={16} />
+                  Plataforma
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
 
             {/* Logout móvil */}
-            <button onClick={logout} style={{
-              width:'100%', display:'flex', alignItems:'center', gap:10,
-              padding:'13px 16px', borderRadius:14, cursor:'pointer',
-              background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.18)',
-              color:'#f87171', fontSize:14, fontWeight:600, fontFamily:'Plus Jakarta Sans,sans-serif',
-            }}>
-              <Ico d={IC.logout} size={17} />
+            <button onClick={logout} className="sp-mas-logout">
+              <Ico d={IC.logout} size={16} />
               Cerrar sesión
             </button>
           </div>
@@ -418,7 +447,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
       )}
 
       {/* ── NAV móvil ─────────────────────────────────────── */}
-      <nav className="sp-nav" ref={navRef}>
+      <nav className="sp-nav" ref={navRef} style={masOpen ? { opacity:0, pointerEvents:'none' } : undefined}>
         {/* Indicador deslizante — se posiciona sobre el tab activo */}
         <div ref={pillRef} className="sp-nav-pill" />
 

@@ -128,6 +128,10 @@ export default function SalonAnalytics() {
   const [gerData,    setGerData]    = useState(null)
   const [loadingGer, setLoadingGer] = useState(false)
 
+  // NPS
+  const [npsData,    setNpsData]    = useState(null)
+  const [loadingNps, setLoadingNps] = useState(false)
+
   async function cargarFinanzas() {
     if (!tenant || loadingF) return
     setLoadingF(true)
@@ -258,6 +262,47 @@ export default function SalonAnalytics() {
     if (tabA === 'gerencial' && tenant) cargarGerencial(gerPeriodo)
   }, [tabA, tenant, gerPeriodo])
 
+  async function cargarNps() {
+    if (!tenant || loadingNps) return
+    setLoadingNps(true)
+    try {
+      const mesInicio = new Date(); mesInicio.setDate(1); mesInicio.setHours(0,0,0,0)
+      const { data: resp } = await supabase
+        .from('nps_respuestas')
+        .select('puntuacion, comentario, created_at, clientes_agenda(nombre)')
+        .eq('tenant_id', tenant.id)
+        .order('created_at', { ascending: false })
+        .limit(200)
+
+      const todas = resp || []
+      const mesActual = new Date().toISOString().slice(0, 7)
+      const delMes = todas.filter(r => r.created_at.slice(0, 7) === mesActual)
+
+      const avg = (arr) => arr.length > 0
+        ? Math.round(arr.reduce((s, r) => s + r.puntuacion, 0) / arr.length * 10) / 10
+        : null
+
+      const dist = [1,2,3,4,5].map(n => ({
+        n, count: todas.filter(r => r.puntuacion === n).length,
+      }))
+
+      setNpsData({
+        total:   todas.length,
+        avgMes:  avg(delMes),
+        avgTotal: avg(todas),
+        delMes:  delMes.length,
+        dist,
+        recientes: todas.slice(0, 10),
+      })
+    } finally { setLoadingNps(false) }
+  }
+
+  useEffect(() => {
+    if (tabA === 'nps' && tenant && !npsData) cargarNps()
+  }, [tabA, tenant])
+
+  const [ocupacionMap,   setOcupacionMap]   = useState({}) // profesional_id → pct
+
   // Ventas por método y servicio
   const [ventasMetodo,   setVentasMetodo]   = useState([])
   const [ventasServicio, setVentasServicio] = useState([])
@@ -327,13 +372,15 @@ export default function SalonAnalytics() {
       const now = new Date()
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      const [kpiRes, staffRes, retRes, citasRes, fuenteRes, cliSegRes] = await Promise.all([
+      const [kpiRes, staffRes, retRes, citasRes, fuenteRes, cliSegRes, horariosRes, citasTiempoRes] = await Promise.all([
         supabase.from('v_kpis_mes').select('*').eq('tenant_id', tenant.id).order('mes', { ascending: false }),
         supabase.from('v_revenue_staff').select('*').eq('tenant_id', tenant.id).order('ingresos_brutos', { ascending: false }),
         supabase.from('v_retention').select('*').eq('tenant_id', tenant.id).maybeSingle(),
         supabase.from('citas').select('fecha_inicio, servicios(id,nombre,precio)').eq('tenant_id', tenant.id).eq('estado', 'completada').gte('fecha_inicio', firstOfMonth),
         supabase.from('clientes_agenda').select('fuente_captacion').eq('tenant_id', tenant.id).not('fuente_captacion', 'is', null),
         supabase.from('clientes_agenda').select('id, num_visitas, segmento, created_at').eq('tenant_id', tenant.id).eq('activo', true),
+        supabase.from('horarios').select('profesional_id, dia, hora_inicio, hora_fin, activo').eq('tenant_id', tenant.id),
+        supabase.from('citas').select('profesional_id, fecha_inicio, fecha_fin').eq('tenant_id', tenant.id).not('estado', 'in', '("cancelada","no_asistio")').gte('fecha_inicio', firstOfMonth.slice(0,10)),
       ])
 
       const kpiRows = kpiRes.data || []
@@ -342,6 +389,32 @@ export default function SalonAnalytics() {
       setHistoria([...kpiRows].reverse().slice(-6))
       setStaff(staffRes.data || [])
       setRetention(retRes.data || null)
+
+      // % Ocupación por profesional
+      const DOW_KEY = { 1:'lunes', 2:'martes', 3:'miercoles', 4:'jueves', 5:'viernes', 6:'sabado', 0:'domingo' }
+      const y = now.getFullYear(), mo = now.getMonth() + 1
+      const dayCounts = {}
+      const iter = new Date(y, mo - 1, 1)
+      while (iter.getMonth() === mo - 1) { const k = DOW_KEY[iter.getDay()]; dayCounts[k] = (dayCounts[k] || 0) + 1; iter.setDate(iter.getDate() + 1) }
+      const horMap = {}
+      ;(horariosRes.data || []).forEach(h => {
+        if (!h.activo) return
+        const parse = t => { const [hr, mn] = t.slice(0,5).split(':').map(Number); return hr * 60 + mn }
+        if (!horMap[h.profesional_id]) horMap[h.profesional_id] = {}
+        horMap[h.profesional_id][h.dia] = Math.max(0, parse(h.hora_fin) - parse(h.hora_inicio))
+      })
+      const minUsados = {}
+      ;(citasTiempoRes.data || []).forEach(c => {
+        if (!c.fecha_fin || !c.fecha_inicio) return
+        const mins = Math.round((new Date(c.fecha_fin) - new Date(c.fecha_inicio)) / 60000)
+        if (mins > 0 && mins <= 480) minUsados[c.profesional_id] = (minUsados[c.profesional_id] || 0) + mins
+      })
+      const ocMap = {}
+      Object.entries(horMap).forEach(([pid, dias]) => {
+        const disp = Object.entries(dayCounts).reduce((s, [dia, cnt]) => s + (dias[dia] || 0) * cnt, 0)
+        if (disp > 0) ocMap[pid] = Math.min(100, Math.round((minUsados[pid] || 0) / disp * 100))
+      })
+      setOcupacionMap(ocMap)
 
       // Heatmap día de semana (0=Dom→6=Sáb, reordenamos a Lun→Dom)
       const dow = new Array(7).fill(0)
@@ -661,7 +734,7 @@ export default function SalonAnalytics() {
 
       {/* ── Tabs ── */}
       <div className="sp-tabs-scroll" style={{ padding:'16px 16px 0', gap:8, scrollbarWidth:'none' }}>
-        {[['resumen','Resumen'],['ventas','Ventas'],['citas','Citas'],['finanzas','Finanzas'],['gerencial','Gerencial']].map(([t,label]) => (
+        {[['resumen','Resumen'],['ventas','Ventas'],['citas','Citas'],['finanzas','Finanzas'],['gerencial','Gerencial'],['nps','⭐ NPS']].map(([t,label]) => (
           <button key={t} onClick={() => setTabA(t)} style={{
             flexShrink:0, padding:'8px 18px', borderRadius:20, cursor:'pointer',
             fontWeight:700, fontSize:13, fontFamily:'Outfit',
@@ -1410,7 +1483,7 @@ export default function SalonAnalytics() {
                 </div>
 
                 {/* Métricas secundarias */}
-                <div style={{ display:'flex', gap:16, marginTop:10 }}>
+                <div style={{ display:'flex', gap:16, marginTop:10, flexWrap:'wrap' }}>
                   <div>
                     <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
                       textTransform:'uppercase', letterSpacing:0.5 }}>No-show</span>
@@ -1429,6 +1502,20 @@ export default function SalonAnalytics() {
                         : '—'}
                     </span>
                   </div>
+                  {prof.profesional_id && ocupacionMap[prof.profesional_id] != null && (() => {
+                    const oc = ocupacionMap[prof.profesional_id]
+                    const ocColor = oc >= 70 ? '#22c55e' : oc >= 40 ? '#f59e0b' : '#f87171'
+                    return (
+                      <div>
+                        <span style={{ fontSize:10, color:'var(--text-3)', fontWeight:700,
+                          textTransform:'uppercase', letterSpacing:0.5 }}>Ocupación</span>
+                        <span style={{ fontSize:13, fontWeight:800, color:ocColor,
+                          marginLeft:6, fontFamily:'Outfit' }}>
+                          {oc}%
+                        </span>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             )
@@ -1615,6 +1702,149 @@ export default function SalonAnalytics() {
 
       <div style={{ height:24 }} />
       </>)}
+
+      {/* ── Tab: NPS ──────────────────────────────────────── */}
+      {tabA === 'nps' && (
+        <div style={{ padding:'16px' }}>
+          {loadingNps && (
+            <div style={{ display:'flex', justifyContent:'center', padding:40 }}>
+              <div style={{ width:28,height:28,borderRadius:'50%',border:`2px solid ${col}`,borderTopColor:'transparent',animation:'spin 0.8s linear infinite' }} />
+            </div>
+          )}
+
+          {!loadingNps && npsData && (
+            <>
+              {/* KPIs principales */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
+                <div style={{ padding:'14px 12px', borderRadius:16, background:`${col}12`, border:`1px solid ${col}22`, textAlign:'center' }}>
+                  <div style={{ fontSize:28, fontWeight:900, color:col, fontFamily:'Outfit', lineHeight:1 }}>
+                    {npsData.avgMes != null ? npsData.avgMes : '—'}
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:0.5 }}>Promedio mes</div>
+                  {'⭐'.repeat(Math.round(npsData.avgMes || 0)).padEnd(5,'☆') && (
+                    <div style={{ fontSize:14, marginTop:3 }}>{'⭐'.repeat(Math.round(npsData.avgMes || 0)).padEnd(5,'☆')}</div>
+                  )}
+                </div>
+                <div style={{ padding:'14px 12px', borderRadius:16, background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.2)', textAlign:'center' }}>
+                  <div style={{ fontSize:28, fontWeight:900, color:'#818cf8', fontFamily:'Outfit', lineHeight:1 }}>
+                    {npsData.delMes}
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:0.5 }}>Respuestas mes</div>
+                </div>
+                <div style={{ padding:'14px 12px', borderRadius:16, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.2)', textAlign:'center' }}>
+                  <div style={{ fontSize:28, fontWeight:900, color:'#4ade80', fontFamily:'Outfit', lineHeight:1 }}>
+                    {npsData.total}
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:0.5 }}>Total histórico</div>
+                </div>
+              </div>
+
+              {/* Distribución de puntuaciones */}
+              {npsData.total > 0 && (
+                <div style={{ background:'var(--card)', borderRadius:16, border:'1px solid var(--border)', padding:'16px', marginBottom:16 }}>
+                  <div style={{ fontSize:12, fontWeight:800, color:'var(--text-2)', marginBottom:12, textTransform:'uppercase', letterSpacing:0.5 }}>
+                    Distribución de puntuaciones
+                  </div>
+                  {[5,4,3,2,1].map(n => {
+                    const item  = npsData.dist.find(d => d.n === n)
+                    const count = item?.count || 0
+                    const pct   = npsData.total > 0 ? Math.round(count / npsData.total * 100) : 0
+                    const STAR_COLS = { 5:'#22c55e', 4:'#84cc16', 3:'#eab308', 2:'#f97316', 1:'#ef4444' }
+                    const sc = STAR_COLS[n]
+                    return (
+                      <div key={n} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                        <div style={{ width:18, fontSize:13, fontWeight:800, color:sc, textAlign:'right', flexShrink:0 }}>{n}</div>
+                        <div style={{ fontSize:14, flexShrink:0 }}>⭐</div>
+                        <div style={{ flex:1, height:10, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
+                          <div style={{ height:'100%', borderRadius:99, width:`${pct}%`, background:sc, transition:'width 0.5s ease' }} />
+                        </div>
+                        <div style={{ fontSize:12, fontWeight:700, color:'var(--text-3)', width:36, textAlign:'right', flexShrink:0 }}>
+                          {count > 0 ? count : ''}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-3)', width:28, flexShrink:0 }}>
+                          {pct > 0 ? `${pct}%` : ''}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Últimas respuestas */}
+              {npsData.recientes.length > 0 && (
+                <div style={{ background:'var(--card)', borderRadius:16, border:'1px solid var(--border)', overflow:'hidden' }}>
+                  <div style={{ padding:'14px 16px 10px', fontSize:12, fontWeight:800, color:'var(--text-2)', textTransform:'uppercase', letterSpacing:0.5 }}>
+                    Últimas opiniones
+                  </div>
+                  {npsData.recientes.map((r, i) => {
+                    const STAR_COLS = { 5:'#22c55e', 4:'#84cc16', 3:'#eab308', 2:'#f97316', 1:'#ef4444' }
+                    const sc = STAR_COLS[r.puntuacion]
+                    const nombre = r.clientes_agenda?.nombre || 'Cliente'
+                    const fecha  = new Date(r.created_at).toLocaleDateString('es-CO', { day:'numeric', month:'short' })
+                    return (
+                      <div key={i} style={{
+                        padding:'12px 16px',
+                        borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                        display:'flex', gap:12, alignItems:'flex-start',
+                      }}>
+                        <div style={{
+                          width:34, height:34, borderRadius:10, flexShrink:0,
+                          background:`${sc}18`, display:'flex', alignItems:'center', justifyContent:'center',
+                          fontSize:16, fontWeight:900, color:sc,
+                        }}>
+                          {r.puntuacion}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+                            <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{nombre}</span>
+                            <span style={{ fontSize:11, color:'var(--text-3)' }}>{fecha}</span>
+                          </div>
+                          {r.comentario && (
+                            <div style={{ fontSize:12, color:'var(--text-2)', lineHeight:1.4 }}>
+                              "{r.comentario}"
+                            </div>
+                          )}
+                          <div style={{ display:'flex', gap:2, marginTop:4 }}>
+                            {'⭐'.repeat(r.puntuacion).split('').map((s,j) => (
+                              <span key={j} style={{ fontSize:11 }}>{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {npsData.total === 0 && (
+                <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text-3)' }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>⭐</div>
+                  <div style={{ fontSize:14, fontWeight:700 }}>Sin respuestas aún</div>
+                  <div style={{ fontSize:12, marginTop:6 }}>
+                    El NPS se activa automáticamente cuando se completa una cita.<br/>
+                    Los clientes recibirán un WA 2 horas después.
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {!loadingNps && !npsData && (
+            <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text-3)' }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>⭐</div>
+              <div style={{ fontSize:14, fontWeight:700 }}>Sin datos de NPS</div>
+              <div style={{ fontSize:12, marginTop:6 }}>
+                Aplica el SQL v86 y deploya la Edge Function nps-post-visita.
+              </div>
+              <button onClick={cargarNps} style={{
+                marginTop:16, padding:'10px 20px', borderRadius:10, border:'none',
+                background:col, color:'#fff', fontWeight:700, cursor:'pointer', fontSize:13,
+              }}>Reintentar</button>
+            </div>
+          )}
+        </div>
+      )}
+
     </>
   )
 }

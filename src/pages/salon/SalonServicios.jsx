@@ -41,10 +41,14 @@ export default function SalonServicios() {
   const [elimConfirm,  setElimConfirm]  = useState(false)
   const [elimTarget,   setElimTarget]   = useState(null)
 
+  // Comisiones por profesional para este servicio
+  const [profComisiones, setProfComisiones] = useState({}) // { profesional_id: { tipo, valor } }
+
   // Vista principal: servicios | paquetes
   const [citasMes,     setCitasMes]     = useState({}) // servicio_id → count
 
   const [vistaMain,    setVistaMain]    = useState('servicios')
+  const [catFiltro,    setCatFiltro]    = useState(null) // null = todas
 
   // Paquetes
   const [paquetes,     setPaquetes]     = useState([])
@@ -176,16 +180,19 @@ export default function SalonServicios() {
       })
   }, [sel?.id, nuevo, tenant])
 
+  const categoriasDisponibles = [...new Set(servicios.map(s => s.categoria || 'General'))].sort()
+
   const porCategoria = {}
   servicios.forEach(s => {
     const cat = s.categoria || 'General'
+    if (catFiltro && cat !== catFiltro) return
     if (!porCategoria[cat]) porCategoria[cat] = []
     porCategoria[cat].push(s)
   })
 
   function cerrarSheet() { setSel(null); setElimConfirm(false); setTab('detalles') }
 
-  function abrir(serv) {
+  async function abrir(serv) {
     setSel(serv)
     setTab('detalles')
     setForm({
@@ -201,8 +208,17 @@ export default function SalonServicios() {
       productos_ids:      serv.productos_ids || [],
       sedes_ids:          serv.sedes_ids || [],
     })
+    setProfComisiones({})
     setNuevo(false)
     setElimConfirm(false)
+    if (serv.id && tenant) {
+      const { data } = await supabase.from('profesional_servicios')
+        .select('profesional_id, tipo_comision, valor_comision')
+        .eq('servicio_id', serv.id).eq('tenant_id', tenant.id)
+      const map = {}
+      ;(data || []).forEach(r => { map[r.profesional_id] = { tipo: r.tipo_comision || 'ninguna', valor: r.valor_comision || 0 } })
+      setProfComisiones(map)
+    }
   }
 
   function abrirNuevo() {
@@ -221,7 +237,9 @@ export default function SalonServicios() {
   function toggleProf(id) {
     setForm(f => {
       const ids = f.profesionales_ids || []
-      return { ...f, profesionales_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id] }
+      const adding = !ids.includes(id)
+      if (adding) setProfComisiones(prev => ({ ...prev, [id]: prev[id] || { tipo: 'ninguna', valor: 0 } }))
+      return { ...f, profesionales_ids: adding ? [...ids, id] : ids.filter(x => x !== id) }
     })
   }
 
@@ -273,6 +291,22 @@ export default function SalonServicios() {
         .filter(([, cant]) => Number(cant) > 0)
         .map(([producto_id, cantidad]) => ({ tenant_id: tenant.id, servicio_id: servicioId, producto_id, cantidad: Number(cantidad) }))
       if (rows.length > 0) await supabase.from('servicio_insumos').insert(rows)
+
+      // Sync comisiones por profesional
+      const profIds = form.profesionales_ids || []
+      if (profIds.length > 0) {
+        const psRows = profIds.map(pid => ({
+          tenant_id:      tenant.id,
+          servicio_id:    servicioId,
+          profesional_id: pid,
+          activo:         true,
+          tipo_comision:  profComisiones[pid]?.tipo  || 'ninguna',
+          valor_comision: Number(profComisiones[pid]?.valor) || 0,
+        }))
+        await supabase.from('profesional_servicios').delete()
+          .eq('servicio_id', servicioId).eq('tenant_id', tenant.id)
+        await supabase.from('profesional_servicios').insert(psRows)
+      }
     }
     showToast(nuevo ? 'Servicio creado' : 'Guardado')
     cerrarSheet()
@@ -358,6 +392,28 @@ export default function SalonServicios() {
           <Ico d="M12 4v16m8-8H4" size={15} /> {vistaMain === 'servicios' ? 'Agregar' : 'Paquete'}
         </button>
       </div>
+
+      {/* ── Pills filtro categoría (solo en vista servicios) ── */}
+      {vistaMain === 'servicios' && categoriasDisponibles.length > 1 && (
+        <div style={{ display:'flex', gap:6, overflowX:'auto', padding:'0 0 10px',
+          scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
+          {[null, ...categoriasDisponibles].map(c => {
+            const activo = catFiltro === c
+            return (
+              <button key={c ?? '__todas'} onClick={() => setCatFiltro(c)} style={{
+                flexShrink:0, padding:'6px 14px', borderRadius:20, border:'none', cursor:'pointer',
+                fontSize:12, fontWeight:700,
+                background: activo ? col : 'var(--card)',
+                color: activo ? '#fff' : 'var(--text-3)',
+                boxShadow: activo ? `0 2px 8px ${col}40` : '0 1px 4px rgba(0,0,0,0.08)',
+                transition:'background 0.15s, color 0.15s',
+              }}>
+                {c ?? 'Todas'}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── VISTA PAQUETES ── */}
       {vistaMain === 'paquetes' && (
@@ -796,37 +852,71 @@ export default function SalonServicios() {
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {profesionales.map(p => {
                       const activo = (form.profesionales_ids || []).includes(p.id)
+                      const com = profComisiones[p.id] || { tipo: 'ninguna', valor: 0 }
                       return (
-                        <button key={p.id} onClick={() => toggleProf(p.id)} style={{
-                          display:'flex', alignItems:'center', gap:12,
-                          padding:'13px 14px', borderRadius:14, width:'100%', textAlign:'left',
-                          background: activo ? `${col}10` : 'var(--card)',
+                        <div key={p.id} style={{
+                          borderRadius:14,
+                          background: activo ? `${col}08` : 'var(--card)',
                           border:`1.5px solid ${activo ? col : 'var(--border)'}`,
-                          cursor:'pointer', transition:'all 0.12s',
+                          overflow:'hidden', transition:'all 0.12s',
                         }}>
-                          <div style={{
-                            width:34, height:34, borderRadius:10,
-                            background:`${p.color || col}22`,
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontFamily:'Outfit', fontWeight:800, fontSize:14, color: p.color || col, flexShrink:0,
+                          <button onClick={() => toggleProf(p.id)} style={{
+                            display:'flex', alignItems:'center', gap:12,
+                            padding:'13px 14px', width:'100%', textAlign:'left',
+                            background:'transparent', border:'none', cursor:'pointer',
                           }}>
-                            {p.nombre?.[0]}
-                          </div>
-                          <span style={{ flex:1, fontWeight:600, fontSize:14, color:'var(--text)' }}>{p.nombre}</span>
-                          <div style={{
-                            width:22, height:22, borderRadius:6, flexShrink:0,
-                            background: activo ? col : 'var(--card)',
-                            border:`1.5px solid ${activo ? col : 'var(--border)'}`,
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                          }}>
-                            {activo && (
-                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
-                                stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
+                            <div style={{
+                              width:34, height:34, borderRadius:10,
+                              background:`${p.color || col}22`,
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              fontFamily:'Outfit', fontWeight:800, fontSize:14, color: p.color || col, flexShrink:0,
+                            }}>
+                              {p.nombre?.[0]}
+                            </div>
+                            <span style={{ flex:1, fontWeight:600, fontSize:14, color:'var(--text)' }}>{p.nombre}</span>
+                            <div style={{
+                              width:22, height:22, borderRadius:6, flexShrink:0,
+                              background: activo ? col : 'var(--card)',
+                              border:`1.5px solid ${activo ? col : 'var(--border)'}`,
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                            }}>
+                              {activo && (
+                                <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
+                                  stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                          {activo && (
+                            <div style={{ padding:'0 14px 13px', display:'flex', gap:8, alignItems:'center' }}>
+                              <select
+                                value={com.tipo}
+                                onChange={e => setProfComisiones(prev => ({ ...prev, [p.id]: { ...com, tipo: e.target.value } }))}
+                                style={{ flex:'0 0 auto', padding:'7px 10px', borderRadius:10, fontSize:12, fontWeight:700,
+                                  border:'1.5px solid var(--border)', background:'var(--card)', color:'var(--text)', cursor:'pointer' }}>
+                                <option value="ninguna">Sin comisión</option>
+                                <option value="porcentaje">%</option>
+                                <option value="monto">$ fijo</option>
+                              </select>
+                              {com.tipo !== 'ninguna' && (
+                                <input
+                                  type="number" min="0" step={com.tipo === 'porcentaje' ? '0.5' : '1000'}
+                                  value={com.valor}
+                                  onChange={e => setProfComisiones(prev => ({ ...prev, [p.id]: { ...com, valor: e.target.value } }))}
+                                  placeholder={com.tipo === 'porcentaje' ? 'Ej: 15' : 'Ej: 20000'}
+                                  style={{ flex:1, padding:'7px 10px', borderRadius:10, fontSize:13, fontWeight:700,
+                                    border:'1.5px solid var(--border)', background:'var(--card)', color:'var(--text)' }}
+                                />
+                              )}
+                              {com.tipo !== 'ninguna' && (
+                                <span style={{ fontSize:12, color:'var(--text-3)', fontWeight:700, flexShrink:0 }}>
+                                  {com.tipo === 'porcentaje' ? '%' : 'COP'}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>

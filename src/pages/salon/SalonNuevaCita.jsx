@@ -94,7 +94,6 @@ function CalendarioPicker({ value, onChange, col }) {
   )
 }
 
-const STEP_LABELS = ['Profesional', 'Servicios', 'Fecha y hora', 'Cliente']
 const DIA_KEY = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado']
 
 function fmtCOP(n) {
@@ -102,11 +101,20 @@ function fmtCOP(n) {
   return '$' + Number(n).toLocaleString('es-CO')
 }
 
+function SecLabel({ label }) {
+  return (
+    <p style={{ fontSize:11, color:'var(--text-3)', marginBottom:10, fontWeight:700,
+      letterSpacing:1, textTransform:'uppercase', marginTop:20,
+      borderBottom:'1px solid var(--border)', paddingBottom:6 }}>
+      {label}
+    </p>
+  )
+}
+
 export default function SalonNuevaCita({ onClose, onCreada, clientePreId, clientePreNombre, profPreId, fechaPre }) {
   const { tenant } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
 
-  const [step,       setStep]       = useState(0)
   const [profs,      setProfs]      = useState([])
   const [sedes,      setSedes]      = useState([])
   const [filtroSede, setFiltroSede] = useState(null)
@@ -116,7 +124,7 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
   const [clientes,   setClientes]   = useState([])
 
   const [profId,      setProfId]      = useState(null)
-  const [servIds,     setServIds]     = useState([])   // multi-select
+  const [servIds,     setServIds]     = useState([])
   const [fecha,       setFecha]       = useState(new Date().toISOString().slice(0,10))
   const [slot,        setSlot]        = useState(null)
   const [clienteId,   setClienteId]   = useState(null)
@@ -136,7 +144,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     if (profPreId) {
       setProfId(profPreId)
       if (fechaPre) setFecha(fechaPre)
-      setStep(1)
     }
   }, [profPreId]) // eslint-disable-line
 
@@ -148,12 +155,10 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     setTimeout(() => setToast(null), 3000)
   }
 
-  // Derivados de servicios seleccionados
   const selectedServs  = useMemo(() => servs.filter(s => servIds.includes(s.id)), [servs, servIds])
   const duracionTotal  = useMemo(() => selectedServs.reduce((sum, s) => sum + (s.duracion_min || 0), 0), [selectedServs])
   const precioTotal    = useMemo(() => selectedServs.reduce((sum, s) => sum + (Number(s.precio) || 0), 0), [selectedServs])
 
-  // Servicios agrupados por categoría
   const porCategoria = useMemo(() => {
     const map = {}
     servs.forEach(s => {
@@ -169,7 +174,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     setSlot(null)
   }
 
-  // Carga profesionales + sedes
   useEffect(() => {
     if (!tenant) return
     Promise.all([
@@ -183,7 +187,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     })
   }, [tenant])
 
-  // Carga servicios al elegir profesional — filtra por profesional_servicios si hay filas
   useEffect(() => {
     if (!profId || !tenant) return
     setServIds([])
@@ -196,7 +199,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
           .eq('tenant_id', tenant.id).eq('profesional_id', profId).eq('activo', true),
       ])
       const habilitados = ps || []
-      // Si el profesional no tiene filas → puede hacer todos los servicios
       if (habilitados.length === 0) {
         setServs(todos || [])
       } else {
@@ -206,7 +208,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     })()
   }, [profId, tenant])
 
-  // Regenera slots cuando cambia duración total, fecha o profesional
   useEffect(() => {
     if (!profId || duracionTotal === 0 || !fecha || !tenant) { setSlots([]); return }
     setSinHorario(false)
@@ -243,7 +244,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
       const hh     = String(Math.floor(h / 60)).padStart(2, '0')
       const mm     = String(h % 60).padStart(2, '0')
       const inicio = `${f}T${hh}:${mm}:00`
-      // Calcular fin en tiempo local (sin conversión UTC) para evitar desfase timezone
       const finDate = new Date(new Date(inicio).getTime() + durMin * 60000)
       const pad2 = n => String(n).padStart(2, '0')
       const fin = `${f}T${pad2(finDate.getHours())}:${pad2(finDate.getMinutes())}:00`
@@ -253,7 +253,6 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     setSlots(generados)
   }
 
-  // Búsqueda de clientes (nombre o teléfono)
   useEffect(() => {
     if (!tenant || busqCliente.length < 2) { setClientes([]); return }
     supabase.from('clientes_agenda')
@@ -303,367 +302,294 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
     setSaving(false)
   }
 
-  const prof     = profs.find(p => p.id === profId)
-  const canNext  = [
-    !!profId,
-    servIds.length > 0,
-    !!slot,
-    modoNuevo ? !!nuevoCliente.nombre.trim() : !!clienteId,
-  ]
+  const prof    = profs.find(p => p.id === profId)
+  const canSave = !!profId && servIds.length > 0 && !!slot &&
+    (modoNuevo ? !!nuevoCliente.nombre.trim() : !!clienteId)
 
   return (
     <>
       {toast && <div className="sp-toast show" style={{ background: toast.color }}>{toast.msg}</div>}
 
       <div className="sp-sheet-overlay" onClick={onClose} />
-      <div className="sp-sheet" style={{
-        padding: 0,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        {/* Handle — fuera del scroll */}
-        <div className="sp-sheet-handle" style={{ flexShrink: 0, margin: '12px auto 0' }} />
+      <div className="sp-sheet" style={{ padding:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+
+        <div className="sp-sheet-handle" style={{ flexShrink:0, margin:'12px auto 0' }} />
 
         {/* Body scrollable */}
-        <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '0 20px' }}>
+        <div style={{ flex:1, overflowY:'auto', overscrollBehavior:'contain', padding:'0 20px' }}>
 
-        {/* Header */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, marginTop:8 }}>
-          <p className="sp-sheet-title" style={{ margin:0 }}>Nueva cita</p>
-          <button onClick={onClose} style={{
-            width:32, height:32, borderRadius:10, border:'none',
-            background:'rgba(255,255,255,0.08)', color:'var(--text-2)', display:'flex',
-            alignItems:'center', justifyContent:'center', cursor:'pointer',
-          }}>
-            <Ico d="M6 18L18 6M6 6l12 12" size={16} />
-          </button>
-        </div>
+          {/* Header */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8, marginTop:8 }}>
+            <p className="sp-sheet-title" style={{ margin:0 }}>Nueva cita</p>
+            <button onClick={onClose} style={{
+              width:32, height:32, borderRadius:10, border:'none',
+              background:'rgba(255,255,255,0.08)', color:'var(--text-2)', display:'flex',
+              alignItems:'center', justifyContent:'center', cursor:'pointer',
+            }}>
+              <Ico d="M6 18L18 6M6 6l12 12" size={16} />
+            </button>
+          </div>
 
-        {/* Barra de progreso */}
-        <div style={{ display:'flex', gap:6, marginBottom:24 }}>
-          {STEP_LABELS.map((lbl, i) => (
-            <div key={i} style={{
-              flex:1, height:3, borderRadius:2,
-              background: i <= step ? col : 'var(--border)',
-              transition:'background 0.3s',
-            }} />
-          ))}
-        </div>
+          {/* Resumen compacto (aparece una vez hay datos) */}
+          {(prof || servIds.length > 0 || slot) && (
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:4, padding:'8px 12px',
+              background:'var(--card)', borderRadius:10, border:'1px solid var(--border)' }}>
+              {prof && <span style={{ fontSize:12, color:'var(--text-2)', fontWeight:600 }}>👤 {prof.nombre}</span>}
+              {servIds.length > 0 && (
+                <span style={{ fontSize:12, color:'var(--text-2)' }}>
+                  · {servIds.length} serv{servIds.length > 1 ? 's' : ''} · {duracionTotal}min
+                </span>
+              )}
+              {precioTotal > 0 && <span style={{ fontSize:12, color:col, fontWeight:700 }}>· {fmtCOP(precioTotal)}</span>}
+              {slot && <span style={{ fontSize:12, color:'var(--text-2)' }}>· {fecha} {slot.label}</span>}
+            </div>
+          )}
 
-        <p style={{ fontSize:12, color:'var(--text-3)', marginBottom:16, fontWeight:600, letterSpacing:1, textTransform:'uppercase' }}>
-          {STEP_LABELS[step]}
-        </p>
-
-        {/* ── Step 0 — Profesional ── */}
-        {step === 0 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {/* Filtro de sede — solo cuando hay múltiples sedes */}
-            {sedes.length > 1 && (
-              <div style={{ display:'flex', gap:6, marginBottom:4, flexWrap:'wrap' }}>
-                <button onClick={() => { setFiltroSede(null); if (filtroSede) setProfId(null) }} style={{
+          {/* ── 1. Profesional ── */}
+          <SecLabel label="Profesional" />
+          {sedes.length > 1 && (
+            <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+              <button onClick={() => { setFiltroSede(null); if (filtroSede) setProfId(null) }} style={{
+                padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                background: filtroSede === null ? col : 'var(--card)',
+                color: filtroSede === null ? '#fff' : 'var(--text-3)',
+                fontSize:12, fontWeight:700,
+              }}>Todas</button>
+              {sedes.map(s => (
+                <button key={s.id} onClick={() => { setFiltroSede(filtroSede === s.id ? null : s.id); setProfId(null) }} style={{
                   padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
-                  background: filtroSede === null ? col : 'var(--card)',
-                  color: filtroSede === null ? '#fff' : 'var(--text-3)',
-                  fontSize:12, fontWeight:700, transition:'all 0.15s',
-                }}>Todas</button>
-                {sedes.map(s => (
-                  <button key={s.id} onClick={() => { setFiltroSede(filtroSede === s.id ? null : s.id); setProfId(null) }} style={{
-                    padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
-                    background: filtroSede === s.id ? col : 'var(--card)',
-                    color: filtroSede === s.id ? '#fff' : 'var(--text-3)',
-                    fontSize:12, fontWeight:700, transition:'all 0.15s',
-                  }}>📍 {s.nombre}</button>
-                ))}
-              </div>
-            )}
+                  background: filtroSede === s.id ? col : 'var(--card)',
+                  color: filtroSede === s.id ? '#fff' : 'var(--text-3)',
+                  fontSize:12, fontWeight:700,
+                }}>📍 {s.nombre}</button>
+              ))}
+            </div>
+          )}
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:4 }}>
             {(filtroSede ? profs.filter(p => p.sede_id === filtroSede) : profs).map(p => (
               <button key={p.id} onClick={() => setProfId(p.id)} style={{
-                display:'flex', alignItems:'center', gap:14, padding:'14px 16px',
-                borderRadius:14, cursor:'pointer', textAlign:'left',
-                background: profId === p.id ? `${col}15` : 'var(--card)',
-                border: `1px solid ${profId === p.id ? col + '55' : 'var(--border)'}`,
+                display:'flex', alignItems:'center', gap:8, padding:'8px 12px',
+                borderRadius:12, cursor:'pointer', flexShrink:0,
+                background: profId === p.id ? `${col}18` : 'var(--card)',
+                border: `1.5px solid ${profId === p.id ? col : 'var(--border)'}`,
                 color:'var(--text)',
               }}>
                 <div style={{
-                  width:42, height:42, borderRadius:13, background:`${col}25`,
+                  width:30, height:30, borderRadius:9, background:`${col}25`,
                   display:'flex', alignItems:'center', justifyContent:'center',
-                  fontFamily:'Outfit', fontWeight:800, fontSize:18, color:col, flexShrink:0,
+                  fontFamily:'Outfit', fontWeight:800, fontSize:14, color:col, flexShrink:0,
                 }}>
                   {p.foto_url
                     ? <img src={p.foto_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'inherit' }} />
                     : p.nombre[0]
                   }
                 </div>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:15 }}>{p.nombre}</div>
-                  {p.especialidad && <div style={{ fontSize:12, color:'var(--text-3)', marginTop:1 }}>{p.especialidad}</div>}
-                </div>
-                {profId === p.id && <div style={{ marginLeft:'auto', color:col }}><Ico d="M5 13l4 4L19 7" size={18} /></div>}
+                <span style={{ fontWeight:700, fontSize:14 }}>{p.nombre}</span>
+                {profId === p.id && <Ico d="M5 13l4 4L19 7" size={14} />}
               </button>
             ))}
           </div>
-        )}
 
-        {/* ── Step 1 — Servicios (multi-select) ── */}
-        {step === 1 && (
-          <div>
-            {/* Contador de selección */}
-            {servIds.length > 0 && (
-              <div style={{
-                padding:'10px 14px', borderRadius:12, marginBottom:14,
-                background:`${col}12`, border:`1px solid ${col}30`,
-                display:'flex', alignItems:'center', justifyContent:'space-between',
-              }}>
-                <span style={{ fontSize:13, fontWeight:700, color:col }}>
-                  {servIds.length} servicio{servIds.length > 1 ? 's' : ''} · {duracionTotal} min
-                </span>
-                {precioTotal > 0 && (
-                  <span style={{ fontSize:14, fontWeight:800, color:col, fontFamily:'Outfit' }}>
-                    {fmtCOP(precioTotal)}
+          {/* ── 2. Servicios (tras elegir profesional) ── */}
+          {profId && (
+            <>
+              <SecLabel label="Servicios" />
+              {servIds.length > 0 && (
+                <div style={{ padding:'8px 12px', borderRadius:10, marginBottom:10,
+                  background:`${col}12`, border:`1px solid ${col}30`,
+                  display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:col }}>
+                    {servIds.length} servicio{servIds.length > 1 ? 's' : ''} · {duracionTotal} min
                   </span>
-                )}
-              </div>
-            )}
-
-            {/* Lista agrupada por categoría */}
-            {Object.entries(porCategoria).map(([cat, items]) => (
-              <div key={cat} style={{ marginBottom:16 }}>
-                <p style={{ fontSize:11, fontWeight:700, color:'var(--text-2)', letterSpacing:1,
-                  textTransform:'uppercase', marginBottom:8, marginTop:4,
-                  borderBottom:'1px solid var(--border)', paddingBottom:4 }}>
-                  {cat}
-                </p>
-                <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
-                  {items.map(s => {
-                    const sel = servIds.includes(s.id)
-                    return (
-                      <button key={s.id} onClick={() => toggleServ(s.id)} style={{
-                        display:'flex', alignItems:'center', justifyContent:'space-between',
-                        padding:'13px 14px', borderRadius:13, cursor:'pointer', textAlign:'left',
-                        background: sel ? `${col}15` : 'var(--card)',
-                        border: `2px solid ${sel ? col : 'var(--border)'}`,
-                        color:'var(--text)',
-                        transition:'border-color 0.15s, background 0.15s',
-                      }}>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontWeight:700, fontSize:14, color: sel ? col : 'var(--text)' }}>
-                            {s.nombre}
-                          </div>
-                          <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
-                            {s.duracion_min}min
-                            {s.categoria ? ` · ${s.categoria}` : ''}
-                          </div>
-                        </div>
-                        <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
-                          {s.precio > 0 && (
-                            <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:14, color: sel ? col : 'var(--text-2)' }}>
-                              {fmtCOP(s.precio)}
-                            </span>
-                          )}
-                          {/* Checkbox visual */}
-                          <div style={{
-                            width:22, height:22, borderRadius:7, flexShrink:0,
-                            background: sel ? col : 'transparent',
-                            border: `2px solid ${sel ? col : 'var(--border)'}`,
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            transition:'all 0.15s',
-                          }}>
-                            {sel && <Ico d="M5 13l4 4L19 7" size={12} />}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
+                  {precioTotal > 0 && (
+                    <span style={{ fontSize:14, fontWeight:800, color:col, fontFamily:'Outfit' }}>
+                      {fmtCOP(precioTotal)}
+                    </span>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+              {Object.entries(porCategoria).map(([cat, items]) => (
+                <div key={cat} style={{ marginBottom:12 }}>
+                  <p style={{ fontSize:10, fontWeight:700, color:'var(--text-2)', letterSpacing:1,
+                    textTransform:'uppercase', marginBottom:6, borderBottom:'1px solid var(--border)', paddingBottom:3 }}>
+                    {cat}
+                  </p>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {items.map(s => {
+                      const sel = servIds.includes(s.id)
+                      return (
+                        <button key={s.id} onClick={() => toggleServ(s.id)} style={{
+                          display:'flex', alignItems:'center', justifyContent:'space-between',
+                          padding:'11px 12px', borderRadius:11, cursor:'pointer', textAlign:'left',
+                          background: sel ? `${col}15` : 'var(--card)',
+                          border: `2px solid ${sel ? col : 'var(--border)'}`,
+                          color:'var(--text)',
+                        }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontWeight:700, fontSize:13, color: sel ? col : 'var(--text)' }}>{s.nombre}</div>
+                            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
+                              {s.duracion_min}min{s.categoria ? ` · ${s.categoria}` : ''}
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                            {s.precio > 0 && (
+                              <span style={{ fontFamily:'Outfit', fontWeight:700, fontSize:13, color: sel ? col : 'var(--text-2)' }}>
+                                {fmtCOP(s.precio)}
+                              </span>
+                            )}
+                            <div style={{ width:20, height:20, borderRadius:6, flexShrink:0,
+                              background: sel ? col : 'transparent',
+                              border: `2px solid ${sel ? col : 'var(--border)'}`,
+                              display:'flex', alignItems:'center', justifyContent:'center' }}>
+                              {sel && <Ico d="M5 13l4 4L19 7" size={11} />}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
 
-        {/* ── Step 2 — Fecha y hora ── */}
-        {step === 2 && (
-          <div>
-            <CalendarioPicker value={fecha} col={col} onChange={d => { setFecha(d); setSlot(null) }} />
-            {sinHorario ? (
-              <div style={{ textAlign:'center', padding:'24px 0' }}>
-                <p style={{ fontSize:22, marginBottom:8 }}>😴</p>
-                <p style={{ color:'var(--text-3)', fontSize:14, fontWeight:600 }}>
-                  {prof?.nombre?.split(' ')[0] || 'El profesional'} no trabaja este día
+          {/* ── 3. Fecha y hora (tras prof + servicios) ── */}
+          {profId && servIds.length > 0 && (
+            <>
+              <SecLabel label="Fecha y hora" />
+              <CalendarioPicker value={fecha} col={col} onChange={d => { setFecha(d); setSlot(null) }} />
+              {sinHorario ? (
+                <div style={{ textAlign:'center', padding:'16px 0' }}>
+                  <p style={{ fontSize:20, marginBottom:6 }}>😴</p>
+                  <p style={{ color:'var(--text-3)', fontSize:13, fontWeight:600 }}>
+                    {prof?.nombre?.split(' ')[0] || 'El profesional'} no trabaja este día
+                  </p>
+                  <p style={{ color:'var(--text-3)', fontSize:11, marginTop:2 }}>
+                    Elige otra fecha o configura sus horarios en Equipo
+                  </p>
+                </div>
+              ) : slots.length === 0 ? (
+                <p style={{ color:'var(--text-3)', fontSize:13, textAlign:'center', padding:'14px 0' }}>
+                  Sin disponibilidad — todos los horarios están ocupados
                 </p>
-                <p style={{ color:'var(--text-3)', fontSize:12, marginTop:4 }}>
-                  Elige otra fecha o configura sus horarios en Equipo
-                </p>
-              </div>
-            ) : slots.length === 0 ? (
-              <p style={{ color:'var(--text-3)', fontSize:14, textAlign:'center', padding:'20px 0' }}>
-                Sin disponibilidad — todos los horarios están ocupados
-              </p>
-            ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-                {slots.map(s => (
-                  <button key={s.inicio} onClick={() => setSlot(s)} style={{
-                    padding:'12px 8px', borderRadius:12, cursor:'pointer',
-                    background: slot?.inicio === s.inicio ? col : 'var(--card)',
-                    border: `1px solid ${slot?.inicio === s.inicio ? col : 'var(--border)'}`,
-                    color: slot?.inicio === s.inicio ? '#fff' : 'var(--text-2)',
-                    fontFamily:'Outfit', fontWeight:700, fontSize:14,
-                  }}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            )}
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:7, marginBottom:4 }}>
+                  {slots.map(s => (
+                    <button key={s.inicio} onClick={() => setSlot(s)} style={{
+                      padding:'10px 6px', borderRadius:10, cursor:'pointer',
+                      background: slot?.inicio === s.inicio ? col : 'var(--card)',
+                      border: `1px solid ${slot?.inicio === s.inicio ? col : 'var(--border)'}`,
+                      color: slot?.inicio === s.inicio ? '#fff' : 'var(--text-2)',
+                      fontFamily:'Outfit', fontWeight:700, fontSize:13,
+                    }}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── 4. Cliente ── */}
+          <SecLabel label="Cliente" />
+          <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+            <button onClick={() => setModoNuevo(false)} style={{
+              flex:1, padding:'9px', borderRadius:10, cursor:'pointer',
+              background: !modoNuevo ? `${col}20` : 'var(--card)',
+              border: `1px solid ${!modoNuevo ? col + '55' : 'var(--border)'}`,
+              color: !modoNuevo ? col : 'var(--text-2)', fontWeight:600, fontSize:12,
+            }}>Buscar</button>
+            <button onClick={() => setModoNuevo(true)} style={{
+              flex:1, padding:'9px', borderRadius:10, cursor:'pointer',
+              background: modoNuevo ? `${col}20` : 'var(--card)',
+              border: `1px solid ${modoNuevo ? col + '55' : 'var(--border)'}`,
+              color: modoNuevo ? col : 'var(--text-2)', fontWeight:600, fontSize:12,
+            }}>Nuevo</button>
           </div>
-        )}
 
-        {/* ── Step 3 — Cliente ── */}
-        {step === 3 && (
-          <div>
-            <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-              <button onClick={() => setModoNuevo(false)} style={{
-                flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
-                background: !modoNuevo ? `${col}20` : 'var(--card)',
-                border: `1px solid ${!modoNuevo ? col + '55' : 'var(--border)'}`,
-                color: !modoNuevo ? col : 'var(--text-2)', fontWeight:600, fontSize:13,
-              }}>Buscar cliente</button>
-              <button onClick={() => setModoNuevo(true)} style={{
-                flex:1, padding:'10px', borderRadius:12, cursor:'pointer',
-                background: modoNuevo ? `${col}20` : 'var(--card)',
-                border: `1px solid ${modoNuevo ? col + '55' : 'var(--border)'}`,
-                color: modoNuevo ? col : 'var(--text-2)', fontWeight:600, fontSize:13,
-              }}>Nuevo cliente</button>
-            </div>
-
-            {!modoNuevo ? (
-              <>
-                <input className="sp-input" placeholder="Buscar por nombre o teléfono…"
-                  value={busqCliente} onChange={e => setBusqCliente(e.target.value)}
-                  style={{ marginBottom:10 }} />
-                {clientes.map(c => (
-                  <button key={c.id} onClick={() => { setClienteId(c.id); setBusqCliente(c.nombre) }} style={{
-                    width:'100%', display:'flex', alignItems:'center', gap:12,
-                    padding:'12px 14px', borderRadius:12, cursor:'pointer', textAlign:'left', marginBottom:6,
-                    background: clienteId === c.id ? `${col}15` : 'var(--card)',
-                    border: `1px solid ${clienteId === c.id ? col + '55' : 'var(--border)'}`,
-                    color:'var(--text)',
-                  }}>
-                    <div style={{
-                      width:36, height:36, borderRadius:10, background:`${col}25`,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      fontFamily:'Outfit', fontWeight:800, color:col, fontSize:16, flexShrink:0,
-                    }}>{c.nombre[0]}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                        <span style={{ fontWeight:700, fontSize:14 }}>{c.nombre}</span>
-                        {c.tags?.includes('dificil') && (
-                          <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
-                            background:'rgba(239,68,68,0.12)', color:'#f87171', letterSpacing:0.4 }}>⚠ DIFÍCIL</span>
-                        )}
-                        {c.tags?.includes('vip') && (
-                          <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5,
-                            background:'rgba(251,191,36,0.12)', color:'#fbbf24', letterSpacing:0.4 }}>VIP</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize:12, color:'var(--text-3)' }}>{c.telefono}</div>
-                      {c.tags?.includes('dificil') && c.notas && clienteId !== c.id && (
-                        <div style={{ fontSize:11, color:'#f87171', marginTop:2, fontStyle:'italic' }}>
-                          ⚠ {c.notas.slice(0, 60)}{c.notas.length > 60 ? '…' : ''}
-                        </div>
+          {!modoNuevo ? (
+            <>
+              <input className="sp-input" placeholder="Buscar por nombre o teléfono…"
+                value={busqCliente} onChange={e => setBusqCliente(e.target.value)}
+                style={{ marginBottom:8 }} />
+              {clientes.map(c => (
+                <button key={c.id} onClick={() => { setClienteId(c.id); setBusqCliente(c.nombre) }} style={{
+                  width:'100%', display:'flex', alignItems:'center', gap:10,
+                  padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left', marginBottom:5,
+                  background: clienteId === c.id ? `${col}15` : 'var(--card)',
+                  border: `1px solid ${clienteId === c.id ? col + '55' : 'var(--border)'}`,
+                  color:'var(--text)',
+                }}>
+                  <div style={{ width:32, height:32, borderRadius:9, background:`${col}25`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'Outfit', fontWeight:800, color:col, fontSize:14, flexShrink:0 }}>
+                    {c.nombre[0]}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
+                      <span style={{ fontWeight:700, fontSize:13 }}>{c.nombre}</span>
+                      {c.tags?.includes('dificil') && (
+                        <span style={{ fontSize:9, fontWeight:800, padding:'2px 5px', borderRadius:4,
+                          background:'rgba(239,68,68,0.12)', color:'#f87171' }}>⚠ DIFÍCIL</span>
+                      )}
+                      {c.tags?.includes('vip') && (
+                        <span style={{ fontSize:9, fontWeight:800, padding:'2px 5px', borderRadius:4,
+                          background:'rgba(251,191,36,0.12)', color:'#fbbf24' }}>VIP</span>
                       )}
                     </div>
-                    {clienteId === c.id && <div style={{ marginLeft:'auto', color:col, flexShrink:0 }}><Ico d="M5 13l4 4L19 7" size={16} /></div>}
-                  </button>
-                ))}
-                {busqCliente.length > 1 && clientes.length === 0 && (
-                  <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'12px 0' }}>Sin resultados</p>
-                )}
-              </>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <input className="sp-input" placeholder="Nombre completo *"
-                  value={nuevoCliente.nombre} onChange={e => setNuevoCliente(p => ({...p, nombre:e.target.value}))} />
-                <input className="sp-input" placeholder="Teléfono (WhatsApp)" type="tel"
-                  value={nuevoCliente.telefono} onChange={e => setNuevoCliente(p => ({...p, telefono:e.target.value}))} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Notas de la cita (solo en paso 3) ── */}
-        {step === 3 && (
-          <div style={{ marginTop:16, marginBottom:0 }}>
-            <label style={{ fontSize:11, color:'var(--text-3)', fontWeight:700, letterSpacing:0.5,
-              display:'block', marginBottom:6, textTransform:'uppercase' }}>
-              Notas internas (opcional)
-            </label>
-            <textarea className="sp-input" rows={2} placeholder="Alergias, preferencias, indicaciones especiales…"
-              value={notasCita} onChange={e => setNotasCita(e.target.value)}
-              style={{ resize:'none', lineHeight:1.5 }} />
-          </div>
-        )}
-
-        {/* ── Resumen ── */}
-        {step > 0 && (
-          <div style={{
-            marginTop:16, padding:'12px 14px', borderRadius:14,
-            background:'var(--card)', boxShadow:'0 2px 12px rgba(0,0,0,0.1)', marginBottom:16,
-          }}>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:8, fontWeight:600, letterSpacing:0.5, textTransform:'uppercase' }}>
-              Resumen
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {prof && <span style={{ fontSize:13, color:'var(--text-2)' }}>👤 {prof.nombre}</span>}
-              {selectedServs.length > 0 && selectedServs.map(s => (
-                <span key={s.id} style={{ fontSize:13, color:'var(--text-2)' }}>✂️ {s.nombre}</span>
+                    <div style={{ fontSize:11, color:'var(--text-3)' }}>{c.telefono}</div>
+                    {c.tags?.includes('dificil') && c.notas && clienteId !== c.id && (
+                      <div style={{ fontSize:10, color:'#f87171', marginTop:2, fontStyle:'italic' }}>
+                        ⚠ {c.notas.slice(0, 60)}{c.notas.length > 60 ? '…' : ''}
+                      </div>
+                    )}
+                  </div>
+                  {clienteId === c.id && <Ico d="M5 13l4 4L19 7" size={15} />}
+                </button>
               ))}
-              {duracionTotal > 0 && (
-                <span style={{ fontSize:13, color:'var(--text-2)' }}>⏱ {duracionTotal} min total</span>
+              {busqCliente.length > 1 && clientes.length === 0 && (
+                <p style={{ fontSize:12, color:'var(--text-3)', textAlign:'center', padding:'10px 0' }}>Sin resultados</p>
               )}
-              {precioTotal > 0 && (
-                <span style={{ fontSize:13, fontWeight:700, color:col }}>💰 {fmtCOP(precioTotal)} total</span>
-              )}
-              {slot && <span style={{ fontSize:13, color:'var(--text-2)' }}>🕐 {fecha} · {slot.label}</span>}
+            </>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <input className="sp-input" placeholder="Nombre completo *"
+                value={nuevoCliente.nombre} onChange={e => setNuevoCliente(p => ({...p, nombre:e.target.value}))} />
+              <input className="sp-input" placeholder="Teléfono (WhatsApp)" type="tel"
+                value={nuevoCliente.telefono} onChange={e => setNuevoCliente(p => ({...p, telefono:e.target.value}))} />
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Espaciado final del área scrollable */}
-        <div style={{ height: 16 }} />
+          {/* ── 5. Notas internas ── */}
+          <SecLabel label="Notas internas" />
+          <textarea className="sp-input" rows={2} placeholder="Alergias, preferencias, indicaciones especiales…"
+            value={notasCita} onChange={e => setNotasCita(e.target.value)}
+            style={{ resize:'none', lineHeight:1.5 }} />
+
+          <div style={{ height:16 }} />
         </div>{/* fin body scrollable */}
 
-        {/* Footer fijo — fuera del scroll, siempre visible */}
+        {/* Footer fijo */}
         <div style={{
-          flexShrink: 0,
-          padding: '12px 20px',
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--sheet-bg)',
+          flexShrink:0, padding:'12px 20px',
+          paddingBottom:'max(20px, env(safe-area-inset-bottom))',
+          borderTop:'1px solid var(--border)',
+          background:'var(--sheet-bg)',
         }}>
           <div style={{ display:'flex', gap:10 }}>
-            {step > 0 && (
-              <button onClick={() => setStep(s => s - 1)} style={{
-                flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
-                background:'var(--card)', border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
-                color:'var(--text-2)', fontWeight:700, fontSize:15,
-              }}>Atrás</button>
-            )}
-            {step < 3 ? (
-              <button onClick={() => setStep(s => s + 1)} disabled={!canNext[step]} style={{
-                flex:2, padding:'15px', borderRadius:14,
-                cursor: canNext[step] ? 'pointer' : 'not-allowed',
-                background: canNext[step] ? col : 'var(--card)',
-                border:'none', color: canNext[step] ? '#fff' : 'var(--text-3)',
-                fontWeight:700, fontSize:15,
-                opacity: canNext[step] ? 1 : 0.5, fontFamily:'Outfit',
-              }}>Siguiente</button>
-            ) : (
-              <button onClick={guardar} disabled={saving || !canNext[3]} style={{
-                flex:2, padding:'15px', borderRadius:14, cursor:'pointer',
-                background:col, border:'none', color:'#fff', fontWeight:700, fontSize:15,
-                opacity: saving ? 0.7 : 1, fontFamily:'Outfit',
-              }}>{saving ? 'Guardando…' : 'Confirmar cita'}</button>
-            )}
+            <button onClick={onClose} style={{
+              flex:1, padding:'15px', borderRadius:14, cursor:'pointer',
+              background:'var(--card)', border:'none',
+              color:'var(--text-2)', fontWeight:700, fontSize:15,
+            }}>Cancelar</button>
+            <button onClick={guardar} disabled={saving || !canSave} style={{
+              flex:2, padding:'15px', borderRadius:14,
+              cursor: canSave ? 'pointer' : 'not-allowed',
+              background: canSave ? col : 'var(--card)',
+              border:'none', color: canSave ? '#fff' : 'var(--text-3)',
+              fontWeight:700, fontSize:15, fontFamily:'Outfit',
+              opacity: saving ? 0.7 : 1,
+            }}>{saving ? 'Guardando…' : 'Guardar cita'}</button>
           </div>
         </div>
       </div>

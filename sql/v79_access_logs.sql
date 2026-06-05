@@ -19,10 +19,12 @@ CREATE INDEX IF NOT EXISTS idx_access_logs_at
 ALTER TABLE access_logs ENABLE ROW LEVEL SECURITY;
 
 -- Cada usuario puede insertar su propio evento
+DROP POLICY IF EXISTS "access_logs_insert" ON access_logs;
 CREATE POLICY "access_logs_insert" ON access_logs
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
 -- Cada tenant ve solo sus propios logs
+DROP POLICY IF EXISTS "access_logs_select_tenant" ON access_logs;
 CREATE POLICY "access_logs_select_tenant" ON access_logs
   FOR SELECT USING (
     tenant_id IN (

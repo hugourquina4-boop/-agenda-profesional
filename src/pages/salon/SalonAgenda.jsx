@@ -95,6 +95,9 @@ export default function SalonAgenda() {
   const [creandoSerie,     setCreandoSerie]     = useState(false)
   const [busqAgenda,       setBusqAgenda]       = useState('')
 
+  // Bloqueos recurrentes (tabla bloqueos_profesional)
+  const [bloqueosRec, setBloqueosRec] = useState([])
+
   // Bloquear franja horaria
   const [bloqueoModal, setBloqueoModal] = useState(false)
   const [bloqueoProf,  setBloqueoProf]  = useState('')
@@ -175,6 +178,24 @@ export default function SalonAgenda() {
     setPagoRef('')
     setPagoForm(false)
   }, [selCita])
+
+  useEffect(() => {
+    if (!tenant || !selDay) return
+    const dow = new Date(selDay + 'T12:00:00').getDay() // 0=Dom..6=Sáb
+    supabase.from('bloqueos_profesional')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .eq('activo', true)
+      .then(({ data }) => {
+        const aplicables = (data || []).filter(b => {
+          if (b.recurrente) return b.dia_semana === dow
+          const desde = b.fecha_inicio
+          const hasta = b.fecha_fin || b.fecha_inicio
+          return selDay >= desde && selDay <= hasta
+        })
+        setBloqueosRec(aplicables)
+      })
+  }, [tenant, selDay])
 
   useEffect(() => {
     if (!tenant || !selDay) return
@@ -838,7 +859,55 @@ export default function SalonAgenda() {
                   if (sA < eB && eA > sB) { conflictos.add(citasActivas[a].id); conflictos.add(citasActivas[b].id) }
                 }
               }
-              return profCitas.map(c => {
+              // Bloqueos recurrentes de la tabla bloqueos_profesional
+              const blqProf = bloqueosRec.filter(b => b.profesional_id === prof.id)
+              const blqElements = blqProf.map(b => {
+                const top = b.todo_el_dia ? 0
+                  : ((parseInt(b.hora_inicio) - H_START) * 60 + parseInt(b.hora_inicio.slice(3))) / 30 * SLOT_H
+                const height = b.todo_el_dia ? TOTAL_H
+                  : (() => {
+                    const [hI, mI] = b.hora_inicio.slice(0,5).split(':').map(Number)
+                    const [hF, mF] = b.hora_fin.slice(0,5).split(':').map(Number)
+                    return Math.max(SLOT_H, ((hF * 60 + mF) - (hI * 60 + mI)) / 30 * SLOT_H)
+                  })()
+                if (!b.todo_el_dia) {
+                  const [hI, mI] = b.hora_inicio.slice(0,5).split(':').map(Number)
+                  const topFixed = ((hI - H_START) * 60 + mI) / 30 * SLOT_H
+                  return (
+                    <div key={`blq-${b.id}`} style={{
+                      position:'absolute', top:topFixed,
+                      left: 56 + pi * COL_W + 3,
+                      width: COL_W - 6, height: height - 2,
+                      borderRadius:10, pointerEvents:'none', zIndex:1,
+                      background:'repeating-linear-gradient(135deg,rgba(113,113,122,0.09),rgba(113,113,122,0.09) 4px,transparent 4px,transparent 10px)',
+                      border:'1px solid rgba(113,113,122,0.2)',
+                      padding:'4px 7px', overflow:'hidden',
+                    }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#9ca3af', display:'flex', alignItems:'center', gap:3 }}>
+                        <span>⊘</span> {b.titulo}
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div key={`blq-${b.id}`} style={{
+                    position:'absolute', top:0,
+                    left: 56 + pi * COL_W + 3,
+                    width: COL_W - 6, height: TOTAL_H,
+                    borderRadius:0, pointerEvents:'none', zIndex:1,
+                    background:'repeating-linear-gradient(135deg,rgba(113,113,122,0.06),rgba(113,113,122,0.06) 4px,transparent 4px,transparent 10px)',
+                    borderLeft:'2px solid rgba(113,113,122,0.18)',
+                    padding:'8px 7px', overflow:'hidden',
+                  }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#9ca3af', display:'flex', alignItems:'center', gap:3 }}>
+                      <span>⊘</span> {b.titulo}
+                      {b.recurrente && <span style={{ marginLeft:4, opacity:0.6 }}>· cada {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][b.dia_semana]}</span>}
+                    </div>
+                  </div>
+                )
+              })
+
+              return [...blqElements, ...profCitas.map(c => {
                 const top      = minOffset(c.fecha_inicio)
                 const height   = durPx(c)
                 const estColor = ESTADO_COLOR[c.estado] || '#71717a'
@@ -1000,7 +1069,7 @@ export default function SalonAgenda() {
                     )}
                   </div>
                 )
-              })
+              })]
             })}
           </div>
         </div>
@@ -1701,6 +1770,28 @@ export default function SalonAgenda() {
                   <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.849L.054 23.45a.5.5 0 00.612.612l5.601-1.478A11.96 11.96 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.985 0-3.838-.551-5.418-1.508l-.387-.23-4.007 1.056 1.057-3.923-.252-.4A9.956 9.956 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
                 </svg>
                 Enviar recordatorio por WhatsApp
+              </a>
+            )}
+
+            {/* NPS post-visita */}
+            {selCita.estado === 'completada'
+              && tenant?.config_vertical?.nps_activo
+              && selCita.clientes_agenda?.telefono
+              && (
+              <a
+                href={`https://wa.me/${selCita.clientes_agenda.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(
+                  `Hola ${selCita.clientes_agenda.nombre?.split(' ')[0] || 'cliente'} 😊 Gracias por visitarnos en ${tenant?.nombre || 'el salón'}. ¿Cómo fue tu experiencia hoy? Tu opinión nos ayuda a mejorar 🙏${tenant?.config_vertical?.link_google_reviews ? `\n⭐ Déjanos una reseña: ${tenant.config_vertical.link_google_reviews}` : ''}`
+                )}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  padding:'11px 16px', borderRadius:13, marginBottom:16,
+                  background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)',
+                  color:'#818cf8', fontWeight:700, fontSize:13, textDecoration:'none',
+                }}
+              >
+                <span style={{ fontSize:18 }}>⭐</span>
+                Solicitar reseña / NPS por WhatsApp
               </a>
             )}
 

@@ -95,6 +95,12 @@ export default function Login() {
           ¿Eres nuevo?{' '}
           <Link to="/registro" className="text-blue-600 hover:underline font-medium">Crea tu agenda gratis</Link>
         </p>
+
+        <div className="text-center text-xs text-gray-400 dark:text-slate-400 mt-6 space-x-3">
+          <a href="/terminos.html" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-blue-600 dark:hover:text-blue-400">Términos de Servicio</a>
+          <span>•</span>
+          <a href="https://www.iubenda.com/privacy-policy/XXXXXXXX" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-blue-600 dark:hover:text-blue-400">Política de Privacidad</a>
+        </div>
       </div>
     </div>
   )

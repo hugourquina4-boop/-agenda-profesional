@@ -275,16 +275,14 @@ export default function SalonConfig({ onNavigate }) {
           </div>
         </Campo>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <Campo label="Teléfono fijo">
-            <input className="sp-input" type="tel" placeholder="6024445566"
-              value={form.telefono} onChange={e => set('telefono', e.target.value)} />
-          </Campo>
-          <Campo label="Email">
-            <input className="sp-input" type="email" placeholder="salon@correo.com"
-              value={form.email} onChange={e => set('email', e.target.value)} />
-          </Campo>
-        </div>
+        <Campo label="Teléfono fijo">
+          <input className="sp-input" type="tel" placeholder="6024445566"
+            value={form.telefono} onChange={e => set('telefono', e.target.value)} />
+        </Campo>
+        <Campo label="Email">
+          <input className="sp-input" type="email" placeholder="salon@correo.com"
+            value={form.email} onChange={e => set('email', e.target.value)} />
+        </Campo>
 
         <Campo label="Ciudad">
           <input className="sp-input" placeholder="Ej: Cali"
@@ -418,7 +416,7 @@ export default function SalonConfig({ onNavigate }) {
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <Campo label="Duración mínima de cita">
+          <Campo label="Duración mínima">
             <select className="sp-input" value={form.duracion_slot_min}
               onChange={e => set('duracion_slot_min', e.target.value)}>
               {[15,20,30,45,60].map(m => (
@@ -426,7 +424,7 @@ export default function SalonConfig({ onNavigate }) {
               ))}
             </select>
           </Campo>
-          <Campo label="Anticipación mínima (horas)">
+          <Campo label="Anticipación mín. (h)">
             <input className="sp-input" type="number" min="0" max="72"
               value={form.anticipacion_horas}
               onChange={e => set('anticipacion_horas', e.target.value)} />
@@ -463,12 +461,12 @@ export default function SalonConfig({ onNavigate }) {
       {/* ── Programa de puntos ── */}
       <Seccion titulo="Programa de puntos ⭐">
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <Campo label="Puntos por visita completada">
+          <Campo label="Puntos por visita">
             <input className="sp-input" type="number" min="0" max="500"
               value={form.puntos_por_visita}
               onChange={e => set('puntos_por_visita', e.target.value)} />
           </Campo>
-          <Campo label="Mínimo para canjear">
+          <Campo label="Mín. para canjear">
             <input className="sp-input" type="number" min="0" max="5000"
               value={form.puntos_canje_min}
               onChange={e => set('puntos_canje_min', e.target.value)} />
@@ -509,7 +507,7 @@ export default function SalonConfig({ onNavigate }) {
                   value={form.tiquetera_meta}
                   onChange={e => set('tiquetera_meta', e.target.value)} />
               </Campo>
-              <Campo label="Radio de proximidad (m)">
+              <Campo label="Radio GPS (m)">
                 <input className="sp-input" type="number" min="50" max="5000" step="50"
                   value={form.tiquetera_radio_m}
                   onChange={e => set('tiquetera_radio_m', e.target.value)} />
@@ -524,13 +522,13 @@ export default function SalonConfig({ onNavigate }) {
             </Campo>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Campo label="Latitud del negocio">
+              <Campo label="Latitud">
                 <input className="sp-input" type="number" step="0.0000001"
                   placeholder="Ej: 3.4516"
                   value={form.tiquetera_lat}
                   onChange={e => set('tiquetera_lat', e.target.value)} />
               </Campo>
-              <Campo label="Longitud del negocio">
+              <Campo label="Longitud">
                 <input className="sp-input" type="number" step="0.0000001"
                   placeholder="Ej: -76.5319"
                   value={form.tiquetera_lng}

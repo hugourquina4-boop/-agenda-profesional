@@ -4,8 +4,8 @@
 > Stack: React 19 + Vite + Supabase (unpxoamfyushsbyyziyn) + Vercel
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
-> Actualizado: 2026-05-19 (sesión 23)
-> **Versión actual en producción: v1.4-dev** (commit 8541199)
+> Actualizado: 2026-05-20 (sesión 24)
+> **Versión actual en producción: v1.4-dev**
 
 ---
 
@@ -260,6 +260,70 @@ Si el upload de fotos de profesionales falla, aplicar el SQL de `sql/v13_storage
 - **HorarioGrid**: componente táctil reutilizable en `src/components/HorarioGrid.jsx`. Usa `setPointerCapture` + `document.elementFromPoint`. Exporta helpers de conversión de slots.
 - **MiniCalendar**: componente inline en SalonEquipo.jsx. Tappable, verde=horario especial, rojo=ausente, borde accent=hoy.
 - **sp-sheet**: `position:fixed; bottom:0; max-height:90dvh; overflow-y:auto; overscroll-behavior:contain` — soporta scroll interno en mobile.
+
+### Estructura de nav — decisiones fijas (sesión 24)
+
+**NAV_PRINCIPAL** (operación diaria): Inicio · Agenda · Clientes
+
+**NAV_NEGOCIO** (gestión): Equipo · Servicios · Órdenes · Inventario · Proveedores · Ingresos · Comisiones · Mensajería · Analytics
+
+**NAV_SISTEMA** (administración): Sedes · Accesos · Configuración
+- **Sedes** fue movido de NAV_NEGOCIO a NAV_SISTEMA — es configuración, no operación diaria
+- **Bóveda fue retirada del nav** — es una función de nicho que confunde al usuario promedio. Acceso: Configuración → sección "Bóveda de contraseñas" → solo visible si `tenant.plan === 'ultra'`
+- Regla: si un módulo no se visita más de 1 vez/semana, pertenece a Config o NAV_SISTEMA, no a NAV_NEGOCIO
+
+### Categorización de servicios — próximo sprint prioritario
+
+Referencia: Lizto (app.lizto.co) tiene categorías jerárquicas de servicios + Plantillas de Ficha Técnica.
+
+**Plan de implementación:**
+
+#### SQL (v82_categorias_servicios.sql)
+```sql
+CREATE TABLE categorias_servicio (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  nombre TEXT NOT NULL,        -- "Cabello", "Uñas", "Estética"
+  color TEXT DEFAULT '#6366f1',
+  orden INT DEFAULT 0,
+  activo BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+-- RLS tenant + índice orden
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS categoria_id UUID REFERENCES categorias_servicio(id);
+ALTER TABLE servicios ADD COLUMN IF NOT EXISTS subcategoria TEXT; -- "Corte", "Coloración", "Peinado"
+```
+
+#### Categorías predeterminadas (seed al crear tenant)
+- Cabello → subcategorías: Corte, Coloración, Tratamiento, Peinado
+- Uñas → Manicure, Pedicure, Gelish, Acrílico
+- Estética → Depilación, Facial, Masaje
+- Barbería → Corte, Barba, Combo
+- Otro → libre
+
+#### UX impacto
+- SalonServicios: tabs de categoría encima de la lista (pills filtro)
+- Portal de reservas: step 1 muestra categorías como cards grandes antes de listar servicios
+- Analytics: desglose de ingresos por categoría
+- SalonConfig: CRUD de categorías (nombre + color)
+
+#### Plantilla de Ficha Técnica (alta prioridad para coloristas)
+```sql
+CREATE TABLE fichas_tecnicas (
+  id UUID, tenant_id UUID, cliente_id UUID, cita_id UUID,
+  categoria TEXT,          -- "coloracion", "tratamiento", etc.
+  campos JSONB,            -- { tinte: "Wella 7.1", oxidante: "20vol", tiempo: "35min", resultado: "Excelente" }
+  notas TEXT,
+  created_at TIMESTAMPTZ
+);
+CREATE TABLE plantillas_ficha (
+  id UUID, tenant_id UUID, categoria TEXT,
+  campos JSONB             -- [{ label: "Tinte", key: "tinte", tipo: "text" }, ...]
+);
+```
+Esto aparece en el tab "Historial" del cliente con un botón "📋 Ver ficha técnica" por visita.
+
+**Prioridad:** Alta. Diferenciador clave vs competencia para retener coloristas y estilistas de nivel.
 
 ### Schema crítico: usuarios_tenant
 
@@ -673,11 +737,7 @@ v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS
 | ------- | --- | ------ |
 | Servicios: tab **Sedes** (6° tab) — asignar servicio a sucursales específicas | v78 ⏳ aplicar | ✅ DONE — `sedes_ids UUID[]` en form + toggle visual + null=todas las sedes |
 
-**SQL pendiente aplicar en Supabase:** `sql/v78_servicio_sedes.sql`
-```sql
-ALTER TABLE servicios ADD COLUMN IF NOT EXISTS sedes_ids UUID[];
-CREATE INDEX IF NOT EXISTS idx_servicios_sedes ON servicios USING GIN(sedes_ids);
-```
+**SQL aplicado:** v78_servicio_sedes.sql ✅
 
 ## Bloque AH — COMPLETADO (sesión 23 — 2026-05-19)
 
@@ -690,6 +750,21 @@ CREATE INDEX IF NOT EXISTS idx_servicios_sedes ON servicios USING GIN(sedes_ids)
 | Trial efectivo = 15 días: gracia reducida de 2→1 día | sin SQL | ✅ DONE — `diasRestantes < -1` en SalonApp.jsx |
 
 **SQL aplicado:** v79_access_logs.sql ✅ — tabla `access_logs` + índices + RLS + RPC `salon_admin_get_access_logs`
+
+## Bloque AI — COMPLETADO (sesión 23 cont. — 2026-05-19)
+
+| Feature | SQL | Estado |
+| ------- | --- | ------ |
+| Splash: fondo claro #FAFAF8 + logo512 + blur-scale spring | sin SQL | ✅ DONE — SALÓN charcoal + PRO verde #16a34a, Outfit 900 |
+| UPDATE policy en tenants para admins (Config.jsx funcionaba sin actualizar) | v81 ✅ | ✅ DONE — SalonConfig ahora guarda correctamente para admins reales |
+| mi_tenant_id() verifica tenants.activo + fecha_vencimiento | v81 ✅ | ✅ DONE — suscripción bloqueada a nivel de BD, no solo frontend |
+| Bóveda AES-GCM (SalonBoveda.jsx) registrada en app | sin SQL | ✅ DONE — nav + lazy import + PAGE_LABEL |
+| Toast global (ToastContext + Toaster) | sin SQL | ✅ DONE |
+| PWA install prompt (beforeinstallprompt) | sin SQL | ✅ DONE |
+| manifest.json PWA-compliant + assetlinks.json TWA | sin SQL | ✅ DONE |
+| Skeleton loaders en Dashboard + paginación 50/página en Clientes | sin SQL | ✅ DONE |
+
+**SQL aplicado:** v81_tenant_admin_rls.sql ✅ — UPDATE policy `t_admin_update` en tenants + `mi_tenant_id()` con verificación de suscripción
 
 ## Próximos pasos sugeridos
 

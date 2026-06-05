@@ -45,7 +45,8 @@ export default function Registro() {
   async function registrar(e) {
     e.preventDefault()
     if (password !== password2) { setError('Las contraseñas no coinciden'); return }
-    if (password.length < 6)    { setError('La contraseña debe tener al menos 6 caracteres'); return }
+    if (password.length < 8)    { setError('La contraseña debe tener al menos 8 caracteres'); return }
+    if (!/[0-9]/.test(password)){ setError('La contraseña debe incluir al menos un número'); return }
     if (!slug.trim())           { setError('El identificador del negocio es requerido'); return }
 
     setSaving(true)
@@ -305,6 +306,18 @@ export default function Registro() {
               />
             </div>
 
+            <div className="flex items-start gap-2.5 py-1">
+              <input
+                type="checkbox"
+                id="acepta-politicas"
+                required
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="acepta-politicas" className="text-xs text-gray-500 select-none cursor-pointer leading-tight">
+                Acepto los <a href="/terminos.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-semibold">Términos de Servicio</a> y la <a href="https://www.iubenda.com/privacy-policy/XXXXXXXX" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-semibold">Política de Privacidad</a>.
+              </label>
+            </div>
+
             {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
 
             <button
@@ -327,6 +340,12 @@ export default function Registro() {
           ¿Ya tienes cuenta?{' '}
           <Link to="/login" className="text-blue-600 hover:underline font-medium">Inicia sesión</Link>
         </p>
+
+        <div className="text-center text-xs text-gray-400 dark:text-slate-500 mt-6 space-x-3">
+          <a href="/terminos.html" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-gray-600">Términos de Servicio</a>
+          <span>•</span>
+          <a href="https://www.iubenda.com/privacy-policy/XXXXXXXX" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-gray-600">Política de Privacidad</a>
+        </div>
       </div>
     </div>
   )

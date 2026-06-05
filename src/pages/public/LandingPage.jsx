@@ -118,6 +118,297 @@ const TESTIMONIALS = [
   { nombre: 'Juliana P.',  negocio: 'Salón Estilo · Cali',         texto: 'Las comisiones me tomaban horas. Ahora cierro la planilla de todo el equipo en 5 minutos y les mando el PDF por WhatsApp.' },
 ]
 
+// ─── App preview — phone mockup con UI real ───────────────────────────────────
+
+function SalonScene() {
+  const G   = '#16a34a'
+  const PUR = '#7c3aed'
+  const BLU = '#2563eb'
+  const ORG = '#f59e0b'
+
+  // Phone body
+  const PX = 182, PY = 10, PW = 196, PH = 420, PR = 28
+  // Screen (inner clip area)
+  const SX = PX + 6, SY = PY + 14, SW = PW - 12, SH = PH - 28
+
+  const APPTS = [
+    { c: G,   name: 'María García',    svc: '10:00 · Corte + Tinte · 2h',   prof: 'Prof. Ana Sofía · $120.000',  badge: 'Confirmada', bw: 50 },
+    { c: PUR, name: 'Laura Rodríguez', svc: '11:30 · Manicure Gelish · 1h', prof: 'Prof. Carolina · $65.000',     badge: 'En curso',   bw: 40 },
+    { c: BLU, name: 'Ana Martínez',    svc: '14:00 · Peinado novia · 3h',   prof: 'Prof. Valentina · $180.000',  badge: 'Pendiente',  bw: 44 },
+  ]
+
+  return (
+    <svg viewBox="0 0 560 440" width="100%" style={{ maxWidth: 560, display: 'block' }}
+      xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+
+      <defs>
+        <filter id="fs" x="-25%" y="-15%" width="150%" height="140%">
+          <feDropShadow dx="0" dy="10" stdDeviation="16" floodColor="#000" floodOpacity="0.22"/>
+        </filter>
+        <filter id="fc" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="4" stdDeviation="9" floodColor="#000" floodOpacity="0.09"/>
+        </filter>
+        <clipPath id="csc">
+          <rect x={SX} y={SY} width={SW} height={SH} rx="18"/>
+        </clipPath>
+      </defs>
+
+      {/* ── Phone body ── */}
+      <rect x={PX} y={PY} width={PW} height={PH} rx={PR} fill="#101010" filter="url(#fs)"/>
+      <rect x={PX} y={PY} width={PW} height={PH} rx={PR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5"/>
+      {/* Side button */}
+      <rect x={PX+PW-2} y={PY+90} width="3" height="40" rx="1.5" fill="#1e1e1e"/>
+      {/* Volume buttons */}
+      <rect x={PX-1} y={PY+70} width="3" height="28" rx="1.5" fill="#1e1e1e"/>
+      <rect x={PX-1} y={PY+104} width="3" height="28" rx="1.5" fill="#1e1e1e"/>
+      {/* Screen glass */}
+      <rect x={SX} y={SY} width={SW} height={SH} rx="18" fill="#07101f"/>
+
+      {/* ── Screen content ── */}
+      <g clipPath="url(#csc)">
+        <rect x={SX} y={SY} width={SW} height={SH} fill="#07101f"/>
+
+        {/* Status bar */}
+        <text x={SX+10} y={SY+13} fontSize="8" fill="rgba(255,255,255,0.5)" fontFamily="system-ui,sans-serif" fontWeight="600">9:41</text>
+        <rect x={SX+SW-22} y={SY+5} width="14" height="6.5" rx="1.5" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="1"/>
+        <rect x={SX+SW-21} y={SY+6} width="10" height="4.5" rx="1" fill={G}/>
+
+        {/* App header */}
+        <rect x={SX} y={SY+18} width={SW} height={40} fill="#0e1e36"/>
+        <text x={SX+12} y={SY+31} fontSize="7" fill="rgba(255,255,255,0.3)" fontFamily="system-ui,sans-serif" fontWeight="700" letterSpacing="0.5">HOY · MAR 22 MAYO</text>
+        <text x={SX+12} y={SY+48} fontSize="12" fill="white" fontFamily="system-ui,sans-serif" fontWeight="800">Agenda del día</text>
+        <circle cx={SX+SW-14} cy={SY+38} r="11" fill={G}/>
+        <text x={SX+SW-14} y={SY+42.5} fontSize="8" fill="white" fontFamily="system-ui,sans-serif" fontWeight="900" textAnchor="middle">3</text>
+
+        {/* Stats strip */}
+        <rect x={SX} y={SY+58} width={SW} height={38} fill="#0e1e36" opacity="0.7"/>
+        <text x={SX+12} y={SY+71} fontSize="7" fill="rgba(255,255,255,0.28)" fontFamily="system-ui,sans-serif" fontWeight="700">CITAS HOY</text>
+        <text x={SX+12} y={SY+87} fontSize="18" fill="white" fontFamily="system-ui,sans-serif" fontWeight="900">12</text>
+        <text x={SX+38} y={SY+87} fontSize="8" fill={G} fontFamily="system-ui,sans-serif" fontWeight="700">+25%</text>
+        <line x1={SX+SW/2} y1={SY+62} x2={SX+SW/2} y2={SY+94} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+        <text x={SX+SW/2+10} y={SY+71} fontSize="7" fill="rgba(255,255,255,0.28)" fontFamily="system-ui,sans-serif" fontWeight="700">INGRESOS</text>
+        <text x={SX+SW/2+10} y={SY+87} fontSize="15" fill="white" fontFamily="system-ui,sans-serif" fontWeight="900">$420K</text>
+
+        {/* Appointment cards */}
+        {APPTS.map(({ c, name, svc, prof, badge, bw }, idx) => {
+          const cy = SY + 106 + idx * 64
+          return (
+            <g key={name}>
+              <rect x={SX+8} y={cy} width={SW-16} height={56} rx="9" fill={`${c}13`}/>
+              <rect x={SX+8} y={cy} width={SW-16} height={56} rx="9" fill="none" stroke={`${c}22`} strokeWidth="1"/>
+              <rect x={SX+8} y={cy+4} width="3" height="48" rx="1.5" fill={c}/>
+              <text x={SX+18} y={cy+16} fontSize="9" fill="rgba(255,255,255,0.9)" fontFamily="system-ui,sans-serif" fontWeight="700">{name}</text>
+              <text x={SX+18} y={cy+27} fontSize="7.5" fill="rgba(255,255,255,0.36)" fontFamily="system-ui,sans-serif">{svc}</text>
+              <text x={SX+18} y={cy+38} fontSize="7" fill="rgba(255,255,255,0.2)" fontFamily="system-ui,sans-serif">{prof}</text>
+              <rect x={SX+SW-bw-18} y={cy+9} width={bw} height="13" rx="4" fill={`${c}28`}/>
+              <text x={SX+SW-bw/2-18} y={cy+19} fontSize="6.5" fill={c} fontFamily="system-ui,sans-serif" fontWeight="700" textAnchor="middle">{badge}</text>
+            </g>
+          )
+        })}
+
+        {/* Revenue mini-chart strip */}
+        <rect x={SX} y={SY+SH-68} width={SW} height={38} fill="#0e1e36" opacity="0.9"/>
+        <text x={SX+12} y={SY+SH-50} fontSize="7" fill="rgba(255,255,255,0.28)" fontFamily="system-ui,sans-serif" fontWeight="700">SEMANA</text>
+        <text x={SX+12} y={SY+SH-36} fontSize="14" fill="white" fontFamily="system-ui,sans-serif" fontWeight="900">$2.1M</text>
+        <text x={SX+58} y={SY+SH-36} fontSize="8" fill={G} fontFamily="system-ui,sans-serif" fontWeight="700">+31%</text>
+        {[14,22,10,32,20,38,28].map((h, i) => (
+          <rect key={i} x={SX+SW-80+i*10} y={SY+SH-32-h} width="8" height={h} rx="2"
+            fill={i === 6 ? G : 'rgba(22,163,74,0.28)'}/>
+        ))}
+
+        {/* Bottom nav */}
+        <rect x={SX} y={SY+SH-30} width={SW} height={30} fill="#060e1a"/>
+        {['Inicio','Agenda','Caja','Mas'].map((label, i) => {
+          const cx2 = SX + 24 + i * 42
+          const active = i === 1
+          return (
+            <g key={label}>
+              <rect x={cx2-14} y={SY+SH-26} width="28" height="20" rx="7"
+                fill={active ? `${G}20` : 'transparent'}/>
+              <text x={cx2} y={SY+SH-12} fontSize="8"
+                fill={active ? G : 'rgba(255,255,255,0.2)'}
+                fontFamily="system-ui,sans-serif" fontWeight={active ? '700' : '400'}
+                textAnchor="middle">{label}</text>
+            </g>
+          )
+        })}
+        <rect x={SX+SW/2-26} y={SY+SH-5} width="52" height="2.5" rx="1.5" fill="rgba(255,255,255,0.1)"/>
+      </g>
+
+      {/* Camera punch-hole */}
+      <circle cx={PX+PW/2} cy={PY+8} r="4" fill="#07101f"/>
+
+      {/* ── FLOATING CARDS ── */}
+
+      {/* WhatsApp — top left */}
+      <rect x="6" y="50" width="164" height="64" rx="14" fill="white" filter="url(#fc)"/>
+      <rect x="6" y="50" width="164" height="64" rx="14" fill="none" stroke="rgba(0,0,0,0.055)" strokeWidth="1"/>
+      <circle cx="30" cy="82" r="15" fill="#25D366"/>
+      <text x="30" y="87" fontSize="11" fill="white" fontFamily="system-ui,sans-serif" fontWeight="900" textAnchor="middle">W</text>
+      <text x="54" y="68" fontSize="8.5" fill="#111" fontFamily="system-ui,sans-serif" fontWeight="800">WhatsApp automático</text>
+      <text x="54" y="80" fontSize="7.5" fill="#52525b" fontFamily="system-ui,sans-serif">María García confirmada</text>
+      <text x="54" y="91" fontSize="7" fill={G} fontFamily="system-ui,sans-serif" fontWeight="700">Mañana 10:00am · leido</text>
+
+      {/* Ingresos del mes — bottom left */}
+      <rect x="6" y="302" width="164" height="100" rx="14" fill="white" filter="url(#fc)"/>
+      <rect x="6" y="302" width="164" height="100" rx="14" fill="none" stroke="rgba(0,0,0,0.055)" strokeWidth="1"/>
+      <text x="20" y="320" fontSize="7.5" fill="#71717a" fontFamily="system-ui,sans-serif" fontWeight="700">INGRESOS DEL MES</text>
+      <text x="20" y="348" fontSize="24" fill="#111" fontFamily="system-ui,sans-serif" fontWeight="900" letterSpacing="-1">$4.2M</text>
+      <text x="20" y="364" fontSize="8" fill={G} fontFamily="system-ui,sans-serif" fontWeight="700">+31% vs mes anterior</text>
+      {[10,16,8,24,14,34,26].map((h, i) => (
+        <rect key={i} x={90+i*10} y={395-h} width="8" height={h} rx="1.5"
+          fill={i === 6 ? G : 'rgba(22,163,74,0.25)'}/>
+      ))}
+
+      {/* Cliente VIP — top right */}
+      <rect x="390" y="50" width="164" height="64" rx="14" fill="white" filter="url(#fc)"/>
+      <rect x="390" y="50" width="164" height="64" rx="14" fill="none" stroke="rgba(0,0,0,0.055)" strokeWidth="1"/>
+      <circle cx="414" cy="82" r="15" fill="#1a1a1a"/>
+      <text x="414" y="87" fontSize="11" fill="white" fontFamily="system-ui,sans-serif" fontWeight="700" textAnchor="middle">A</text>
+      <text x="437" y="68" fontSize="8.5" fill="#111" fontFamily="system-ui,sans-serif" fontWeight="800">Ana Martínez</text>
+      <text x="437" y="80" fontSize="7.5" fill="#52525b" fontFamily="system-ui,sans-serif">VIP · 48 visitas</text>
+      <text x="437" y="91" fontSize="7" fill={G} fontFamily="system-ui,sans-serif" fontWeight="700">1.200 pts acumulados hoy</text>
+
+      {/* Reservas portal — bottom right */}
+      <rect x="390" y="302" width="164" height="100" rx="14" fill="white" filter="url(#fc)"/>
+      <rect x="390" y="302" width="164" height="100" rx="14" fill="none" stroke="rgba(0,0,0,0.055)" strokeWidth="1"/>
+      <text x="404" y="320" fontSize="7.5" fill="#71717a" fontFamily="system-ui,sans-serif" fontWeight="700">PORTAL · HOY</text>
+      <text x="404" y="348" fontSize="24" fill="#111" fontFamily="system-ui,sans-serif" fontWeight="900" letterSpacing="-1">7</text>
+      <text x="432" y="348" fontSize="11" fill="#71717a" fontFamily="system-ui,sans-serif" fontWeight="400">nuevas reservas</text>
+      <text x="404" y="364" fontSize="8" fill={G} fontFamily="system-ui,sans-serif" fontWeight="700">Agendaron solos · sin llamadas</text>
+      <text x="404" y="376" fontSize="7.5" fill="#a1a1aa" fontFamily="system-ui,sans-serif">salonpro.app/tu-salon</text>
+      {/* Small day dots */}
+      {['L','M','X','J','V','S','D'].map((d, i) => {
+        const booked = i === 1 || i === 3 || i === 5
+        return (
+          <g key={d}>
+            <circle cx={410+i*18} cy={392} r={booked ? 6 : 5}
+              fill={booked ? G : 'rgba(22,163,74,0.18)'}/>
+            <text x={410+i*18} y={395.5} fontSize="5.5" fill={booked ? 'white' : '#a1a1aa'}
+              fontFamily="system-ui,sans-serif" fontWeight="700" textAnchor="middle">{d}</text>
+          </g>
+        )
+      })}
+
+      {/* Tiny connector dots */}
+      <circle cx="170" cy="82" r="3.5" fill="rgba(22,163,74,0.22)"/>
+      <circle cx="170" cy="330" r="3.5" fill="rgba(22,163,74,0.16)"/>
+      <circle cx="390" cy="82" r="3.5" fill="rgba(22,163,74,0.22)"/>
+      <circle cx="390" cy="330" r="3.5" fill="rgba(22,163,74,0.16)"/>
+    </svg>
+  )
+}
+
+// ─── Cómo funciona ────────────────────────────────────────────────────────────
+
+function HowItWorks({ onCTA }) {
+  const steps = [
+    {
+      num: '01',
+      title: 'Crea tu cuenta',
+      desc: 'Regístrate con tu email. En 2 minutos tienes acceso completo a la plataforma. Sin instalar nada.',
+      Icon: () => (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+      ),
+    },
+    {
+      num: '02',
+      title: 'Configura en 5 pasos',
+      desc: 'Agrega tus profesionales, los servicios que ofreces, los horarios y tus primeros clientes. El sistema te guía paso a paso.',
+      Icon: () => (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/>
+        </svg>
+      ),
+    },
+    {
+      num: '03',
+      title: 'Empieza a recibir citas',
+      desc: 'Comparte tu link de reservas con tus clientes. El sistema agenda, confirma y manda recordatorios por WhatsApp solo.',
+      Icon: () => (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ),
+    },
+  ]
+
+  return (
+    <section style={{ padding: 'clamp(60px,8vw,96px) clamp(16px,4vw,40px)', background: DARK }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GREEN, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 10 }}>
+            Así de simple
+          </div>
+          <h2 style={{ fontFamily: 'Outfit', fontWeight: 900, fontSize: 'clamp(26px,4.5vw,42px)', color: '#fff', letterSpacing: -1, margin: '0 0 12px' }}>
+            Listo en menos de 30 minutos
+          </h2>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', maxWidth: 420, margin: '0 auto', lineHeight: 1.65 }}>
+            Sin técnicos, sin instalaciones, sin capacitaciones de medio día. Empiezas solo y el sistema te guía.
+          </p>
+        </div>
+
+        <div className="how-grid">
+          {steps.map((s, i) => (
+            <div key={s.num} style={{ position: 'relative' }}>
+              {/* Línea conectora (no en el último) */}
+              {i < steps.length - 1 && (
+                <div className="how-connector" style={{
+                  position: 'absolute', top: 28, left: '60%', right: '-10%',
+                  height: 1, background: `${GREEN}30`,
+                  zIndex: 0,
+                }} />
+              )}
+              <div style={{
+                background: 'rgba(255,255,255,0.04)', borderRadius: 18,
+                border: '1px solid rgba(255,255,255,0.07)',
+                padding: '28px 24px', position: 'relative', zIndex: 1,
+              }}>
+                {/* Número grande de fondo */}
+                <div style={{
+                  fontFamily: 'Outfit', fontWeight: 900, fontSize: 64,
+                  color: `${GREEN}14`, lineHeight: 1,
+                  position: 'absolute', top: 12, right: 20, letterSpacing: -3,
+                }}>
+                  {s.num}
+                </div>
+                {/* Icono */}
+                <div style={{
+                  width: 52, height: 52, borderRadius: 14, marginBottom: 20,
+                  background: `${GREEN}18`, border: `1px solid ${GREEN}28`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <s.Icon />
+                </div>
+                <div style={{ fontFamily: 'Outfit', fontWeight: 800, fontSize: 17, color: '#fff', marginBottom: 10, lineHeight: 1.3 }}>
+                  {s.title}
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.65 }}>
+                  {s.desc}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 48 }}>
+          <button onClick={onCTA} style={{
+            padding: '14px 34px', borderRadius: 12, fontSize: 15, fontWeight: 800,
+            background: GREEN, color: '#fff', border: 'none', cursor: 'pointer',
+            fontFamily: 'Outfit', boxShadow: `0 6px 22px ${GREEN}40`,
+          }}>
+            Empezar gratis ahora →
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Componentes ─────────────────────────────────────────────────────────────
 
 function Nav({ onCTA }) {
@@ -231,44 +522,9 @@ function Hero({ onCTA }) {
         </a>
       </div>
 
-      {/* App card preview */}
-      <div style={{
-        maxWidth: 340, width: '100%', borderRadius: 22,
-        background: 'white', border: `1px solid ${BORDER}`,
-        boxShadow: '0 20px 70px rgba(0,0,0,0.11)',
-        overflow: 'hidden',
-        transform: 'perspective(900px) rotateX(3deg)',
-      }}>
-        <div style={{ background: DARK, padding: '10px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'Outfit', fontWeight: 800, fontSize: 13, color: '#fff' }}>Hoy · 8 citas</span>
-          <span style={{
-            fontSize: 11, fontWeight: 700, background: `${GREEN}30`, color: GREEN,
-            padding: '2px 8px', borderRadius: 5,
-          }}>$420.000</span>
-        </div>
-        {[
-          { hora: '10:00', nombre: 'María García',    svc: 'Corte + Tintura',    clr: INDIGO, est: 'Confirmada' },
-          { hora: '11:30', nombre: 'Laura Rodríguez', svc: 'Manicure francesa',  clr: GREEN,  est: 'En curso' },
-          { hora: '14:00', nombre: 'Ana Martínez',    svc: 'Peinado de novia',   clr: BLUE,   est: 'Pendiente' },
-        ].map(c => (
-          <div key={c.hora} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '11px 14px', borderBottom: `1px solid ${BORDER}`,
-          }}>
-            <div style={{ width: 3, height: 34, borderRadius: 4, background: c.clr, flexShrink: 0 }} />
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 700, fontSize: 12, color: DARK }}>{c.nombre}</div>
-              <div style={{ fontSize: 10, color: TEXT2 }}>{c.hora} · {c.svc}</div>
-            </div>
-            <div style={{
-              fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 5,
-              background: `${c.clr}16`, color: c.clr, whiteSpace: 'nowrap',
-            }}>{c.est}</div>
-          </div>
-        ))}
-        <div style={{ padding: '9px 14px', textAlign: 'center', fontSize: 11, color: TEXT2, background: BG }}>
-          + 5 citas más hoy
-        </div>
+      {/* Ilustración SVG */}
+      <div style={{ width: '100%', maxWidth: 560 }}>
+        <SalonScene />
       </div>
     </section>
   )
@@ -675,6 +931,17 @@ export default function LandingPage() {
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
 
+        /* How it works: 3 col → 1 col */
+        .how-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+        }
+        @media (max-width: 700px) {
+          .how-grid { grid-template-columns: 1fr; }
+          .how-connector { display: none; }
+        }
+
         /* Smooth scroll */
         html { scroll-behavior: smooth; }
       `}</style>
@@ -683,6 +950,7 @@ export default function LandingPage() {
       <Hero onCTA={handleCTA} />
       <Stats />
       <Features />
+      <HowItWorks onCTA={handleCTA} />
       <Pricing onCTA={handleCTA} />
       <Testimonials />
       <FinalCTA onCTA={handleCTA} />

@@ -142,9 +142,61 @@ export default function SalonEquipo() {
   const [excForm,     setExcForm]     = useState(null)
   const [savingExc,   setSavingExc]   = useState(false)
 
+  // Sheet bloqueos recurrentes
+  const [blqProf,     setBlqProf]     = useState(null)
+  const [bloqueos,    setBloqueos]    = useState([])
+  const [loadBlq,     setLoadBlq]     = useState(false)
+  const [formBlq,     setFormBlq]     = useState(null)   // null = cerrado; {} = abierto
+  const [savingBlq,   setSavingBlq]   = useState(false)
+
   const showToast = (msg, ok = true) => {
     setToast({ msg, color: ok ? '#22c55e' : '#ef4444' })
     setTimeout(() => setToast(null), ok ? 2500 : 6000)
+  }
+
+  async function abrirBloqueos(p) {
+    setBlqProf(p)
+    setFormBlq(null)
+    setLoadBlq(true)
+    const { data } = await supabase.from('bloqueos_profesional')
+      .select('*').eq('profesional_id', p.id).eq('tenant_id', tenant.id)
+      .eq('activo', true).order('fecha_inicio')
+    setBloqueos(data || [])
+    setLoadBlq(false)
+  }
+
+  async function guardarBloqueo() {
+    if (!formBlq?.titulo?.trim()) { showToast('Título requerido', false); return }
+    if (!formBlq.fecha_inicio)    { showToast('Fecha de inicio requerida', false); return }
+    if (!formBlq.todo_el_dia && (!formBlq.hora_inicio || !formBlq.hora_fin)) {
+      showToast('Indicá hora inicio y fin', false); return
+    }
+    setSavingBlq(true)
+    const row = {
+      tenant_id:      tenant.id,
+      profesional_id: blqProf.id,
+      titulo:         formBlq.titulo.trim(),
+      fecha_inicio:   formBlq.fecha_inicio,
+      fecha_fin:      formBlq.fecha_fin || formBlq.fecha_inicio,
+      todo_el_dia:    formBlq.todo_el_dia,
+      hora_inicio:    formBlq.todo_el_dia ? null : formBlq.hora_inicio,
+      hora_fin:       formBlq.todo_el_dia ? null : formBlq.hora_fin,
+      recurrente:     formBlq.recurrente,
+      dia_semana:     formBlq.recurrente ? Number(formBlq.dia_semana) : null,
+      activo:         true,
+    }
+    const { error } = await supabase.from('bloqueos_profesional').insert(row)
+    setSavingBlq(false)
+    if (error) { showToast('Error al guardar', false); return }
+    showToast('Bloqueo guardado ✓')
+    setFormBlq(null)
+    abrirBloqueos(blqProf)
+  }
+
+  async function eliminarBloqueo(id) {
+    await supabase.from('bloqueos_profesional').update({ activo: false }).eq('id', id).eq('tenant_id', tenant.id)
+    setBloqueos(prev => prev.filter(b => b.id !== id))
+    showToast('Bloqueo eliminado')
   }
 
   async function verificarAuth() {
@@ -167,10 +219,10 @@ export default function SalonEquipo() {
     const nextY = m === 12 ? y + 1 : y
     const fin = `${nextY}-${String(nextM).padStart(2,'0')}-01`
     const todayISO = new Date().toISOString().slice(0, 10)
-    const [{ data: profsData }, { data: citasData }, { data: excHoyData }, { data: noShowData }] = await Promise.all([
+    const [{ data: profsData }, { data: citasData }, { data: excHoyData }, { data: noShowData }, { data: horariosData }] = await Promise.all([
       supabase.from('profesionales').select('*').eq('tenant_id', tenant.id).order('nombre'),
       supabase.from('citas')
-        .select('profesional_id, precio_cobrado')
+        .select('profesional_id, precio_cobrado, fecha_inicio, fecha_fin')
         .eq('tenant_id', tenant.id)
         .not('estado', 'in', '("cancelada","no_asistio")')
         .gte('fecha_inicio', inicio)
@@ -186,17 +238,52 @@ export default function SalonEquipo() {
         .eq('estado', 'no_asistio')
         .gte('fecha_inicio', inicio)
         .lt('fecha_inicio', fin),
+      supabase.from('horarios')
+        .select('profesional_id, dia, hora_inicio, hora_fin, activo')
+        .eq('tenant_id', tenant.id),
     ])
     setProfs(profsData || [])
+
+    // % Ocupación: available minutes per prof this month
+    const DOW_KEY = { 1:'lunes', 2:'martes', 3:'miercoles', 4:'jueves', 5:'viernes', 6:'sabado', 0:'domingo' }
+    const dayCounts = {}
+    const iter = new Date(y, m - 1, 1)
+    while (iter.getMonth() === m - 1) {
+      const k = DOW_KEY[iter.getDay()]
+      dayCounts[k] = (dayCounts[k] || 0) + 1
+      iter.setDate(iter.getDate() + 1)
+    }
+    const horMap = {}
+    ;(horariosData || []).forEach(h => {
+      if (!h.activo) return
+      const parse = t => { const [hr, mn] = t.slice(0,5).split(':').map(Number); return hr * 60 + mn }
+      if (!horMap[h.profesional_id]) horMap[h.profesional_id] = {}
+      horMap[h.profesional_id][h.dia] = Math.max(0, parse(h.hora_fin) - parse(h.hora_inicio))
+    })
+    const minDisp = {}
+    Object.entries(horMap).forEach(([pid, dias]) => {
+      minDisp[pid] = Object.entries(dayCounts).reduce((s, [dia, cnt]) => s + (dias[dia] || 0) * cnt, 0)
+    })
+    const minUsados = {}
+    ;(citasData || []).forEach(c => {
+      if (!c.fecha_fin || !c.fecha_inicio) return
+      const mins = Math.round((new Date(c.fecha_fin) - new Date(c.fecha_inicio)) / 60000)
+      if (mins > 0 && mins <= 480) minUsados[c.profesional_id] = (minUsados[c.profesional_id] || 0) + mins
+    })
+
     const stats = {}
     ;(citasData || []).forEach(c => {
-      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0, noShows: 0 }
+      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0, noShows: 0, ocupacion: null }
       stats[c.profesional_id].citas++
       stats[c.profesional_id].ingresos += Number(c.precio_cobrado) || 0
     })
     ;(noShowData || []).forEach(c => {
-      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0, noShows: 0 }
+      if (!stats[c.profesional_id]) stats[c.profesional_id] = { citas: 0, ingresos: 0, noShows: 0, ocupacion: null }
       stats[c.profesional_id].noShows = (stats[c.profesional_id].noShows || 0) + 1
+    })
+    Object.keys(stats).forEach(pid => {
+      const disp = minDisp[pid] || 0
+      stats[pid].ocupacion = disp > 0 ? Math.min(100, Math.round((minUsados[pid] || 0) / disp * 100)) : null
     })
     setProfStats(stats)
     setAusentesHoy(new Set((excHoyData || []).map(e => e.profesional_id)))
@@ -294,7 +381,7 @@ export default function SalonEquipo() {
     const end   = `${nextY}-${String(nextM).padStart(2, '0')}-01`
     const { data } = await supabase
       .from('horarios_excepcion')
-      .select('id, fecha, activo, hora_inicio, hora_fin, nota')
+      .select('id, fecha, activo, hora_inicio, hora_fin, nota, repeat_rule')
       .eq('profesional_id', profId)
       .gte('fecha', start)
       .lt('fecha', end)
@@ -321,7 +408,7 @@ export default function SalonEquipo() {
 
   function abrirNuevaExcepcion(fecha) {
     const dateStr = fecha || new Date().toISOString().split('T')[0]
-    setExcForm({ id: null, fecha: dateStr, activo: true, slots: rangeToSlots('09:00', '19:00'), hora_inicio: '09:00', hora_fin: '19:00', nota: '', isNew: true })
+    setExcForm({ id: null, fecha: dateStr, activo: true, slots: rangeToSlots('09:00', '19:00'), hora_inicio: '09:00', hora_fin: '19:00', nota: '', repeat_rule: null, isNew: true })
   }
 
   function onDayTap(dateStr, existingExc) {
@@ -335,7 +422,7 @@ export default function SalonEquipo() {
   function abrirEditarExcepcion(exc) {
     const inicio = exc.hora_inicio ? exc.hora_inicio.slice(0, 5) : '09:00'
     const fin    = exc.hora_fin    ? exc.hora_fin.slice(0, 5)    : '19:00'
-    setExcForm({ id: exc.id, fecha: exc.fecha, activo: exc.activo, slots: exc.activo ? rangeToSlots(inicio, fin) : [], hora_inicio: inicio, hora_fin: fin, nota: exc.nota || '', isNew: false })
+    setExcForm({ id: exc.id, fecha: exc.fecha, activo: exc.activo, slots: exc.activo ? rangeToSlots(inicio, fin) : [], hora_inicio: inicio, hora_fin: fin, nota: exc.nota || '', repeat_rule: exc.repeat_rule || null, isNew: false })
   }
 
   function setExcSlots(newSlots) {
@@ -345,21 +432,51 @@ export default function SalonEquipo() {
 
   async function guardarExcepcion() {
     setSavingExc(true)
-    const payload = {
+    const base = {
       tenant_id:      tenant.id,
       profesional_id: excProf.id,
-      fecha:          excForm.fecha,
       activo:         excForm.activo,
       hora_inicio:    excForm.activo ? excForm.hora_inicio : null,
       hora_fin:       excForm.activo ? excForm.hora_fin    : null,
       nota:           excForm.nota || null,
+      repeat_rule:    excForm.repeat_rule || null,
     }
-    const { error } = excForm.isNew
-      ? await supabase.from('horarios_excepcion').insert(payload)
-      : await supabase.from('horarios_excepcion').update(payload).eq('id', excForm.id)
+
+    if (!excForm.isNew) {
+      const { error } = await supabase.from('horarios_excepcion')
+        .update({ ...base, fecha: excForm.fecha })
+        .eq('id', excForm.id)
+      setSavingExc(false)
+      if (error) { showToast(error.message, false); return }
+      showToast('Excepción actualizada')
+      setExcForm(null)
+      cargarExcepciones(excProf.id, excMes.year, excMes.month)
+      return
+    }
+
+    // Build list of dates for recurring series
+    const fechas = [excForm.fecha]
+    if (excForm.repeat_rule === 'weekly') {
+      const seed = new Date(excForm.fecha + 'T12:00:00')
+      for (let i = 1; i < 12; i++) {
+        const d = new Date(seed); d.setDate(d.getDate() + i * 7)
+        fechas.push(d.toISOString().slice(0, 10))
+      }
+    } else if (excForm.repeat_rule === 'monthly') {
+      const [y, m, day] = excForm.fecha.split('-').map(Number)
+      for (let i = 1; i < 6; i++) {
+        let nm = m + i; let ny = y
+        while (nm > 12) { nm -= 12; ny++ }
+        const maxDay = new Date(ny, nm, 0).getDate()
+        fechas.push(`${ny}-${String(nm).padStart(2,'0')}-${String(Math.min(day, maxDay)).padStart(2,'0')}`)
+      }
+    }
+
+    const { error } = await supabase.from('horarios_excepcion')
+      .insert(fechas.map(f => ({ ...base, fecha: f })))
     setSavingExc(false)
     if (error) { showToast(error.message, false); return }
-    showToast(excForm.isNew ? 'Excepción creada' : 'Excepción actualizada')
+    showToast(fechas.length > 1 ? `${fechas.length} excepciones creadas` : 'Excepción creada')
     setExcForm(null)
     cargarExcepciones(excProf.id, excMes.year, excMes.month)
   }
@@ -668,36 +785,39 @@ export default function SalonEquipo() {
                       </div>
                     )}
                   </div>
-
-                  {/* Botones compactos — no se solapan con el texto */}
-                  <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                    <button
-                      onClick={() => marcarAusenteHoy(p)} disabled={marcandoAus === p.id}
-                      title={isAusente ? 'Marcar disponible' : 'Marcar ausente hoy'}
-                      style={{ ...btnBase, background: isAusente ? 'rgba(239,68,68,0.1)' : 'var(--card)', color: isAusente ? '#f87171' : 'var(--text-3)', opacity: marcandoAus === p.id ? 0.5 : 1 }}>
-                      <Ico d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" size={13} />
-                    </button>
-                    <button onClick={() => toggleActivo(p)} title={p.activo ? 'Desactivar' : 'Activar'} style={{
-                      padding:'3px 8px', borderRadius:7, fontSize:10, fontWeight:700,
-                      background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
-                      color:       p.activo ? '#4ade80' : '#f87171',
-                      border:'none', cursor:'pointer', whiteSpace:'nowrap',
-                    }}>
-                      {p.activo ? 'Activo' : 'Inactivo'}
-                    </button>
-                    <button onClick={() => abrirHorarios(p)} title="Horarios" style={btnBase}>
-                      <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={13} />
-                    </button>
-                    <button onClick={() => abrir(p)} title="Editar" style={btnBase}>
-                      <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={13} />
-                    </button>
-                    <button onClick={() => setElimTarget(p)} title="Eliminar" style={{ ...btnBase, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
-                      <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={13} />
-                    </button>
-                  </div>
                 </div>
 
-                {/* Fila 2: badges de estadísticas del mes — siempre en su propia línea */}
+                {/* Fila 2: Botones de acción */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:10, flexWrap:'wrap' }}>
+                  <button
+                    onClick={() => marcarAusenteHoy(p)} disabled={marcandoAus === p.id}
+                    title={isAusente ? 'Marcar disponible' : 'Marcar ausente hoy'}
+                    style={{ ...btnBase, background: isAusente ? 'rgba(239,68,68,0.1)' : 'var(--card)', color: isAusente ? '#f87171' : 'var(--text-3)', opacity: marcandoAus === p.id ? 0.5 : 1 }}>
+                    <Ico d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" size={13} />
+                  </button>
+                  <button onClick={() => toggleActivo(p)} title={p.activo ? 'Desactivar' : 'Activar'} style={{
+                    padding:'5px 12px', borderRadius:8, fontSize:11, fontWeight:700,
+                    background: p.activo ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
+                    color:       p.activo ? '#4ade80' : '#f87171',
+                    border:'none', cursor:'pointer', whiteSpace:'nowrap',
+                  }}>
+                    {p.activo ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button onClick={() => abrirHorarios(p)} title="Horarios" style={btnBase}>
+                    <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={13} />
+                  </button>
+                  <button onClick={() => abrirBloqueos(p)} title="Bloqueos" style={btnBase}>
+                    <Ico d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" size={13} />
+                  </button>
+                  <button onClick={() => abrir(p)} title="Editar" style={btnBase}>
+                    <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={13} />
+                  </button>
+                  <button onClick={() => setElimTarget(p)} title="Eliminar" style={{ ...btnBase, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
+                    <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={13} />
+                  </button>
+                </div>
+
+                {/* Fila 3: badges de estadísticas del mes */}
                 {st && st.citas > 0 && (
                   <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:9, paddingTop:8, borderTop:`1px solid ${color}18` }}>
                     <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:`${color}16`, color }}>
@@ -716,6 +836,15 @@ export default function SalonEquipo() {
                     {st.noShows > 0 && (
                       <span style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:'rgba(239,68,68,0.08)', color:'#f87171' }}>
                         {st.noShows} no-show
+                      </span>
+                    )}
+                    {st.ocupacion != null && (
+                      <span style={{
+                        padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
+                        background: st.ocupacion >= 70 ? 'rgba(34,197,94,0.1)' : st.ocupacion >= 40 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.08)',
+                        color:      st.ocupacion >= 70 ? '#22c55e'              : st.ocupacion >= 40 ? '#f59e0b'              : '#f87171',
+                      }}>
+                        {st.ocupacion}% ocup.
                       </span>
                     )}
                   </div>
@@ -1147,6 +1276,9 @@ export default function SalonEquipo() {
                             <span style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>
                               {formatFecha(exc.fecha)}
                             </span>
+                            {exc.repeat_rule && (
+                              <span style={{ fontSize:10, color:col, marginLeft:5, fontWeight:700 }}>↻</span>
+                            )}
                             <span style={{ fontSize:12, color: exc.activo ? '#4ade80' : '#f87171', marginLeft:8 }}>
                               {exc.activo ? `${exc.hora_inicio?.slice(0,5)}–${exc.hora_fin?.slice(0,5)}` : 'Ausente'}
                             </span>
@@ -1232,6 +1364,38 @@ export default function SalonEquipo() {
                       value={excForm.nota}
                       onChange={e => setExcForm(f => ({ ...f, nota: e.target.value }))} />
                   </div>
+
+                  {/* Repetir — solo en nuevas excepciones */}
+                  {excForm.isNew && (
+                    <div>
+                      <label style={{ fontSize:12, color:'var(--text-3)', fontWeight:600, letterSpacing:0.5, display:'block', marginBottom:6 }}>REPETIR</label>
+                      <div style={{ display:'flex', gap:6 }}>
+                        {[
+                          { val: null,      label: 'Sin repetir' },
+                          { val: 'weekly',  label: '↻ Semanal' },
+                          { val: 'monthly', label: '↻ Mensual' },
+                        ].map(opt => (
+                          <button key={String(opt.val)} onClick={() => setExcForm(f => ({ ...f, repeat_rule: opt.val }))} style={{
+                            flex:1, padding:'8px 4px', borderRadius:10, cursor:'pointer',
+                            border: excForm.repeat_rule === opt.val ? `1.5px solid ${col}` : '1.5px solid var(--border)',
+                            background: excForm.repeat_rule === opt.val ? `${col}15` : 'var(--card)',
+                            color: excForm.repeat_rule === opt.val ? col : 'var(--text-3)',
+                            fontWeight: excForm.repeat_rule === opt.val ? 700 : 500,
+                            fontSize: 12,
+                          }}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      {excForm.repeat_rule && (
+                        <p style={{ fontSize:11, color:'var(--text-3)', marginTop:5 }}>
+                          {excForm.repeat_rule === 'weekly'
+                            ? '12 semanas seguidas (3 meses)'
+                            : '6 meses seguidos'}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display:'flex', gap:8 }}>
@@ -1253,6 +1417,159 @@ export default function SalonEquipo() {
           </div>
         </>
       )}
+      {/* ── Sheet bloqueos profesional ───────────────────── */}
+      {blqProf && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => { setBlqProf(null); setFormBlq(null) }} />
+          <div className="sp-sheet" style={{ maxHeight:'85vh', overflowY:'auto' }}>
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">Bloqueos — {blqProf.nombre.split(' ')[0]}</p>
+
+            {/* Botón nuevo bloqueo */}
+            {!formBlq && (
+              <button onClick={() => setFormBlq({
+                titulo:'', fecha_inicio:'', fecha_fin:'', todo_el_dia:true,
+                hora_inicio:'09:00', hora_fin:'18:00', recurrente:false, dia_semana:'1',
+              })} style={{
+                width:'100%', padding:'10px', borderRadius:12,
+                border:`1.5px dashed ${col}66`, background:'transparent',
+                color:col, fontWeight:700, fontSize:13, cursor:'pointer', marginBottom:12,
+              }}>
+                + Nuevo bloqueo
+              </button>
+            )}
+
+            {/* Formulario nuevo bloqueo */}
+            {formBlq && (
+              <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:'14px', marginBottom:14 }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <input className="sp-input" placeholder="Título (ej: Vacaciones, Almuerzo…)"
+                    value={formBlq.titulo} onChange={e => setFormBlq(f => ({...f, titulo:e.target.value}))} />
+
+                  <div style={{ display:'flex', gap:8 }}>
+                    <div style={{ flex:1 }}>
+                      <label style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Desde</label>
+                      <input className="sp-input" type="date" value={formBlq.fecha_inicio}
+                        onChange={e => setFormBlq(f => ({...f, fecha_inicio:e.target.value}))}
+                        style={{ marginTop:3, width:'100%' }} />
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <label style={{ fontSize:10, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>Hasta</label>
+                      <input className="sp-input" type="date" value={formBlq.fecha_fin}
+                        onChange={e => setFormBlq(f => ({...f, fecha_fin:e.target.value}))}
+                        style={{ marginTop:3, width:'100%' }} />
+                    </div>
+                  </div>
+
+                  {/* Todo el día toggle */}
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <button onClick={() => setFormBlq(f => ({...f, todo_el_dia:!f.todo_el_dia}))} style={{
+                      padding:'5px 12px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer',
+                      border:'none',
+                      background: formBlq.todo_el_dia ? `${col}22` : 'var(--border)',
+                      color:       formBlq.todo_el_dia ? col : 'var(--text-3)',
+                    }}>
+                      Todo el día
+                    </button>
+                    {!formBlq.todo_el_dia && (
+                      <div style={{ display:'flex', gap:6, alignItems:'center', flex:1 }}>
+                        <input className="sp-input" type="time" value={formBlq.hora_inicio}
+                          onChange={e => setFormBlq(f => ({...f, hora_inicio:e.target.value}))}
+                          style={{ flex:1 }} />
+                        <span style={{ fontSize:11, color:'var(--text-3)' }}>–</span>
+                        <input className="sp-input" type="time" value={formBlq.hora_fin}
+                          onChange={e => setFormBlq(f => ({...f, hora_fin:e.target.value}))}
+                          style={{ flex:1 }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recurrente toggle */}
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <button onClick={() => setFormBlq(f => ({...f, recurrente:!f.recurrente}))} style={{
+                      padding:'5px 12px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer',
+                      border:'none',
+                      background: formBlq.recurrente ? `${col}22` : 'var(--border)',
+                      color:       formBlq.recurrente ? col : 'var(--text-3)',
+                    }}>
+                      Repetir semanalmente
+                    </button>
+                    {formBlq.recurrente && (
+                      <select className="sp-input" value={formBlq.dia_semana}
+                        onChange={e => setFormBlq(f => ({...f, dia_semana:e.target.value}))}
+                        style={{ flex:1 }}>
+                        {[['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado'],['0','Domingo']].map(([v,l]) => (
+                          <option key={v} value={v}>{l}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div style={{ display:'flex', gap:8, marginTop:2 }}>
+                    <button onClick={() => setFormBlq(null)} style={{
+                      flex:1, padding:'10px', borderRadius:10, border:'none',
+                      background:'var(--border)', color:'var(--text-2)', fontWeight:600, fontSize:13, cursor:'pointer',
+                    }}>Cancelar</button>
+                    <button onClick={guardarBloqueo} disabled={savingBlq} style={{
+                      flex:2, padding:'10px', borderRadius:10, border:'none',
+                      background:`linear-gradient(135deg,${col},${col}cc)`,
+                      color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer',
+                      opacity: savingBlq ? 0.7 : 1,
+                    }}>{savingBlq ? 'Guardando…' : 'Guardar bloqueo'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de bloqueos existentes */}
+            {loadBlq ? (
+              <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}>
+                <div className="sp-spinner" style={{ borderTopColor:col }} />
+              </div>
+            ) : bloqueos.length === 0 ? (
+              <p style={{ fontSize:13, color:'var(--text-3)', textAlign:'center', padding:'16px 0' }}>
+                Sin bloqueos activos
+              </p>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {bloqueos.map(b => {
+                  const desde = new Date(b.fecha_inicio + 'T12:00:00').toLocaleDateString('es-CO', { day:'numeric', month:'short' })
+                  const hasta = b.fecha_fin && b.fecha_fin !== b.fecha_inicio
+                    ? new Date(b.fecha_fin + 'T12:00:00').toLocaleDateString('es-CO', { day:'numeric', month:'short' })
+                    : null
+                  const diasLabel = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+                  return (
+                    <div key={b.id} style={{
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'10px 14px',
+                    }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                          {b.titulo}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                          {b.recurrente
+                            ? `Cada ${diasLabel[b.dia_semana]}`
+                            : hasta ? `${desde} → ${hasta}` : desde
+                          }
+                          {!b.todo_el_dia && b.hora_inicio && ` · ${b.hora_inicio.slice(0,5)}–${b.hora_fin.slice(0,5)}`}
+                          {b.todo_el_dia && ' · Todo el día'}
+                          {b.recurrente && <span style={{ marginLeft:6, padding:'1px 6px', borderRadius:10, fontSize:10, fontWeight:700, background:`${col}20`, color:col }}>Recurrente</span>}
+                        </div>
+                      </div>
+                      <button onClick={() => eliminarBloqueo(b.id)} style={{
+                        padding:'4px 8px', borderRadius:8, border:'1px solid rgba(239,68,68,0.3)',
+                        background:'rgba(239,68,68,0.06)', color:'#ef4444', fontSize:11, cursor:'pointer', flexShrink:0, marginLeft:10,
+                      }}>Eliminar</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* ── Sheet editar propietario ─────────────────────── */}
       {editOwner && (
         <>

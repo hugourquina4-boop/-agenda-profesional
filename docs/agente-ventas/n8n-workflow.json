@@ -12,7 +12,7 @@
       "name": "Webhook Whapi",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300]
+      "position": [220, 320]
     },
     {
       "parameters": {
@@ -20,7 +20,7 @@
           "options": { "caseSensitive": false },
           "conditions": [
             {
-              "id": "cond-fromme",
+              "id": "cond-type",
               "leftValue": "={{ $json.body.event.type }}",
               "rightValue": "message",
               "operator": { "type": "string", "operation": "equals" }
@@ -39,17 +39,27 @@
       "name": "Solo mensajes entrantes",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 1,
-      "position": [440, 300]
+      "position": [420, 320]
     },
     {
       "parameters": {
-        "jsCode": "// Extraer datos del mensaje de Whapi\nconst msg = $input.first().json.body.messages[0];\nconst sender = msg.from;           // ej: '573001234567@s.whatsapp.net'\nconst phone = sender.split('@')[0]; // '573001234567'\nconst text = msg.text?.body || msg.caption || '[media]';\nconst messageId = msg.id;\n\n// Historial: n8n guarda conversaciones en workflow static data\nconst workflowData = $getWorkflowStaticData('global');\nif (!workflowData.conversations) workflowData.conversations = {};\n\nconst history = workflowData.conversations[phone] || [];\n\n// Agregar mensaje del usuario al historial\nhistory.push({ role: 'user', content: text });\n\n// Limitar historial a últimos 20 turnos (10 de cada lado)\nif (history.length > 20) history.splice(0, history.length - 20);\n\nworkflowData.conversations[phone] = history;\n\nreturn [{ json: { phone, text, history, sender, messageId } }];"
+        "jsCode": "const msg = $input.first().json.body.messages[0];\nconst sender = msg.from;\nconst phone  = sender.split('@')[0];\nconst text   = msg.text?.body || msg.caption || '[media]';\n\nconst workflowData = $getWorkflowStaticData('global');\nif (!workflowData.conversations) workflowData.conversations = {};\n\nconst history = workflowData.conversations[phone] || [];\nhistory.push({ role: 'user', content: text });\nif (history.length > 20) history.splice(0, history.length - 20);\nworkflowData.conversations[phone] = history;\n\nreturn [{ json: { phone, text, history, sender } }];"
       },
       "id": "extract-message",
       "name": "Extraer mensaje e historial",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [640, 300]
+      "position": [620, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const systemPrompt = `Eres el asistente de ventas de Salón Pro — el sistema de gestión para peluquerías, barberías y salones de belleza en Colombia.\n\nCuando saludes por primera vez o el contexto no esté claro, preséntate: 'Hola, soy el asistente de Salón Pro 💈 — el sistema para peluquerías, barberías y salones de belleza.'\n\nTu misión: convertir cada prospecto en un trial activo de 15 días.\n\nEstilo:\n- Mensajes cortos (máximo 3-4 líneas)\n- Tutea siempre, español colombiano natural\n- Máximo 1-2 emojis por mensaje\n- Siempre deja claro que hablas del sector belleza (peluquería, barbería, spa, estética)\n\nPlanes y precios:\n- Starter $60.000/mes: 1 profesional\n- Pro $100.000/mes: hasta 5 profesionales (el más popular)\n- Ultra $140.000/mes: equipo ilimitado, multi-sede\n\nTrial: 15 días gratis en https://project-gnyy8.vercel.app/salon-registro\n\nFunciones principales: agenda por profesional, portal de reservas, WhatsApp automático (confirmaciones + recordatorios), gestión de clientes, caja y cobros, comisiones y planilla, inventario y proveedores, analytics P&L, multi-sede.\n\nManejo de objeciones:\n- 'Es caro': calcula cuántos clientes atiende al mes y si el ahorro de tiempo lo justifica\n- 'No tengo tiempo': onboarding de 5 pasos, listo en 30 minutos\n- 'Ya tengo otro sistema': pregunta qué le falta; diferenciadores: precio en COP sin comisión, WA nativo, P&L gerencial\n- 'Déjame pensarlo': ofrece el trial gratis sin compromiso\n\nCuando el prospecto tiene negocio real (menciona profesionales, clientes, servicios), incluye AL FINAL de tu respuesta (invisible para el usuario):\n[LEAD: nombre=X, negocio=X, ciudad=X, estado=CALIFICADO]`;\n\nreturn [{ json: { systemPrompt } }];"
+      },
+      "id": "load-prompt",
+      "name": "System prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [820, 320]
     },
     {
       "parameters": {
@@ -66,37 +76,27 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 500,\n  \"system\": {{ JSON.stringify($('Cargar system prompt').first().json.systemPrompt) }},\n  \"messages\": {{ JSON.stringify($json.history) }}\n}",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 400,\n  \"system\": {{ JSON.stringify($('System prompt').first().json.systemPrompt) }},\n  \"messages\": {{ JSON.stringify($('Extraer mensaje e historial').first().json.history) }}\n}",
         "options": {}
       },
       "id": "call-claude",
-      "name": "Llamar Claude API",
+      "name": "Claude API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1040, 300],
+      "position": [1020, 320],
       "credentials": {
         "httpHeaderAuth": { "id": "anthropic-key", "name": "Anthropic API Key" }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Leer el system prompt desde un archivo o constante\n// IMPORTANTE: pega aquí el contenido del system-prompt.md entre las comillas\nconst systemPrompt = `Eres el asistente de ventas de Salón Pro, el sistema de gestión #1 para peluquerías, barberías y salones de belleza en Colombia.\n\nTu misión: convertir cada prospecto en un trial activo de 15 días, respondiendo rápido, siendo útil y sin presionar.\n\nTu estilo:\n- Mensajes cortos (máximo 3-4 líneas por respuesta)\n- Usa emojis con moderación: 1-2 máximo por mensaje\n- Tutea siempre\n- Español colombiano natural\n- Divide información larga en mensajes cortos separados por saltos de línea\n\nPlanes:\n- Starter $60.000/mes: 1 profesional\n- Pro $100.000/mes: hasta 5 profesionales (el más popular)\n- Ultra $140.000/mes: equipo grande, multi-sede\n\nTrial: 15 días gratis en https://project-gnyy8.vercel.app/salon-registro\n\nFeatures clave: agenda inteligente, portal de reservas, WhatsApp automático, gestión de clientes, caja y cobros, comisiones, inventario, analytics P&L, multi-sede, pagos en línea Wompi.\n\nCuando detectes un lead calificado (tiene negocio real, pregunta precio, quiere probar), incluye al final:\n[LEAD: nombre=X, negocio=X, ciudad=X, estado=CALIFICADO]`;\n\nreturn [{ json: { systemPrompt } }];"
-      },
-      "id": "load-prompt",
-      "name": "Cargar system prompt",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [840, 300]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Guardar respuesta del asistente en el historial\nconst claudeResponse = $input.first().json;\nconst assistantText = claudeResponse.content[0].text;\n\n// Recuperar datos del mensaje original\nconst phone = $('Extraer mensaje e historial').first().json.phone;\n\nconst workflowData = $getWorkflowStaticData('global');\nconst history = workflowData.conversations[phone] || [];\nhistory.push({ role: 'assistant', content: assistantText });\nworkflowData.conversations[phone] = history;\n\n// Detectar si es lead calificado\nconst isLead = assistantText.includes('[LEAD:');\nconst leadMatch = assistantText.match(/\\[LEAD: (.+?)\\]/);\nconst leadData = leadMatch ? leadMatch[1] : null;\n\n// Limpiar texto (quitar el tag de lead antes de enviar)\nconst cleanText = assistantText.replace(/\\[LEAD:.*?\\]/g, '').trim();\n\nreturn [{ json: { \n  phone, \n  responseText: cleanText, \n  isLead, \n  leadData,\n  sender: $('Extraer mensaje e historial').first().json.sender\n} }];"
+        "jsCode": "const claudeResponse = $input.first().json;\nconst assistantText  = claudeResponse.content[0].text;\nconst phone  = $('Extraer mensaje e historial').first().json.phone;\nconst sender = $('Extraer mensaje e historial').first().json.sender;\n\n// Guardar respuesta en historial\nconst workflowData = $getWorkflowStaticData('global');\nconst history = workflowData.conversations[phone] || [];\nhistory.push({ role: 'assistant', content: assistantText });\nworkflowData.conversations[phone] = history;\n\n// Detectar lead calificado\nconst isLead   = assistantText.includes('[LEAD:');\nconst leadMatch = assistantText.match(/\\[LEAD: (.+?)\\]/);\nconst leadRaw  = leadMatch ? leadMatch[1] : null;\n\n// Parsear campos del lead\nlet leadData = {};\nif (leadRaw) {\n  leadRaw.split(',').forEach(part => {\n    const [k, v] = part.split('=').map(s => s.trim());\n    if (k && v) leadData[k] = v;\n  });\n}\n\n// Limpiar texto para enviar al usuario\nconst cleanText = assistantText.replace(/\\[LEAD:.*?\\]/g, '').trim();\n\nreturn [{ json: { phone, sender, responseText: cleanText, isLead, leadData } }];"
       },
       "id": "process-response",
-      "name": "Procesar respuesta y guardar historial",
+      "name": "Procesar respuesta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1240, 300]
+      "position": [1220, 320]
     },
     {
       "parameters": {
@@ -110,10 +110,10 @@
         "options": {}
       },
       "id": "send-whatsapp",
-      "name": "Enviar respuesta WhatsApp",
+      "name": "Enviar respuesta WA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 300],
+      "position": [1420, 320],
       "credentials": {
         "httpHeaderAuth": { "id": "whapi-key", "name": "Whapi API Token" }
       }
@@ -132,27 +132,51 @@
         }
       },
       "id": "check-lead",
-      "name": "¿Es lead calificado?",
+      "name": "Es lead calificado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1640, 300]
+      "position": [1620, 320]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://gate.whapi.cloud/messages/text",
+        "url": "=https://unpxoamfyushsbyyziyn.supabase.co/rest/v1/rpc/insertar_lead_comercial",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "={{ $vars.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_nombre\": \"{{ $('Procesar respuesta').first().json.leadData.nombre || '' }}\",\n  \"p_telefono\": \"{{ $('Procesar respuesta').first().json.phone }}\",\n  \"p_negocio\": \"{{ $('Procesar respuesta').first().json.leadData.negocio || '' }}\",\n  \"p_ciudad\": \"{{ $('Procesar respuesta').first().json.leadData.ciudad || '' }}\",\n  \"p_fuente\": \"whatsapp\",\n  \"p_notas\": \"Detectado por agente WA. Estado: {{ $('Procesar respuesta').first().json.leadData.estado || 'CALIFICADO' }}\"\n}",
+        "options": {}
+      },
+      "id": "save-supabase",
+      "name": "Guardar lead en Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1820, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gate.whapi.cloud/messages/text",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"to\": \"573XXXXXXXXX@s.whatsapp.net\",\n  \"body\": \"🔔 *Nuevo lead calificado*\\n\\nTeléfono: {{ $('Procesar respuesta y guardar historial').first().json.phone }}\\nDatos: {{ $('Procesar respuesta y guardar historial').first().json.leadData }}\\n\\nRevisa y dale seguimiento.\"\n}",
+        "jsonBody": "={\n  \"to\": \"573028480238@s.whatsapp.net\",\n  \"body\": \"[SALÓN PRO — Agente Ventas]\\n🔔 *Nuevo lead calificado*\\n\\nNombre: {{ $('Procesar respuesta').first().json.leadData.nombre || 'Sin datos' }}\\nTel: {{ $('Procesar respuesta').first().json.phone }}\\nNegocio: {{ $('Procesar respuesta').first().json.leadData.negocio || '?' }}\\nCiudad: {{ $('Procesar respuesta').first().json.leadData.ciudad || '?' }}\\n\\n→ Peluquería / Barbería / Spa interesado en el sistema\\n→ Revisa Supabase › leads_comerciales\"\n}",
         "options": {}
       },
       "id": "notify-hugo",
       "name": "Notificar a Hugo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1840, 200],
+      "position": [2020, 200],
       "credentials": {
         "httpHeaderAuth": { "id": "whapi-key", "name": "Whapi API Token" }
       }
@@ -163,52 +187,27 @@
         "responseBody": "={ \"status\": \"ok\" }",
         "options": {}
       },
-      "id": "respond-webhook",
-      "name": "Responder OK al webhook",
+      "id": "respond-ok",
+      "name": "OK al webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1840, 400]
+      "position": [2020, 440]
     }
   ],
   "connections": {
-    "Webhook Whapi": {
-      "main": [[{ "node": "Solo mensajes entrantes", "type": "main", "index": 0 }]]
-    },
-    "Solo mensajes entrantes": {
-      "main": [[{ "node": "Extraer mensaje e historial", "type": "main", "index": 0 }]]
-    },
-    "Extraer mensaje e historial": {
-      "main": [[{ "node": "Cargar system prompt", "type": "main", "index": 0 }]]
-    },
-    "Cargar system prompt": {
-      "main": [[{ "node": "Llamar Claude API", "type": "main", "index": 0 }]]
-    },
-    "Llamar Claude API": {
-      "main": [[{ "node": "Procesar respuesta y guardar historial", "type": "main", "index": 0 }]]
-    },
-    "Procesar respuesta y guardar historial": {
-      "main": [[{ "node": "Enviar respuesta WhatsApp", "type": "main", "index": 0 }]]
-    },
-    "Enviar respuesta WhatsApp": {
-      "main": [[{ "node": "¿Es lead calificado?", "type": "main", "index": 0 }]]
-    },
-    "¿Es lead calificado?": {
-      "main": [
-        [{ "node": "Notificar a Hugo", "type": "main", "index": 0 }],
-        [{ "node": "Responder OK al webhook", "type": "main", "index": 0 }]
-      ]
-    },
-    "Notificar a Hugo": {
-      "main": [[{ "node": "Responder OK al webhook", "type": "main", "index": 0 }]]
-    }
+    "Webhook Whapi":          { "main": [[{ "node": "Solo mensajes entrantes",     "type": "main", "index": 0 }]] },
+    "Solo mensajes entrantes":{ "main": [[{ "node": "Extraer mensaje e historial", "type": "main", "index": 0 }]] },
+    "Extraer mensaje e historial": { "main": [[{ "node": "System prompt",  "type": "main", "index": 0 }]] },
+    "System prompt":          { "main": [[{ "node": "Claude API",          "type": "main", "index": 0 }]] },
+    "Claude API":             { "main": [[{ "node": "Procesar respuesta",   "type": "main", "index": 0 }]] },
+    "Procesar respuesta":     { "main": [[{ "node": "Enviar respuesta WA",  "type": "main", "index": 0 }]] },
+    "Enviar respuesta WA":    { "main": [[{ "node": "Es lead calificado?",  "type": "main", "index": 0 }]] },
+    "Es lead calificado?":    { "main": [
+      [{ "node": "Guardar lead en Supabase", "type": "main", "index": 0 }],
+      [{ "node": "OK al webhook",            "type": "main", "index": 0 }]
+    ]},
+    "Guardar lead en Supabase": { "main": [[{ "node": "Notificar a Hugo", "type": "main", "index": 0 }]] },
+    "Notificar a Hugo":        { "main": [[{ "node": "OK al webhook",     "type": "main", "index": 0 }]] }
   },
-  "settings": {
-    "executionOrder": "v1",
-    "saveManualExecutions": true,
-    "saveExecutionProgress": false
-  },
-  "staticData": null,
-  "meta": {
-    "templateCredsSetupCompleted": false
-  }
+  "settings": { "executionOrder": "v1" }
 }

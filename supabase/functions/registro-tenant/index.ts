@@ -16,28 +16,63 @@ function slugify(t: string) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+// Max 5 intentos por IP por hora
+async function checkRateLimit(ip: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - 3_600_000).toISOString()
+  const { count } = await db
+    .from('rate_limits')
+    .select('id', { count: 'exact', head: true })
+    .eq('ip', ip)
+    .eq('endpoint', 'registro-tenant')
+    .gte('created_at', windowStart)
+  if ((count ?? 0) >= 5) return false
+  await db.from('rate_limits').insert({ ip, endpoint: 'registro-tenant' })
+  return true
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+    if (!(await checkRateLimit(ip))) {
+      return new Response(
+        JSON.stringify({ error: 'Demasiados intentos desde tu red. Espera una hora e intenta de nuevo.' }),
+        { status: 429, headers: cors },
+      )
+    }
+
     const { email, password, nombre, slug, vertical, ciudad, whatsapp, nombre_owner } = await req.json()
 
     if (!email?.trim() || !password || !nombre?.trim()) {
-      return new Response(JSON.stringify({ error: 'Email, contraseña y nombre son requeridos' }), { status: 400, headers: cors })
+      return new Response(
+        JSON.stringify({ error: 'Email, contraseña y nombre son requeridos' }),
+        { status: 400, headers: cors },
+      )
     }
-    if (password.length < 6) {
-      return new Response(JSON.stringify({ error: 'La contraseña debe tener al menos 6 caracteres' }), { status: 400, headers: cors })
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'La contraseña debe tener al menos 8 caracteres' }),
+        { status: 400, headers: cors },
+      )
+    }
+    if (!/[0-9]/.test(password)) {
+      return new Response(
+        JSON.stringify({ error: 'La contraseña debe incluir al menos un número' }),
+        { status: 400, headers: cors },
+      )
     }
 
     const finalSlug = (slug?.trim() || slugify(nombre)).substring(0, 60)
 
-    // 1. Verificar slug disponible
     const { data: existing } = await db.from('tenants').select('id').eq('slug', finalSlug).maybeSingle()
     if (existing) {
-      return new Response(JSON.stringify({ error: 'Ese identificador ya está en uso, elige otro.' }), { status: 409, headers: cors })
+      return new Response(
+        JSON.stringify({ error: 'Ese identificador ya está en uso, elige otro.' }),
+        { status: 409, headers: cors },
+      )
     }
 
-    // 2. Crear usuario en Supabase Auth (confirmado automáticamente)
     const { data: { user }, error: authErr } = await db.auth.admin.createUser({
       email: email.trim(),
       password,
@@ -48,11 +83,10 @@ Deno.serve(async (req) => {
     if (authErr) {
       const msg = authErr.message.toLowerCase()
       return new Response(JSON.stringify({
-        error: msg.includes('already') ? 'Este email ya tiene una cuenta registrada.' : authErr.message
+        error: msg.includes('already') ? 'Este email ya tiene una cuenta registrada.' : authErr.message,
       }), { status: 400, headers: cors })
     }
 
-    // 3. Crear tenant
     const { data: tenant, error: tErr } = await db.from('tenants').insert({
       nombre:    nombre.trim(),
       slug:      finalSlug,
@@ -69,7 +103,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: tErr.message }), { status: 400, headers: cors })
     }
 
-    // 4. Vincular usuario como admin del tenant
     await db.from('usuarios_tenant').insert({
       tenant_id: tenant.id,
       user_id:   user!.id,
@@ -79,9 +112,10 @@ Deno.serve(async (req) => {
       activo:    true,
     })
 
-    return new Response(JSON.stringify({ ok: true, slug: finalSlug }), {
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ ok: true, slug: finalSlug }),
+      { headers: { ...cors, 'Content-Type': 'application/json' } },
+    )
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors })
   }

@@ -178,6 +178,103 @@ function PortalCalendario({ value, onChange, col, diasTrabaja, T }) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// Tiquetera inline para el portal (usa T theme, no CSS vars del app)
+function PortalTiqueteraCard({ tq, col, darkMode, T }) {
+  const progreso = tq.progreso ?? 0
+  const meta     = tq.meta     ?? 10
+  const premio   = tq.premio   ?? 'Servicio gratis'
+  const listo    = tq.listo    ?? false
+  const pct      = meta > 0 ? Math.min(100, Math.round(progreso / meta * 100)) : 0
+  const faltan   = Math.max(0, meta - progreso)
+  const fillCol  = listo ? '#22c55e' : col
+  const slots    = Array.from({ length: meta }, (_, i) => i < progreso)
+
+  return (
+    <div style={{
+      borderRadius:16,
+      background: listo
+        ? 'linear-gradient(135deg,rgba(34,197,94,0.14),rgba(34,197,94,0.04))'
+        : darkMode
+          ? `linear-gradient(135deg,${col}12,${col}04)`
+          : `linear-gradient(135deg,${col}0d,transparent)`,
+      border: `1px solid ${listo ? 'rgba(34,197,94,0.35)' : `${col}30`}`,
+      padding:'16px',
+    }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+        <div style={{
+          width:40, height:40, borderRadius:12, flexShrink:0,
+          background: listo ? 'rgba(34,197,94,0.18)' : `${col}18`,
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:20,
+        }}>
+          {listo ? '🎁' : '🎟️'}
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:800, color:T.text }}>
+            {listo ? '¡Premio desbloqueado!' : 'Tiquetera de visitas'}
+          </div>
+          <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>
+            {listo
+              ? `Reclama: ${premio}`
+              : `Completa ${meta} visitas · ganas: ${premio}`}
+          </div>
+        </div>
+        {tq.canjeados > 0 && (
+          <div style={{ padding:'3px 8px', borderRadius:8, background:'rgba(99,102,241,0.15)', color:'#818cf8', fontSize:10, fontWeight:700, flexShrink:0 }}>
+            {tq.canjeados} canjeado{tq.canjeados !== 1 ? 's' : ''}
+          </div>
+        )}
+      </div>
+
+      {/* Grid de sellos */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:12,
+        justifyContent: meta <= 10 ? 'space-between' : 'flex-start' }}>
+        {slots.map((filled, i) => (
+          <div key={i} style={{
+            width:26, height:26, borderRadius:7, flexShrink:0,
+            background: filled ? (i === meta-1 && !darkMode ? '#f59e0b' : fillCol) : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)'),
+            display:'flex', alignItems:'center', justifyContent:'center',
+            boxShadow: filled ? `0 2px 8px ${fillCol}40` : 'none',
+            fontSize: i === meta-1 ? 12 : 0,
+          }}>
+            {i === meta-1 ? '🏆' : filled ? (
+              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 13l4 4L19 7"/>
+              </svg>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {/* Barra */}
+      <div style={{ height:6, borderRadius:6, background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', overflow:'hidden', marginBottom:8 }}>
+        <div style={{
+          height:'100%', borderRadius:6, width:`${pct}%`,
+          background: listo ? 'linear-gradient(90deg,#22c55e,#4ade80)' : `linear-gradient(90deg,${col},${col}bb)`,
+          boxShadow: `0 2px 6px ${fillCol}50`,
+          transition:'width 0.5s ease',
+        }} />
+      </div>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:11 }}>
+        <span style={{ color:T.muted }}>{progreso} de {meta} visitas</span>
+        <span style={{ fontWeight:800, color: listo ? '#22c55e' : col }}>
+          {listo ? '¡Listo! 🎉' : `${faltan} más`}
+        </span>
+      </div>
+
+      {listo && (
+        <div style={{
+          marginTop:12, padding:'10px 14px', borderRadius:12,
+          background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.3)',
+          textAlign:'center', fontSize:12, fontWeight:700, color:'#4ade80',
+        }}>
+          🎁 Muestra esta pantalla en el salón para reclamar tu premio
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SalonPortal() {
   const { slug } = useParams()
 
@@ -203,11 +300,12 @@ export default function SalonPortal() {
   const [fecha,   setFecha]   = useState(new Date().toISOString().slice(0, 10))
   const [slot,    setSlot]    = useState(null)
 
-  const [nombre,     setNombre]    = useState('')
-  const [telefono,   setTelefono]  = useState('')
-  const [notasPortal,setNotasPortal]= useState('')
-  const [saving,     setSaving]    = useState(false)
-  const [error,      setError]     = useState(null)
+  const [nombre,      setNombre]      = useState('')
+  const [telefono,    setTelefono]    = useState('')
+  const [notasPortal, setNotasPortal] = useState('')
+  const [aceptaCons,  setAceptaCons]  = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState(null)
   const [confirmada, setConfirmada]= useState(null)
 
   const [wlMode,   setWlMode]   = useState(false)
@@ -222,10 +320,15 @@ export default function SalonPortal() {
   const [misCitas,     setMisCitas]     = useState(null)
   const [buscandoMis,  setBuscandoMis]  = useState(false)
 
+  // Tiquetera del portal
+  const [portalTiquetera, setPortalTiquetera] = useState(null)
+  const [cercano,          setCercano]         = useState(false)
+
   async function buscarMisCitas() {
     if (!misCitasTel.trim() || !tenant) return
     setBuscandoMis(true)
     setMisCitas(null)
+    setPortalTiquetera(null)
     try {
       const { data: cli } = await supabase.from('clientes_agenda')
         .select('id, nombre')
@@ -233,15 +336,46 @@ export default function SalonPortal() {
         .ilike('telefono', `%${misCitasTel.replace(/\D/g,'').slice(-8)}%`)
         .limit(1).maybeSingle()
       if (!cli) { setMisCitas([]); return }
-      const { data: citas } = await supabase.from('citas')
-        .select('id, fecha_inicio, estado, servicios(nombre), profesionales(nombre)')
-        .eq('tenant_id', tenant.id).eq('cliente_id', cli.id)
-        .neq('estado', 'cancelada').gte('fecha_inicio', new Date().toISOString())
-        .order('fecha_inicio').limit(5)
+      const [{ data: citas }, { data: tq }] = await Promise.all([
+        supabase.from('citas')
+          .select('id, fecha_inicio, estado, servicios(nombre), profesionales(nombre)')
+          .eq('tenant_id', tenant.id).eq('cliente_id', cli.id)
+          .neq('estado', 'cancelada').gte('fecha_inicio', new Date().toISOString())
+          .order('fecha_inicio').limit(5),
+        supabase.rpc('tiquetera_cliente', {
+          p_tenant_id:  tenant.id,
+          p_cliente_id: cli.id,
+        }),
+      ])
       setMisCitas({ nombre: cli.nombre, citas: citas || [] })
+      if (tq?.activa) {
+        setPortalTiquetera(tq)
+        // Comprobar proximidad si el negocio tiene coordenadas
+        if (tenant.tiquetera_lat && tenant.tiquetera_lng && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              const dist = calcDistM(
+                pos.coords.latitude, pos.coords.longitude,
+                tenant.tiquetera_lat, tenant.tiquetera_lng
+              )
+              setCercano(dist <= (tenant.tiquetera_radio_m || 300))
+            },
+            () => setCercano(false),
+            { timeout: 6000, maximumAge: 60000 }
+          )
+        }
+      }
     } finally {
       setBuscandoMis(false)
     }
+  }
+
+  function calcDistM(lat1, lon1, lat2, lon2) {
+    const R = 6371000
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
   }
 
   const [cancelando, setCancelando] = useState(null) // citaId being cancelled
@@ -721,6 +855,52 @@ export default function SalonPortal() {
                     )}
                   </div>
                 )}
+
+                {/* ── Tiquetera del cliente ── */}
+                {portalTiquetera && (
+                  <div style={{ marginTop:14 }}>
+                    {/* Banner de proximidad cuando está cerca y le falta poco */}
+                    {cercano && portalTiquetera.listo && (
+                      <div style={{
+                        padding:'12px 14px', borderRadius:14, marginBottom:10,
+                        background:'linear-gradient(135deg,rgba(34,197,94,0.22),rgba(34,197,94,0.08))',
+                        border:'1px solid rgba(34,197,94,0.45)',
+                        display:'flex', alignItems:'center', gap:10,
+                        animation:'fadeIn 0.3s ease',
+                      }}>
+                        <span style={{ fontSize:22 }}>📍</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:800, color:'#4ade80' }}>
+                            ¡Estás cerca! Reclama tu premio hoy
+                          </div>
+                          <div style={{ fontSize:11, color:'rgba(74,222,128,0.8)', marginTop:2 }}>
+                            Muestra esta pantalla en el salón para canjear: {portalTiquetera.premio}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {cercano && !portalTiquetera.listo && portalTiquetera.meta - portalTiquetera.progreso <= 2 && (
+                      <div style={{
+                        padding:'12px 14px', borderRadius:14, marginBottom:10,
+                        background:`linear-gradient(135deg,${col}22,${col}08)`,
+                        border:`1px solid ${col}45`,
+                        display:'flex', alignItems:'center', gap:10,
+                        animation:'fadeIn 0.3s ease',
+                      }}>
+                        <span style={{ fontSize:20 }}>📍</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:800, color:col }}>
+                            ¡Estás a {portalTiquetera.meta - portalTiquetera.progreso} {portalTiquetera.meta - portalTiquetera.progreso === 1 ? 'visita' : 'visitas'} del premio!
+                          </div>
+                          <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>
+                            Aprovecha que ya estás cerca del salón
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <PortalTiqueteraCard tq={portalTiquetera} col={col} darkMode={darkMode} T={T} />
+                  </div>
+                )}
               </div>
             )}
 
@@ -999,9 +1179,27 @@ export default function SalonPortal() {
             )}
             {(() => {
               const pagoRequerido = tenant.pagos_portal_activo && tenant.wompi_public_key && precioTotal > 0
+              const consTxt = tenant.config_vertical?.consentimiento_texto
+              const consReq = !!consTxt && !aceptaCons
               return (
                 <>
-                  <button onClick={confirmar} disabled={saving || !nombre.trim()} style={primaryBtn(col, saving || !nombre.trim())}>
+                  {consTxt && (
+                    <label style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:20, cursor:'pointer' }}>
+                      <div onClick={() => setAceptaCons(v => !v)} style={{
+                        width:20, height:20, borderRadius:5, flexShrink:0, marginTop:2,
+                        border: `2px solid ${aceptaCons ? col : T.faint}`,
+                        background: aceptaCons ? col : 'transparent',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        transition:'all 0.15s',
+                      }}>
+                        {aceptaCons && <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      <span style={{ fontSize:12, color: aceptaCons ? T.text : T.muted, lineHeight:1.5 }}>
+                        {consTxt}
+                      </span>
+                    </label>
+                  )}
+                  <button onClick={confirmar} disabled={saving || !nombre.trim() || consReq} style={primaryBtn(col, saving || !nombre.trim() || consReq)}>
                     {saving
                       ? (pagoRequerido ? 'Procesando pago…' : 'Confirmando…')
                       : pagoRequerido
@@ -1014,9 +1212,11 @@ export default function SalonPortal() {
                       <p style={{ fontSize:11, color:T.faint, margin:0 }}>Pago seguro procesado por Wompi</p>
                     </div>
                   )}
-                  <p style={{ fontSize:11, color:T.faint, textAlign:'center', marginTop: pagoRequerido ? 6 : 18, lineHeight:1.6 }}>
-                    Al confirmar aceptas que el salón guarde tus datos de contacto
-                  </p>
+                  {!consTxt && (
+                    <p style={{ fontSize:11, color:T.faint, textAlign:'center', marginTop: pagoRequerido ? 6 : 18, lineHeight:1.6 }}>
+                      Al confirmar aceptas que el salón guarde tus datos de contacto
+                    </p>
+                  )}
                 </>
               )
             })()}

@@ -189,6 +189,31 @@ function TabGeneral({ tenant, recargar, col }) {
     setTimeout(() => setSaved(false), 3000)
   }
 
+  async function solicitarEliminacion() {
+    const confirmar = window.confirm(
+      "¿Estás seguro de que deseas solicitar la eliminación permanente de tu cuenta y todos tus datos personales asociados? Esta acción es irreversible, cerrará tu sesión y eliminará todos tus registros de la plataforma."
+    )
+    if (!confirmar) return
+
+    setSaving(true); setErr('')
+    const { error } = await supabase.auth.updateUser({
+      data: { 
+        solicitud_eliminacion: true, 
+        fecha_solicitud_eliminacion: new Date().toISOString() 
+      }
+    })
+    setSaving(false)
+
+    if (error) {
+      setErr("Error al registrar la solicitud: " + error.message)
+      return
+    }
+
+    alert("Tu solicitud de eliminación ha sido registrada con éxito. Se cerrará tu sesión y tus datos se borrarán en un plazo máximo de 7 días hábiles conforme a la Ley 1581.")
+    await supabase.auth.signOut()
+    window.location.href = "/login"
+  }
+
   return (
     <div className="space-y-4">
       <Alert msg={err} onClose={() => setErr('')} />
@@ -225,6 +250,20 @@ function TabGeneral({ tenant, recargar, col }) {
             placeholder="https://..." maxLength={300} />
         </FieldRow>
       </Card>
+      
+      <Card className="px-5 py-4 border border-red-200/50 dark:border-red-900/30 bg-red-50/10 dark:bg-red-950/10 rounded-2xl">
+        <h3 className="text-sm font-bold text-red-600 dark:text-red-400 border-none m-0 p-0 mb-1 flex items-center gap-2">
+          ⚠️ Zona de Peligro
+        </h3>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-3 leading-relaxed">
+          De conformidad con la Ley 1581 de 2012 de Protección de Datos Personales y las políticas de la tienda, tienes derecho a solicitar la supresión total de tu información. Esta acción desactivará tu cuenta y todos tus datos personales asociados de forma permanente en un plazo máximo de 7 días hábiles.
+        </p>
+        <button onClick={solicitarEliminacion}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98]">
+          Solicitar eliminación permanente de mi cuenta
+        </button>
+      </Card>
+
       <div className="flex justify-end">
         <SaveBtn onClick={guardar} saving={saving} saved={saved} col={col} />
       </div>

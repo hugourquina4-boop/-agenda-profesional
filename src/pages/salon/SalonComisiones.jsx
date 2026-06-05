@@ -874,7 +874,7 @@ export default function SalonComisiones() {
                       value={valor}
                       onChange={e => setEditPct(p => ({ ...p, [prof.id]: e.target.value }))}
                       style={{
-                        width:64, padding:'7px 24px 7px 9px', borderRadius:10,
+                        width:80, padding:'7px 24px 7px 9px', borderRadius:10,
                         border:`1px solid ${editing ? col : 'var(--border)'}`,
                         background:'var(--bg)', color:'var(--text)',
                         fontSize:14, fontWeight:700, fontFamily:'Outfit',

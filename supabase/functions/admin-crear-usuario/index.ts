@@ -9,13 +9,22 @@ const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
-const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET') || 'salonpro2026'
+
+// Sin fallback: si no está configurado, la función retorna 503
+const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET') ?? ''
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
+  if (!ADMIN_SECRET) {
+    return new Response(
+      JSON.stringify({ error: 'Función no configurada en servidor' }),
+      { status: 503, headers: cors },
+    )
+  }
+
   const secret = req.headers.get('x-admin-secret')
-  if (secret !== ADMIN_SECRET) {
+  if (!secret || secret !== ADMIN_SECRET) {
     return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: cors })
   }
 
@@ -24,11 +33,16 @@ Deno.serve(async (req) => {
     if (!email || !password || !tenant_id) {
       return new Response(
         JSON.stringify({ error: 'email, password y tenant_id son requeridos' }),
-        { status: 400, headers: cors }
+        { status: 400, headers: cors },
+      )
+    }
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'La contraseña debe tener al menos 8 caracteres' }),
+        { status: 400, headers: cors },
       )
     }
 
-    // Crear usuario con service role (sin confirmación de email)
     const { data: created, error: userErr } = await db.auth.admin.createUser({
       email,
       password,
@@ -40,7 +54,6 @@ Deno.serve(async (req) => {
 
     const userId = created.user.id
 
-    // Vincular al tenant
     const { error: utErr } = await db.from('usuarios_tenant').insert({
       user_id: userId,
       tenant_id,
@@ -52,16 +65,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: utErr.message }), { status: 500, headers: cors })
     }
 
-    // Guardar credenciales en tenants para el panel superadmin
+    // Solo actualiza el email de referencia, nunca la contraseña en texto plano
     await db.from('tenants').update({
-      admin_email:       email,
-      admin_clave_temp:  password,
-      admin_clave_fecha: new Date().toISOString(),
+      admin_email: email,
     }).eq('id', tenant_id)
 
     return new Response(
       JSON.stringify({ ok: true, user_id: userId, email }),
-      { headers: { ...cors, 'Content-Type': 'application/json' } }
+      { headers: { ...cors, 'Content-Type': 'application/json' } },
     )
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors })

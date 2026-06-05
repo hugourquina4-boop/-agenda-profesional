@@ -27,6 +27,7 @@ const SalonMensajeria  = lazy(() => import('./SalonMensajeria'))
 const SalonProveedores = lazy(() => import('./SalonProveedores'))
 const SalonSedes       = lazy(() => import('./SalonSedes'))
 const SalonBoveda      = lazy(() => import('./SalonBoveda'))
+const SalonMarketing   = lazy(() => import('./SalonMarketing'))
 
 function PageLoader() {
   return (
@@ -734,10 +735,10 @@ function SalonApp() {
   function renderPage() {
     // Guard: superadmin requiere esSuperadmin; demás módulos requieren tieneAcceso
     const acceso = page === 'superadmin' ? esSuperadmin : tieneAcceso(page)
-    if (!acceso) return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} />
+    if (!acceso) return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} onNuevaCita={handleNuevaCita} />
 
     switch (page) {
-      case 'hoy':        return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} />
+      case 'hoy':        return <SalonDashboard key={refreshKey} onNavigate={handleNavigate} onNuevaCita={handleNuevaCita} />
       case 'agenda':     return <SalonAgenda />
       case 'clientes':   return <SalonClientes />
       case 'equipo':     return <SalonEquipo />
@@ -748,11 +749,12 @@ function SalonApp() {
       case 'comisiones': return <SalonComisiones />
       case 'analytics':  return <SalonAnalytics />
       case 'mensajeria':   return <SalonMensajeria />
+      case 'marketing':    return <SalonMarketing />
       case 'proveedores':  return <SalonProveedores />
       case 'sedes':        return <SalonSedes />
       case 'boveda':       return <SalonBoveda />
       case 'accesos':    return <SalonAccesos />
-      case 'config':     return <SalonConfig />
+      case 'config':     return <SalonConfig onNavigate={handleNavigate} />
       case 'superadmin': return (
         <SalonSuperadmin onGestionar={async (tid) => {
           await seleccionarTenant(tid)

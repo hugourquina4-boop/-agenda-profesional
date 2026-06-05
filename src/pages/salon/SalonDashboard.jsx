@@ -136,7 +136,7 @@ function LinkReservas({ slug, col, showToast }) {
   )
 }
 
-export default function SalonDashboard({ onNavigate }) {
+export default function SalonDashboard({ onNavigate, onNuevaCita }) {
   const { tenant, suscripcion, esSuperadmin } = useTenant()
   const col = tenant?.color_primario || '#f43f5e'
   const isDemo = !tenant
@@ -150,9 +150,9 @@ export default function SalonDashboard({ onNavigate }) {
   const [gastosMes,      setGastosMes]      = useState(isDemo ? 890000 : 0)
   const [ingresosMes,    setIngresosMes]    = useState(isDemo ? 7252000 : 0)
   const [manana,         setManana]         = useState(isDemo ? { count:3, citas:[
-    { nombre:'Laura González', servicio:'Mechas', hora:'09:00' },
-    { nombre:'Sofía Pérez',    servicio:'Corte',  hora:'10:30' },
-    { nombre:'Andrea Ruiz',    servicio:'Tinte',  hora:'14:00' },
+    { nombre:'Laura González', servicio:'Mechas', hora:'09:00', estado:'confirmada' },
+    { nombre:'Sofía Pérez',    servicio:'Corte',  hora:'10:30', estado:'pendiente'  },
+    { nombre:'Andrea Ruiz',    servicio:'Tinte',  hora:'14:00', estado:'pendiente'  },
   ]} : null)
   const [cumpleaneros,   setCumpleaneros]   = useState(isDemo ? [
     { nombre:'Valentina Cruz', telefono:'3001234567' }
@@ -170,6 +170,7 @@ export default function SalonDashboard({ onNavigate }) {
   const [portalHoy,      setPortalHoy]      = useState(0)
   const [proximos7,      setProximos7]      = useState([])
   const [showRecordManana, setShowRecordManana] = useState(false)
+  const [waCitasCount,   setWaCitasCount]   = useState(isDemo ? 42 : 0)
 
   const [cobrando, setCobrando] = useState(null)  // { citaId, metodo }
 
@@ -282,6 +283,7 @@ export default function SalonDashboard({ onNavigate }) {
           profesional: c.profesionales?.nombre || '',
           hora:      fmtHora(c.fecha_inicio),
           fechaIso:  c.fecha_inicio,
+          estado:    c.estado || 'pendiente',
         })),
       })
       setCumpleaneros(cumplRes?.data || [])
@@ -300,6 +302,8 @@ export default function SalonDashboard({ onNavigate }) {
       const citasIdsCobradas = new Set((pagosHoyRes.data || []).map(p => p.cita_id).filter(Boolean))
       setSinCobrar(citasList.filter(c => c.estado === 'completada' && !citasIdsCobradas.has(c.id)))
       setPortalHoy(portalHoyRes.count || 0)
+
+      setWaCitasCount((analyticsMesRes.data || []).length)
 
       // Analytics del mes
       const citasMes = analyticsMesRes.data || []
@@ -675,7 +679,7 @@ export default function SalonDashboard({ onNavigate }) {
             label: 'Crea tu primera cita',
             desc:  '¡El sistema ya funciona!',
             done:  citas.length > 0,
-            page:  'agenda',
+            action: 'nueva-cita',
             icon:  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
           },
         ]
@@ -749,7 +753,7 @@ export default function SalonDashboard({ onNavigate }) {
                 </div>
 
                 {!step.done && (
-                  <button onClick={() => onNavigate?.(step.page)} style={{
+                  <button onClick={() => step.action === 'nueva-cita' ? onNuevaCita?.() : onNavigate?.(step.page)} style={{
                     fontSize:11, fontWeight:700, color:col,
                     padding:'5px 12px', borderRadius:8,
                     background:`${col}15`, border:`1px solid ${col}30`,
@@ -768,6 +772,37 @@ export default function SalonDashboard({ onNavigate }) {
       {/* ── Tarjeta: link de reservas ── */}
       {tenant?.slug && (
         <LinkReservas slug={tenant.slug} col={col} showToast={showToast} />
+      )}
+
+      {/* ── Chip WA ─────────────────────────────────────── */}
+      {!isDemo && (
+        <button onClick={() => onNavigate('config')} style={{
+          margin:'8px 16px 0', padding:'10px 14px', borderRadius:12, width:'calc(100% - 32px)',
+          display:'flex', alignItems:'center', gap:10, cursor:'pointer',
+          background: tenant?.whatsapp ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)',
+          border: `1px solid ${tenant?.whatsapp ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}`,
+        }}>
+          <div style={{
+            width:32, height:32, borderRadius:9, flexShrink:0,
+            background: tenant?.whatsapp ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.12)',
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:16,
+          }}>
+            {tenant?.whatsapp ? '💬' : '📵'}
+          </div>
+          <div style={{ flex:1, textAlign:'left', minWidth:0 }}>
+            <div style={{ fontSize:12, fontWeight:700, color: tenant?.whatsapp ? '#4ade80' : '#fbbf24', lineHeight:1.2 }}>
+              {tenant?.whatsapp
+                ? `WhatsApp · ~${waCitasCount} notif. este mes`
+                : 'WhatsApp no configurado'}
+            </div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+              {tenant?.whatsapp
+                ? 'Confirmaciones + recordatorios automáticos'
+                : 'Toca para configurar recordatorios automáticos'}
+            </div>
+          </div>
+          <Ico d="M9 5l7 7-7 7" size={14} />
+        </button>
       )}
 
       {/* ── Hero ─────────────────────────────────────────── */}
@@ -1458,95 +1493,84 @@ export default function SalonDashboard({ onNavigate }) {
       )}
       {/* ── Vista previa mañana ─────────────────────────── */}
       {manana && manana.count > 0 && (
-        <div style={{ margin:'16px 16px 0' }}>
-          <div style={{ borderRadius:18, overflow:'hidden', boxShadow:'0 4px 24px rgba(0,0,0,0.18)' }}>
-            <div style={{
-              padding:'14px 18px',
-              background:`linear-gradient(135deg, ${col}22, ${col}0a)`,
-              display:'flex', alignItems:'center', justifyContent:'space-between',
-            }}>
-              <div style={{ display:'flex', alignItems:'center', gap:11 }}>
-                <div style={{
-                  width:34, height:34, borderRadius:10, flexShrink:0,
-                  background:`${col}30`,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                }}>
-                  <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={16} style={{ color:col }} />
-                </div>
-                <div>
-                  <div style={{ fontSize:14, fontWeight:800, color:'var(--text)', letterSpacing:-0.2 }}>Mañana</div>
-                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
-                    {manana.count} cita{manana.count !== 1 ? 's' : ''} agendada{manana.count !== 1 ? 's' : ''}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                {manana.citas.some(c => c.telefono) && (
-                  <button onClick={() => setShowRecordManana(v => !v)} style={{
-                    fontSize:11, fontWeight:700, color:'#25d366', padding:'6px 11px',
-                    borderRadius:9, border:'1px solid rgba(37,211,102,0.3)',
-                    background:'rgba(37,211,102,0.08)', cursor:'pointer', whiteSpace:'nowrap',
-                  }}>
-                    📲 Recordar
-                  </button>
-                )}
-                <button onClick={() => onNavigate?.('agenda')} style={{
-                  fontSize:12, fontWeight:700, color:col, padding:'6px 12px',
-                  borderRadius:9, border:'none',
-                  background:`${col}22`, cursor:'pointer', whiteSpace:'nowrap',
-                }}>
-                  Ver →
-                </button>
-              </div>
-            </div>
-            <div style={{ background:'rgba(255,255,255,0.025)' }}>
-              {manana.citas.map((c, i) => (
-                <div key={i} style={{
-                  padding:'11px 18px', display:'flex', alignItems:'center', gap:12,
-                  borderTop:'1px solid rgba(255,255,255,0.05)',
-                }}>
-                  <span style={{
-                    fontSize:12, fontWeight:700, color:col,
-                    minWidth:46, fontFamily:'Outfit, monospace',
-                    letterSpacing:-0.3,
-                  }}>{c.hora}</span>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                      {c.nombre}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>{c.servicio}</div>
-                  </div>
-                </div>
-              ))}
-              {showRecordManana && (
-                <div style={{ padding:'12px 16px 16px', borderTop:'1px solid var(--border)' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', marginBottom:10, letterSpacing:0.5, textTransform:'uppercase' }}>
-                    Enviar recordatorio individual
-                  </div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {manana.citas.filter(c => c.telefono).map((c, i) => {
-                      const tel = c.telefono.replace(/\D/g, '')
-                      const fecha = new Date(c.fechaIso).toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
-                      const msg = encodeURIComponent(`Hola ${c.nombre.split(' ')[0]} 👋 Te recordamos que tienes cita mañana ${fecha} a las ${c.hora}${c.servicio ? ` · ${c.servicio}` : ''}${c.profesional ? ` con ${c.profesional}` : ''} en ${tenant?.nombre || 'el salón'}. ¡Te esperamos! 💇`)
-                      return (
-                        <a key={i} href={`https://wa.me/${tel}?text=${msg}`} target="_blank" rel="noreferrer"
-                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                            padding:'10px 12px', borderRadius:10, textDecoration:'none',
-                            background:'rgba(37,211,102,0.07)', border:'1px solid rgba(37,211,102,0.22)' }}>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{c.nombre}</div>
-                            <div style={{ fontSize:11, color:'var(--text-3)' }}>{c.hora} · {c.servicio}</div>
-                          </div>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#25d366', flexShrink:0, marginLeft:8 }}>📲 WA</span>
-                        </a>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+        <>
+          {/* Divisor de sección — igual que "Agenda del día" */}
+          <div className="sp-section" style={{ marginBottom:16, marginTop:8 }}>
+            <span className="sp-section-title">Mañana</span>
+            <span style={{ fontSize:12, color:'var(--text-3)', fontWeight:600 }}>
+              {manana.count} cita{manana.count !== 1 ? 's' : ''}
+            </span>
           </div>
-        </div>
+
+          {/* Tarjetas — estructura idéntica a las de hoy */}
+          <div className="sp-timeline">
+            {manana.citas.map((c, i) => {
+              const profColor = PROF_COLORS[i % PROF_COLORS.length]
+              const est       = ESTADO_CFG[c.estado] || ESTADO_CFG.pendiente
+              const tel       = c.telefono?.replace(/\D/g, '')
+              const fecha     = c.fechaIso
+                ? new Date(c.fechaIso).toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })
+                : ''
+              const waMsg = encodeURIComponent(
+                `Hola ${c.nombre.split(' ')[0]} 👋 Te recordamos que tienes cita mañana ${fecha} a las ${c.hora}${c.servicio ? ` · ${c.servicio}` : ''}${c.profesional ? ` con ${c.profesional}` : ''} en ${tenant?.nombre || 'el salón'}. ¡Te esperamos! 💇`
+              )
+              return (
+                <div key={i} className="sp-tl-item">
+                  <div className="sp-tl-left">
+                    <span className="sp-tl-time">
+                      {c.hora.replace(' am','').replace(' pm','')}
+                      <br /><span style={{ fontSize:9, color:'var(--text-3)' }}>{c.hora.slice(-2)}</span>
+                    </span>
+                    <span className="sp-tl-dot" style={{ borderColor:profColor, background:`${profColor}22` }} />
+                  </div>
+                  <div className="sp-tl-card" style={{
+                    background:`linear-gradient(135deg, ${profColor}10 0%, var(--card) 55%)`,
+                    borderColor:`${profColor}28`,
+                    padding:'10px 12px',
+                  }}>
+                    <div className="sp-tl-top" style={{ marginBottom:3 }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                        <span className="sp-tl-client" style={{ fontSize:14 }}>{c.nombre}</span>
+                        {c.profesional && (
+                          <span style={{
+                            display:'inline-flex', alignItems:'center', gap:3,
+                            fontSize:11, fontWeight:700, width:'fit-content',
+                            padding:'2px 7px', borderRadius:20,
+                            background:`${profColor}20`, color:profColor,
+                          }}>
+                            <span style={{ width:5, height:5, borderRadius:'50%', background:profColor, flexShrink:0 }} />
+                            {c.profesional.split(' ')[0]}
+                          </span>
+                        )}
+                      </div>
+                      <span className="sp-tl-badge" style={{ background:est.bg, color:est.color, fontSize:10 }}>
+                        {est.label}
+                      </span>
+                    </div>
+                    <p className="sp-tl-service" style={{ marginTop:4, marginBottom:6, fontSize:12 }}>{c.servicio}</p>
+                    <div className="sp-tl-actions" style={{ gap:6 }}>
+                      <button className="sp-tl-action wa"
+                        onClick={() => tel && window.open(`https://wa.me/${tel}?text=${waMsg}`, '_blank')}
+                        title={tel ? 'Enviar recordatorio WA' : 'Sin teléfono'}
+                        style={{ flex:'0 0 38px', height:34, opacity: tel ? 1 : 0.35 }}>
+                        <Ico d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={14} />
+                      </button>
+                      <button className="sp-tl-action ok" style={{
+                        flex:1,
+                        background:`linear-gradient(135deg, ${profColor}22, ${profColor}08)`,
+                        borderColor:`${profColor}35`, color:profColor, fontWeight:700,
+                      }}
+                        onClick={() => onNavigate?.('agenda')}>
+                        <Ico d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={13} />
+                        Ver agenda
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       <div style={{ height:20 }} />

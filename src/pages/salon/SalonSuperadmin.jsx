@@ -741,6 +741,178 @@ function MensajesTab({ negocios, cardStyle }) {
   )
 }
 
+// ── Modal ver negocio ─────────────────────────────────────────────────────────
+function ModalVer({ negocio, logsUso, onClose, onPago, onEditar, onToggle }) {
+  const uso = logsUso.find(l => l.tenant_id === negocio.id)
+  const vence = negocio.fecha_vencimiento ? new Date(negocio.fecha_vencimiento) : null
+  const dias  = vence ? Math.ceil((vence - new Date()) / 86400000) : null
+  const diasColor = !dias ? '#9ca3af' : dias < 0 ? '#ef4444' : dias < 7 ? '#f97316' : dias < 30 ? '#f59e0b' : '#22c55e'
+  const col   = negocio.color_primario || '#f43f5e'
+  const [copiado, setCopiado] = useState(false)
+  function copiarEmail() {
+    navigator.clipboard.writeText(negocio.admin_email || '')
+      .then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000) })
+  }
+  const secStyle = {
+    padding: '12px 14px', borderRadius: 12,
+    background: 'var(--bg)', border: '1px solid var(--border)',
+  }
+  const secTitle = {
+    fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8,
+  }
+  return (
+    <>
+      <div className="sp-sheet-overlay" onClick={onClose} />
+      <div className="sp-sheet">
+        <div className="sp-sheet-handle" />
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+            background: `${col}22`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, fontWeight: 800, color: col,
+          }}>{(negocio.nombre || '?')[0]}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', marginBottom: 2 }}>{negocio.nombre}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>/{negocio.slug} · {negocio.vertical || 'salon'}</div>
+          </div>
+          <span style={{
+            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, flexShrink: 0,
+            background: negocio.activo ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+            color: negocio.activo ? '#4ade80' : '#f87171',
+            border: `1px solid ${negocio.activo ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+          }}>{negocio.activo ? '● Activo' : '● Suspendido'}</span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+          {/* Acceso */}
+          <div style={secStyle}>
+            <div style={secTitle}>Email de acceso</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                flex: 1, fontFamily: 'monospace', fontSize: 13, fontWeight: 700,
+                color: 'var(--text)', wordBreak: 'break-all',
+              }}>{negocio.admin_email || '—'}</div>
+              {negocio.admin_email && (
+                <button onClick={copiarEmail} style={{
+                  padding: '5px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--card)',
+                  color: copiado ? '#4ade80' : 'var(--text-2)',
+                  cursor: 'pointer', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  transition: 'color 0.15s',
+                }}>{copiado ? '✓ Copiado' : 'Copiar'}</button>
+              )}
+            </div>
+          </div>
+
+          {/* Datos negocio */}
+          <div style={secStyle}>
+            <div style={secTitle}>Datos del negocio</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {negocio.nombre_representante && (
+                <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-2)' }}>
+                  <span style={{ width: 16 }}>👤</span>{negocio.nombre_representante}
+                </div>
+              )}
+              {(negocio.telefono || negocio.whatsapp) && (
+                <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-2)' }}>
+                  <span style={{ width: 16 }}>📞</span>{negocio.telefono || negocio.whatsapp}
+                </div>
+              )}
+              {negocio.direccion && (
+                <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-2)' }}>
+                  <span style={{ width: 16 }}>📍</span>{negocio.direccion}{negocio.ciudad ? `, ${negocio.ciudad}` : ''}
+                </div>
+              )}
+              {!negocio.direccion && negocio.ciudad && (
+                <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-2)' }}>
+                  <span style={{ width: 16 }}>📍</span>{negocio.ciudad}
+                </div>
+              )}
+              {negocio.instagram && (
+                <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-2)' }}>
+                  <span style={{ width: 16 }}>📷</span>@{negocio.instagram.replace(/^@/, '')}
+                </div>
+              )}
+              {negocio.pagina_web && (
+                <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-2)' }}>
+                  <span style={{ width: 16 }}>🌐</span>{negocio.pagina_web}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Suscripción */}
+          <div style={secStyle}>
+            <div style={secTitle}>Suscripción</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <PlanBadge plan={negocio.plan} />
+                {PLAN_PRECIO[negocio.plan] > 0 && (
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{fmtCOP(PLAN_PRECIO[negocio.plan])}/mes</span>
+                )}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmtFecha(negocio.fecha_vencimiento)}</div>
+                {dias !== null && (
+                  <div style={{ fontSize: 11, fontWeight: 800, color: diasColor, marginTop: 2 }}>
+                    {dias > 0 ? `Vence en ${dias}d` : dias === 0 ? 'Vence hoy' : `Vencido hace ${Math.abs(dias)}d`}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Actividad */}
+          {uso && (
+            <div style={secStyle}>
+              <div style={secTitle}>Actividad</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{negocio.citas_hoy || 0}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Citas hoy</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#60a5fa' }}>{uso.sesiones_mes || 0}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Sesiones/mes</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: uso.ultimo_acceso ? '#4ade80' : '#9ca3af', marginTop: 4 }}>
+                    {uso.dias_sin_uso === 0 ? 'Hoy' : uso.dias_sin_uso === 1 ? 'Ayer' : uso.ultimo_acceso ? `Hace ${uso.dias_sin_uso}d` : '—'}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Último acceso</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
+            <button onClick={() => { onEditar(); onClose() }} style={{
+              padding: '11px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+              background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa',
+            }}>✏️ Editar plan</button>
+            <button onClick={() => { onPago(); onClose() }} style={{
+              padding: '11px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#4ade80',
+            }}>💳 Registrar pago</button>
+          </div>
+          <button onClick={() => { onToggle(); onClose() }} style={{
+            padding: '11px', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 13, width: '100%',
+            background: negocio.activo ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+            border: `1px solid ${negocio.activo ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
+            color: negocio.activo ? '#f87171' : '#4ade80',
+          }}>{negocio.activo ? '⏸ Suspender acceso' : '▶ Reactivar acceso'}</button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function SalonSuperadmin({ onGestionar }) {
   const { user } = useTenant()
@@ -758,6 +930,7 @@ export default function SalonSuperadmin({ onGestionar }) {
   const [elimModal,   setElimModal]   = useState(null)
   const [claveModal,  setClaveModal]  = useState(null)
   const [pagoModal,   setPagoModal]   = useState(null)
+  const [verModal,    setVerModal]    = useState(null)
   const [gestionando, setGestionando] = useState(null)
   const [toast,       setToast]       = useState(null)
 
@@ -929,6 +1102,16 @@ export default function SalonSuperadmin({ onGestionar }) {
       {pagoModal && (
         <ModalPago negocio={pagoModal} onClose={() => setPagoModal(null)}
           onSaved={() => { cargar(); cargarHistorialPagos() }} showToast={showToast} />
+      )}
+      {verModal && (
+        <ModalVer
+          negocio={verModal}
+          logsUso={logsUso}
+          onClose={() => setVerModal(null)}
+          onPago={() => setPagoModal(verModal)}
+          onEditar={() => setEditModal(verModal)}
+          onToggle={() => toggleActivo(verModal)}
+        />
       )}
 
       <div style={{ padding: '0 0 40px' }}>
@@ -1123,63 +1306,42 @@ export default function SalonSuperadmin({ onGestionar }) {
                 <p className="sp-empty-sub">{buscar ? 'Prueba otra búsqueda' : 'Crea el primer negocio con + Nuevo Negocio'}</p>
               </div>
             ) : (
-              <div style={{ margin: '10px 16px 0', overflowX: 'auto', overflowY: 'clip' }}>
-                {/* Header */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: 'minmax(140px,1.4fr) 80px 90px 80px 90px 180px',
-                  padding: '6px 12px', marginBottom: 2, minWidth: 640,
-                  fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.7,
-                }}>
-                  <span>Negocio</span>
-                  <span style={{ textAlign: 'center' }}>Ciudad</span>
-                  <span style={{ textAlign: 'center' }}>Plan</span>
-                  <span style={{ textAlign: 'center' }}>Estado</span>
-                  <span style={{ textAlign: 'center' }}>Vence</span>
-                  <span style={{ textAlign: 'right' }}>Acciones</span>
-                </div>
-
+              <div style={{ margin: '10px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {filtrados.map(n => {
                   const col = n.color_primario || '#f43f5e'
                   return (
-                    <div key={n.id} className="sp-tbl-row" style={{
-                      display: 'grid', gridTemplateColumns: 'minmax(140px,1.4fr) 80px 90px 80px 90px 180px',
-                      alignItems: 'center', opacity: n.activo ? 1 : 0.55, minWidth: 640,
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div key={n.id} style={{ ...cardStyle, opacity: n.activo ? 1 : 0.55 }}>
+                      {/* Fila 1: Avatar + Nombre/Slug + Plan + Estado */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                         <div style={{
-                          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                          background: col, boxShadow: `0 0 6px ${col}80`,
-                        }} />
-                        <div style={{ minWidth: 0 }}>
+                          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                          background: `${col}22`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 15, fontWeight: 800, color: col,
+                        }}>{(n.nombre || '?')[0]}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
                             fontSize: 13, fontWeight: 700, color: 'var(--text)',
                             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                           }}>{n.nombre}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>/{n.slug}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>/{n.slug}{n.ciudad ? ` · ${n.ciudad}` : ''}</div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                          <PlanBadge plan={n.plan} />
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                            background: n.activo ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                            color: n.activo ? '#4ade80' : '#f87171',
+                            border: `1px solid ${n.activo ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                          }}>● {n.activo ? 'Activo' : 'Suspendido'}</span>
                         </div>
                       </div>
-                      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-2)' }}>
-                        {n.ciudad || '—'}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <PlanBadge plan={n.plan} />
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                          background: n.activo ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                          color: n.activo ? '#4ade80' : '#f87171',
-                          border: `1px solid ${n.activo ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                        }}>● {n.activo ? 'Activo' : 'Suspendido'}</span>
-                      </div>
-                      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>
-                        {fmtFecha(n.fecha_vencimiento)}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, flexWrap: 'wrap' }}>
-                        <button onClick={() => gestionar(n.id)} disabled={!!gestionando}
-                          style={{ ...btnOutline(col), opacity: gestionando === n.id ? 0.6 : 1 }}>
-                          {gestionando === n.id ? '…' : 'Ver'}
-                        </button>
+                      {/* Fila 2: Vencimiento + Acciones */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 'auto' }}>
+                          Vence: {fmtFecha(n.fecha_vencimiento)}
+                        </span>
+                        <button onClick={() => setVerModal(n)} style={btnOutline(col)}>Ver</button>
                         <button onClick={() => setEditModal(n)} style={btnOutline('#60a5fa')}>Editar</button>
                         <button onClick={() => toggleActivo(n)} style={btnOutline(n.activo ? '#f87171' : '#4ade80')}>
                           {n.activo ? 'Suspender' : 'Activar'}
@@ -1200,32 +1362,64 @@ export default function SalonSuperadmin({ onGestionar }) {
         {tab === 'accesos' && (
           <div style={{ margin: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>
-              Resetea la contraseña del administrador de cada negocio. La clave se muestra en pantalla para entregársela directamente.
+              Para ayudar a un cliente con problemas de acceso: copia su email y usa "Resetear clave" para generar una nueva contraseña.
             </p>
-            {negocios.map(n => (
-              <div key={n.id} style={{
-                ...cardStyle,
-                display: 'flex', alignItems: 'center', gap: 12, opacity: n.activo ? 1 : 0.55,
-              }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  background: `${n.color_primario || '#f43f5e'}22`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 800, color: n.color_primario || '#f43f5e',
-                }}>{(n.nombre || '?')[0]}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.nombre}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>
-                    {n.admin_email || 'Sin email de admin'}
+            {negocios.map(n => {
+              const vence     = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null
+              const dias      = vence ? Math.ceil((vence - new Date()) / 86400000) : null
+              const diasColor = !dias ? '#9ca3af' : dias < 0 ? '#ef4444' : dias < 7 ? '#f97316' : dias < 30 ? '#f59e0b' : '#22c55e'
+              const col       = n.color_primario || '#f43f5e'
+              return (
+                <div key={n.id} style={{ ...cardStyle, opacity: n.activo ? 1 : 0.55 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                      background: `${col}22`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, fontWeight: 800, color: col,
+                    }}>{(n.nombre || '?')[0]}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.nombre}</div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 3, flexWrap: 'wrap' }}>
+                        <PlanBadge plan={n.plan} />
+                        {dias !== null && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                            background: `${diasColor}18`, color: diasColor, border: `1px solid ${diasColor}35`,
+                          }}>
+                            {dias > 0 ? `${dias}d para vencer` : dias === 0 ? 'Vence hoy' : `Vencido ${Math.abs(dias)}d`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Email prominente + copy + reset */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 10px', borderRadius: 10,
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                  }}>
+                    <div style={{
+                      flex: 1, fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
+                      color: 'var(--text)', wordBreak: 'break-all',
+                    }}>{n.admin_email || '—'}</div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      {n.admin_email && (
+                        <button onClick={() => {
+                          navigator.clipboard.writeText(n.admin_email)
+                          showToast('Email copiado')
+                        }} style={{ ...btnOutline('#60a5fa'), whiteSpace: 'nowrap' }}>
+                          Copiar
+                        </button>
+                      )}
+                      <button onClick={() => setResetModal(n)} style={{ ...btnOutline('#f59e0b'), whiteSpace: 'nowrap' }}>
+                        🔑 Reset
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <PlanBadge plan={n.plan} />
-                <button onClick={() => setResetModal(n)} style={{
-                  ...btnOutline('#f59e0b'),
-                  whiteSpace: 'nowrap',
-                }}>🔑 Resetear clave</button>
-              </div>
-            ))}
+              )
+            })}
             {negocios.length === 0 && !loading && (
               <div className="sp-empty">
                 <span className="sp-empty-icon">🔑</span>
@@ -1240,68 +1434,93 @@ export default function SalonSuperadmin({ onGestionar }) {
         ════════════════════════════════════════════════════════ */}
         {tab === 'pagos' && (
           <div style={{ margin: '12px 16px 0' }}>
-            {/* Resumen rápido */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
-              {[
-                { lbl: 'MRR',         val: fmtCOP(mrr),  col: '#4ade80', bg: 'rgba(34,197,94,0.14)'  },
-                { lbl: 'Vence ≤ 7d',  val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; return v && Math.ceil((v - new Date()) / 86400000) <= 7 }).length,  col: '#f87171', bg: 'rgba(239,68,68,0.13)'  },
-                { lbl: 'Vence ≤ 30d', val: activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; const d = v ? Math.ceil((v - new Date()) / 86400000) : null; return d !== null && d > 7 && d <= 30 }).length, col: '#f59e0b', bg: 'rgba(245,158,11,0.13)' },
-              ].map(({ lbl, val, col, bg }) => (
-                <div key={lbl} className="sp-kpi-card" style={{
-                  background: `linear-gradient(135deg, ${bg} 0%, transparent 100%)`,
-                  textAlign: 'center', padding: '14px 8px',
-                }}>
-                  <div className="sp-kpi-val" style={{ color: col, fontSize: 22, textAlign: 'center' }}>{val}</div>
-                  <div className="sp-kpi-lbl" style={{ color: col, opacity: 0.8, marginTop: 5 }}>{lbl}</div>
-                </div>
-              ))}
+            {/* KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px,1fr))', gap: 10, marginBottom: 16 }}>
+              {(() => {
+                const vence7  = activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; return v && Math.ceil((v - new Date()) / 86400000) <= 7 }).length
+                const vence30 = activos.filter(n => { const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null; const d = v ? Math.ceil((v - new Date()) / 86400000) : null; return d !== null && d > 7 && d <= 30 }).length
+                const ingMes  = historialPagos.filter(p => { const f = new Date(p.fecha); const n = new Date(); return f.getMonth() === n.getMonth() && f.getFullYear() === n.getFullYear() }).reduce((s, p) => s + (p.monto || 0), 0)
+                return [
+                  { lbl: 'MRR estimado',   val: fmtCOP(mrr),      sub: `${activos.length} activos`,      col: '#4ade80', bg: 'rgba(34,197,94,0.14)'   },
+                  { lbl: 'Ingresos mes',   val: fmtCOP(ingMes),   sub: `${historialPagos.filter(p => { const f=new Date(p.fecha);const n=new Date();return f.getMonth()===n.getMonth()&&f.getFullYear()===n.getFullYear()}).length} pagos`,  col: '#60a5fa', bg: 'rgba(96,165,250,0.13)' },
+                  { lbl: 'Vence en 7d',    val: vence7,           sub: 'requieren atención',             col: '#f87171', bg: 'rgba(239,68,68,0.13)'   },
+                  { lbl: 'Vence en 30d',   val: vence30,          sub: 'próximos a vencer',              col: '#f59e0b', bg: 'rgba(245,158,11,0.13)'  },
+                ].map(({ lbl, val, sub, col, bg }) => (
+                  <div key={lbl} className="sp-kpi-card" style={{
+                    background: `linear-gradient(135deg, ${bg} 0%, transparent 100%)`,
+                    padding: '16px 14px',
+                  }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: col, marginBottom: 4 }}>{val}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: col, opacity: 0.85 }}>{lbl}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3 }}>{sub}</div>
+                  </div>
+                ))
+              })()}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Tabla de negocios — header + rows */}
+            <div style={{ overflowX: 'auto', overflowY: 'clip' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(140px,1.6fr) 90px 70px 100px 60px 130px',
+                padding: '6px 12px', marginBottom: 2, minWidth: 620,
+                fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
+                textTransform: 'uppercase', letterSpacing: 0.7,
+              }}>
+                <span>Negocio</span>
+                <span style={{ textAlign: 'center' }}>Plan</span>
+                <span style={{ textAlign: 'right' }}>$/mes</span>
+                <span style={{ textAlign: 'center' }}>Vence</span>
+                <span style={{ textAlign: 'center' }}>Días</span>
+                <span style={{ textAlign: 'right' }}>Acciones</span>
+              </div>
+
               {negocios.map(n => {
-                const precio = PLAN_PRECIO[n.plan] || 0
-                const vence  = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null
-                const dias   = vence ? Math.ceil((vence - new Date()) / 86400000) : null
+                const precio    = PLAN_PRECIO[n.plan] || 0
+                const vence     = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null
+                const dias      = vence ? Math.ceil((vence - new Date()) / 86400000) : null
                 const diasColor = !dias ? '#9ca3af' : dias < 0 ? '#ef4444' : dias < 7 ? '#f97316' : dias < 30 ? '#f59e0b' : '#22c55e'
-                const urgente = dias !== null && dias <= 7
+                const urgente   = dias !== null && dias <= 7
                 return (
                   <div key={n.id} className="sp-tbl-row" style={{
-                    display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-                    opacity: n.activo ? 1 : 0.55,
-                    background: urgente ? 'rgba(239,68,68,0.07)' : undefined,
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(140px,1.6fr) 90px 70px 100px 60px 130px',
+                    alignItems: 'center', minWidth: 620, opacity: n.activo ? 1 : 0.55,
+                    background: urgente ? 'rgba(239,68,68,0.06)' : undefined,
                   }}>
-                    <div style={{ flex: 1, minWidth: 140 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.nombre}</div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                        <PlanBadge plan={n.plan} />
-                        {precio > 0 && (
-                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmtCOP(precio)}/mes</span>
-                        )}
-                        {!n.activo && <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }}>SUSPENDIDO</span>}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'center', minWidth: 100 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Vence</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmtFecha(n.fecha_vencimiento)}</div>
-                      {dias !== null && (
-                        <div style={{ fontSize: 11, fontWeight: 700, color: diasColor, marginTop: 2 }}>
-                          {dias > 0 ? `${dias}d` : dias === 0 ? 'Hoy' : 'VENCIDO'}
-                        </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 700, color: 'var(--text)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>{n.nombre}</div>
+                      {!n.activo && (
+                        <div style={{ fontSize: 10, color: '#f87171', fontWeight: 700, marginTop: 1 }}>SUSPENDIDO</div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <PlanBadge plan={n.plan} />
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
+                      {precio > 0 ? fmtCOP(precio) : '—'}
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>
+                      {fmtFecha(n.fecha_vencimiento)}
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      {dias !== null ? (
+                        <span style={{ fontSize: 12, fontWeight: 800, color: diasColor }}>
+                          {dias > 0 ? dias : dias === 0 ? '0' : '—'}
+                        </span>
+                      ) : <span style={{ color: 'var(--text-3)', fontSize: 11 }}>—</span>}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }}>
                       <button onClick={() => setPagoModal(n)} style={{
-                        ...btnOutline('#22c55e'),
-                        background: urgente ? 'rgba(239,68,68,0.1)' : undefined,
-                        borderColor: urgente ? 'rgba(239,68,68,0.4)' : undefined,
-                        color: urgente ? '#f87171' : '#22c55e',
+                        ...btnOutline(urgente ? '#f87171' : '#22c55e'),
                         whiteSpace: 'nowrap',
                       }}>
                         {urgente ? '⚠ Pago' : '💳 Pago'}
                       </button>
-                      <button onClick={() => setEditModal(n)} style={{ ...btnOutline('#60a5fa') }} title="Editar plan/fecha">
-                        ✏️
-                      </button>
+                      <button onClick={() => setEditModal(n)} style={btnOutline('#60a5fa')} title="Editar">✏️</button>
                     </div>
                   </div>
                 )

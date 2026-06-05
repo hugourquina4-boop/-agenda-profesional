@@ -53,11 +53,11 @@ Deno.serve(async (req) => {
     const mananaLine = manana > 0 ? `\n\n📅 *Mañana:* ${manana} cita${manana !== 1 ? 's' : ''} programada${manana !== 1 ? 's' : ''}` : ''
 
     const msg =
-      `📊 *Resumen del día — ${t.salon_nombre}*\n\n` +
+      `💈 *[Salón Pro] Resumen — ${t.salon_nombre}*\n\n` +
       `✅ Citas atendidas: ${completadas}${noShowLine}\n` +
       `💰 Ingresos: ${fmtCOP(ingresos)}` +
       mananaLine +
-      `\n\n_Salón Pro · ¡Hasta mañana!_ 🌙`
+      `\n\n_Salón Pro — peluquerías, barberías y spas · ¡Hasta mañana!_ 🌙`
 
     const ok = await enviarWA(t.salon_whatsapp, msg)
     if (ok) enviados++

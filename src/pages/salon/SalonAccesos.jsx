@@ -30,8 +30,10 @@ const MODULOS = [
   { key:'inventario',  label:'Inventario' },
   { key:'proveedores', label:'Proveedores / Gastos' },
   { key:'mensajeria',  label:'Mensajería WhatsApp' },
+  { key:'marketing',   label:'Marketing' },
   { key:'analytics',   label:'Analytics' },
   { key:'equipo',      label:'Equipo' },
+  { key:'sedes',       label:'Sedes' },
   { key:'accesos',     label:'Accesos' },
   { key:'config',      label:'Configuración' },
 ]
@@ -197,6 +199,9 @@ export default function SalonAccesos() {
     if (!formEmail.trim() || !formPass.trim()) {
       setCreError('Email y contraseña requeridos'); return
     }
+    if (formPass.trim().length < 8 || !/\d/.test(formPass)) {
+      setCreError('La contraseña debe tener al menos 8 caracteres y un número'); return
+    }
     setCreando(true); setCreError('')
 
     const { data: resultado, error } = await supabase.rpc('crear_acceso_tenant', {
@@ -211,7 +216,7 @@ export default function SalonAccesos() {
       const msg = resultado?.error || error?.message || 'Error creando acceso'
       setCreError(
         msg.includes('solo_admin') ? 'Solo el admin puede crear accesos'
-        : msg.includes('clave_minimo') ? 'La clave debe tener al menos 6 caracteres'
+        : msg.includes('clave_minimo') ? 'La contraseña debe tener al menos 8 caracteres y un número'
         : msg
       )
       setCreando(false); return
