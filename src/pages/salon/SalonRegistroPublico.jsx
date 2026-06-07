@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { trackTrialSignup } from '../../lib/analytics'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -241,6 +242,9 @@ export default function SalonRegistroPublico() {
       setError(msgs[data?.error] || data?.detail || 'Error al crear la cuenta. Intenta de nuevo.')
       return
     }
+
+    // Conversión: alta de trial completada (GA4 + Meta Pixel)
+    trackTrialSignup({ vertical })
 
     await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
