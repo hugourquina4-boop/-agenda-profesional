@@ -1,0 +1,267 @@
+{
+  "nodes": [
+    {
+      "id": "CLAUDE_md",
+      "label": "Documentación General y Reglas de Control",
+      "file_type": "document",
+      "source_file": "CLAUDE.md"
+    },
+    {
+      "id": "TenantContext",
+      "label": "Contexto Multi-Tenant y Validación de Roles",
+      "file_type": "code",
+      "source_file": "src/context/TenantContext.jsx"
+    },
+    {
+      "id": "SalonLayout",
+      "label": "Layout Principal del Panel y Navegación",
+      "file_type": "code",
+      "source_file": "src/layouts/SalonLayout.jsx"
+    },
+    {
+      "id": "SalonLogin",
+      "label": "Acceso de Usuarios y Selector de Salones",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonLogin.jsx"
+    },
+    {
+      "id": "SalonDashboard",
+      "label": "Dashboard Principal y Cuadre de Caja Rápido",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonDashboard.jsx"
+    },
+    {
+      "id": "SalonAgenda",
+      "label": "Agenda de Citas (Mes/Semana/Día/Serie)",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonAgenda.jsx"
+    },
+    {
+      "id": "SalonClientes",
+      "label": "Gestión de Clientes, Galería e Historial",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonClientes.jsx"
+    },
+    {
+      "id": "SalonEquipo",
+      "label": "Gestión de Colaboradores y Excepciones de Horario",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonEquipo.jsx"
+    },
+    {
+      "id": "SalonServicios",
+      "label": "Servicios, Paquetes Combos e Insumos",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonServicios.jsx"
+    },
+    {
+      "id": "SalonCaja",
+      "label": "Registro de Movimientos de Caja e Ingresos/Egresos",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonCaja.jsx"
+    },
+    {
+      "id": "SalonComisiones",
+      "label": "Liquidación de Comisiones y Anticipos de Profesionales",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonComisiones.jsx"
+    },
+    {
+      "id": "SalonInventario",
+      "label": "Inventario de Insumos y Productos de Venta",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonInventario.jsx"
+    },
+    {
+      "id": "SalonProveedores",
+      "label": "Ordenes de Compra y Pedidos a Proveedores",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonProveedores.jsx"
+    },
+    {
+      "id": "SalonMensajeria",
+      "label": "Campañas de Marketing y Envío Automático WA",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonMensajeria.jsx"
+    },
+    {
+      "id": "SalonAccesos",
+      "label": "Administración de Accesos y Permisos por Tenant",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonAccesos.jsx"
+    },
+    {
+      "id": "SalonSuperadmin",
+      "label": "Panel de Administración de Plataforma Salón Pro",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonSuperadmin.jsx"
+    },
+    {
+      "id": "SalonAnalytics",
+      "label": "Estadísticas, Heatmaps y Comparativa P&L",
+      "file_type": "code",
+      "source_file": "src/pages/salon/SalonAnalytics.jsx"
+    },
+    {
+      "id": "db_tenants",
+      "label": "Tabla Base de Datos: tenants",
+      "file_type": "code",
+      "source_file": "sql/schema_v1.sql"
+    },
+    {
+      "id": "db_usuarios_tenant",
+      "label": "Tabla Base de Datos: usuarios_tenant",
+      "file_type": "code",
+      "source_file": "sql/schema_v1.sql"
+    },
+    {
+      "id": "db_citas",
+      "label": "Tabla Base de Datos: citas",
+      "file_type": "code",
+      "source_file": "sql/schema_v1.sql"
+    },
+    {
+      "id": "db_pagos",
+      "label": "Tabla Base de Datos: pagos",
+      "file_type": "code",
+      "source_file": "sql/schema_v1.sql"
+    },
+    {
+      "id": "db_productos_salon",
+      "label": "Tabla Base de Datos: productos_salon",
+      "file_type": "code",
+      "source_file": "sql/v41_inventario_enhanced.sql"
+    }
+  ],
+  "edges": [
+    {
+      "source": "SalonLogin",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonLogin.jsx"
+    },
+    {
+      "source": "SalonLayout",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/layouts/SalonLayout.jsx"
+    },
+    {
+      "source": "SalonDashboard",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonDashboard.jsx"
+    },
+    {
+      "source": "SalonAgenda",
+      "target": "db_citas",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/pages/salon/SalonAgenda.jsx"
+    },
+    {
+      "source": "SalonCaja",
+      "target": "db_pagos",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/pages/salon/SalonCaja.jsx"
+    },
+    {
+      "source": "SalonClientes",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonClientes.jsx"
+    },
+    {
+      "source": "SalonEquipo",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonEquipo.jsx"
+    },
+    {
+      "source": "SalonServicios",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonServicios.jsx"
+    },
+    {
+      "source": "SalonComisiones",
+      "target": "db_pagos",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/salon/SalonComisiones.jsx"
+    },
+    {
+      "source": "SalonInventario",
+      "target": "db_productos_salon",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/pages/salon/SalonInventario.jsx"
+    },
+    {
+      "source": "SalonProveedores",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonProveedores.jsx"
+    },
+    {
+      "source": "SalonMensajeria",
+      "target": "TenantContext",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/pages/salon/SalonMensajeria.jsx"
+    },
+    {
+      "source": "SalonAccesos",
+      "target": "db_usuarios_tenant",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "src/pages/salon/SalonAccesos.jsx"
+    },
+    {
+      "source": "SalonSuperadmin",
+      "target": "db_tenants",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "src/pages/salon/SalonSuperadmin.jsx"
+    },
+    {
+      "source": "SalonAnalytics",
+      "target": "db_pagos",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/pages/salon/SalonAnalytics.jsx"
+    },
+    {
+      "source": "db_usuarios_tenant",
+      "target": "db_tenants",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "sql/schema_v1.sql"
+    }
+  ],
+  "hyperedges": []
+}

@@ -15,7 +15,7 @@ const TIPO_COLOR = {
   flash: '#f59e0b', pack_cumpleanos: '#ec4899', recuperacion: '#8b5cf6',
   doble_asistencia: '#06b6d4', temporada: '#10b981', lanzamiento: '#6366f1',
 }
-const SEGMENTO_LABEL = { todos: 'Todos', sin_visita: 'Sin visita', con_tag: 'Por etiqueta', cumpleanos_mes: 'Cumpleaños del mes', por_barrio: 'Por barrio/zona' }
+const SEGMENTO_LABEL = { todos: 'Todos', sin_visita: 'Sin visita', con_tag: 'Por etiqueta', cumpleanos_mes: 'Cumpleaños del mes' }
 
 const AUTOS_META = [
   {
@@ -433,28 +433,31 @@ function TabFidelizacion({ tenant, toast }) {
   if (loading) return <div style={S.empty}>Cargando...</div>
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr min(320px, 100%)', gap: 24, alignItems: 'start' }}>
       {/* Configuración */}
       <div>
         <h2 style={S.h2}>Tarjeta de sellos</h2>
         <p style={S.sub}>Configura el programa de fidelización y el descuento de bienvenida por QR</p>
 
         <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <span style={{ fontWeight: 600 }}>Programa activo</span>
+          {/* Toggle activo */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Programa activo</span>
             <div style={S.toggle(form.activo)} onClick={() => upd('activo', !form.activo)}><div style={S.dot} /></div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Fila 1: Nombre del programa + Sellos requeridos */}
             <div style={S.grid2}>
               <Field label="Nombre del programa">
                 <input style={S.input} value={form.nombre || ''} onChange={e => upd('nombre', e.target.value)} />
               </Field>
-              <Field label="Sellos para completar tarjeta">
+              <Field label="Sellos requeridos">
                 <input style={S.input} type="number" min={2} max={20} value={form.sellos_requeridos || 8} onChange={e => upd('sellos_requeridos', +e.target.value)} />
               </Field>
             </div>
 
+            {/* Fila 2: Recompensa */}
             <div style={S.grid2}>
               <Field label="Recompensa al completar">
                 <select style={S.select} value={form.recompensa_tipo || 'descuento'} onChange={e => upd('recompensa_tipo', e.target.value)}>
@@ -463,12 +466,11 @@ function TabFidelizacion({ tenant, toast }) {
                   <option value="producto">Producto gratis</option>
                 </select>
               </Field>
-              {form.recompensa_tipo === 'descuento' && (
+              {form.recompensa_tipo === 'descuento' ? (
                 <Field label="Descuento %">
                   <input style={S.input} type="number" min={1} max={100} value={form.recompensa_descuento_pct || 100} onChange={e => upd('recompensa_descuento_pct', +e.target.value)} />
                 </Field>
-              )}
-              {form.recompensa_tipo !== 'descuento' && (
+              ) : (
                 <Field label="Descripción de la recompensa">
                   <input style={S.input} value={form.recompensa_descripcion || ''} onChange={e => upd('recompensa_descripcion', e.target.value)} placeholder="Ej: Corte + lavado gratis" />
                 </Field>
@@ -476,22 +478,27 @@ function TabFidelizacion({ tenant, toast }) {
             </div>
 
             <div style={S.sep} />
-            <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px', color: 'var(--text)' }}>Registro por QR</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px', color: 'var(--text)' }}>Registro por QR</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>El cliente escanea el QR en el local y recibe el descuento por WhatsApp automáticamente</p>
 
-            <div style={S.grid2}>
-              <Field label="Descuento bienvenida QR (%)">
-                <input style={S.input} type="number" min={0} max={50} value={form.descuento_qr_bienvenida || 10} onChange={e => upd('descuento_qr_bienvenida', +e.target.value)} />
-              </Field>
-            </div>
+            {/* Fila 3: Descuento bienvenida — campo ancho completo, no en grid de 2 */}
+            <Field label="Descuento de bienvenida (%)">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input style={{ ...S.input, width: 100, flexShrink: 0 }} type="number" min={0} max={50} value={form.descuento_qr_bienvenida || 10} onChange={e => upd('descuento_qr_bienvenida', +e.target.value)} />
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>% de descuento en la primera visita del cliente</span>
+              </div>
+            </Field>
 
-            <Field label="Mensaje de bienvenida (se envía por WhatsApp al registrarse)">
+            <Field label="Mensaje de bienvenida (WhatsApp automático al registrarse)">
               <textarea style={S.textarea} value={form.mensaje_bienvenida_qr || ''} onChange={e => upd('mensaje_bienvenida_qr', e.target.value)} />
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>Variables: {'{{nombre}}'} {'{{descuento}}'} {'{{negocio}}'}</div>
             </Field>
 
-            <button style={{ ...S.btn('accent'), alignSelf: 'flex-end' }} onClick={guardar} disabled={saving}>
-              {saving ? 'Guardando...' : 'Guardar configuración'}
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button style={S.btn('accent')} onClick={guardar} disabled={saving}>
+                {saving ? 'Guardando...' : 'Guardar configuración'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -513,15 +520,28 @@ function TabFidelizacion({ tenant, toast }) {
       </div>
 
       {/* QR Preview */}
-      <div>
-        <div style={{ ...S.card, textAlign: 'center', position: 'sticky', top: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: 'var(--text)' }}>QR de registro</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16 }}>Coloca este QR en el local. El cliente se registra y recibe el descuento de bienvenida automáticamente.</p>
-          <img src={qrUrl} alt="QR fidelización" style={{ borderRadius: 8, border: '1px solid var(--border)', width: 180, height: 180 }} />
-          <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12, wordBreak: 'break-all' }}>
+      <div style={{ position: 'sticky', top: 20 }}>
+        <div style={{ ...S.card, padding: '24px 20px' }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 6px', color: 'var(--text)', textAlign: 'center' }}>QR de registro</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 20, textAlign: 'center', lineHeight: 1.5 }}>
+            Coloca este QR en el local. El cliente se registra y recibe el descuento de bienvenida automáticamente.
+          </p>
+
+          {/* QR centrado con contenedor explícito */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <img
+              src={qrUrl}
+              alt="QR fidelización"
+              style={{ display: 'block', width: 200, height: 200, borderRadius: 12, border: '2px solid var(--border)', padding: 8, background: '#fff' }}
+            />
+          </div>
+
+          {/* URL truncada */}
+          <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 4px', marginBottom: 16 }}>
             {window.location.origin}/s/{tenant.slug || tenant.id}/unirse
           </p>
-          <button style={{ ...S.btn('ghost'), marginTop: 8, width: '100%' }} onClick={() => window.open(qrUrl, '_blank')}>
+
+          <button style={{ ...S.btn('ghost'), width: '100%' }} onClick={() => window.open(qrUrl, '_blank')}>
             Descargar QR
           </button>
         </div>
@@ -553,22 +573,26 @@ const MODELOS_MEMBRESIA = [
 ]
 
 function TabMembresias({ tenant, toast }) {
-  const [planes, setPlanes]     = useState([])
-  const [activos, setActivos]   = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [modal, setModal]       = useState(null)
-  const [form, setForm]         = useState({})
-  const [saving, setSaving]     = useState(false)
+  const [planes, setPlanes]       = useState([])
+  const [activos, setActivos]     = useState([])
+  const [clientes, setClientes]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [modal, setModal]         = useState(null)
+  const [form, setForm]           = useState({})
+  const [formAsig, setFormAsig]   = useState({ fecha_inicio: new Date().toISOString().slice(0,10), estado: 'activo' })
+  const [saving, setSaving]       = useState(false)
   const [showEstrategia, setShowEstrategia] = useState(false)
 
   const cargar = useCallback(async () => {
-    const [{ data: p }, { data: a }] = await Promise.all([
+    const [{ data: p }, { data: a }, { data: c }] = await Promise.all([
       supabase.from('membresias_config').select('*').eq('tenant_id', tenant.id).eq('activo', true).order('precio_mensual'),
-      supabase.from('membresias_cliente').select('*, clientes(nombre, telefono), membresias_config(nombre, color)')
+      supabase.from('membresias_cliente').select('*, clientes_agenda(nombre, telefono), membresias_config(nombre, color)')
         .eq('tenant_id', tenant.id).eq('estado', 'activo').order('fecha_vencimiento', { ascending: true }),
+      supabase.from('clientes_agenda').select('id,nombre,telefono').eq('tenant_id', tenant.id).order('nombre'),
     ])
     setPlanes(p || [])
     setActivos(a || [])
+    setClientes(c || [])
     setLoading(false)
   }, [tenant.id])
 
@@ -603,6 +627,29 @@ function TabMembresias({ tenant, toast }) {
     if (!confirm('¿Desactivar este plan?')) return
     await supabase.from('membresias_config').update({ activo: false }).eq('id', id)
     toast.success('Plan desactivado')
+    cargar()
+  }
+
+  const updA = (k, v) => setFormAsig(f => ({ ...f, [k]: v }))
+
+  async function guardarAsignacion() {
+    if (!formAsig.cliente_id) { toast.error('Selecciona un cliente'); return }
+    if (!formAsig.membresia_id) { toast.error('Selecciona un plan'); return }
+    setSaving(true)
+    const payload = {
+      tenant_id: tenant.id,
+      cliente_id: formAsig.cliente_id,
+      membresia_id: formAsig.membresia_id,
+      fecha_inicio: formAsig.fecha_inicio || new Date().toISOString().slice(0,10),
+      fecha_vencimiento: formAsig.fecha_vencimiento || null,
+      estado: 'activo',
+      usos_este_mes: 0,
+    }
+    const { error } = await supabase.from('membresias_cliente').insert(payload)
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Membresía asignada')
+    setModal(null)
     cargar()
   }
 
@@ -701,25 +748,63 @@ function TabMembresias({ tenant, toast }) {
       </div>
 
       {/* Clientes activos */}
-      {activos.length > 0 && (
-        <div>
-          <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 12px' }}>Clientes con membresía activa</h3>
-          {activos.map(m => (
-            <div key={m.id} style={{ ...S.card, padding: '14px 20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <span style={{ fontWeight: 600 }}>{m.clientes?.nombre || '—'}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-2)', marginLeft: 12 }}>{m.membresias_config?.nombre}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-3)', alignItems: 'center' }}>
-                  <span>Usos este mes: <strong style={{ color: 'var(--text)' }}>{m.usos_este_mes}</strong></span>
-                  {m.fecha_vencimiento && <span>Vence: <strong style={{ color: 'var(--text)' }}>{m.fecha_vencimiento}</strong></span>}
-                  <span style={S.badge(m.membresias_config?.color || '#6366f1')}>{m.estado}</span>
-                </div>
+      <div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Clientes con membresía activa</h3>
+          {planes.length > 0 && (
+            <button style={{ ...S.btn('accent'), fontSize:13, padding:'6px 14px' }}
+              onClick={() => { setFormAsig({ fecha_inicio: new Date().toISOString().slice(0,10), estado:'activo' }); setModal('asignar') }}>
+              + Asignar plan
+            </button>
+          )}
+        </div>
+        {activos.length === 0 && <div style={S.empty}>Sin membresías activas. Crea un plan y asígnalo a un cliente.</div>}
+        {activos.map(m => (
+          <div key={m.id} style={{ ...S.card, padding: '14px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <span style={{ fontWeight: 600 }}>{m.clientes_agenda?.nombre || '—'}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', marginLeft: 12 }}>{m.membresias_config?.nombre}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-3)', alignItems: 'center' }}>
+                <span>Usos este mes: <strong style={{ color: 'var(--text)' }}>{m.usos_este_mes}</strong></span>
+                {m.fecha_vencimiento && <span>Vence: <strong style={{ color: 'var(--text)' }}>{m.fecha_vencimiento}</strong></span>}
+                <span style={S.badge(m.membresias_config?.color || '#6366f1')}>{m.estado}</span>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
+
+      {modal === 'asignar' && (
+        <Modal title="Asignar membresía a cliente" onClose={() => setModal(null)}>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <Field label="Cliente">
+              <select style={S.input} value={formAsig.cliente_id || ''} onChange={e => updA('cliente_id', e.target.value)}>
+                <option value="">— Seleccionar cliente —</option>
+                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}{c.telefono ? ` · ${c.telefono}` : ''}</option>)}
+              </select>
+            </Field>
+            <Field label="Plan de membresía">
+              <select style={S.input} value={formAsig.membresia_id || ''} onChange={e => updA('membresia_id', e.target.value)}>
+                <option value="">— Seleccionar plan —</option>
+                {planes.map(p => <option key={p.id} value={p.id}>{p.nombre} — ${fmt(p.precio_mensual)}/mes</option>)}
+              </select>
+            </Field>
+            <div style={S.grid2}>
+              <Field label="Fecha inicio">
+                <input style={S.input} type="date" value={formAsig.fecha_inicio || ''} onChange={e => updA('fecha_inicio', e.target.value)} />
+              </Field>
+              <Field label="Fecha vencimiento (opcional)">
+                <input style={S.input} type="date" value={formAsig.fecha_vencimiento || ''} onChange={e => updA('fecha_vencimiento', e.target.value)} />
+              </Field>
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
+              <button style={S.btn('ghost')} onClick={() => setModal(null)}>Cancelar</button>
+              <button style={S.btn('accent')} onClick={guardarAsignacion} disabled={saving}>{saving ? 'Guardando...' : 'Asignar'}</button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {modal === 'plan' && (
@@ -805,7 +890,15 @@ function TabAutomatizaciones({ tenant, toast }) {
   return (
     <div>
       <h2 style={S.h2}>Automatizaciones</h2>
-      <p style={S.sub}>Mensajes de WhatsApp enviados automáticamente en momentos clave del cliente</p>
+      <p style={S.sub}>Configura mensajes de WhatsApp para momentos clave del cliente</p>
+
+      <div style={{ background:'#fffbe6', border:'1px solid #f5c842', borderRadius:10, padding:'12px 16px', marginBottom:20, fontSize:13 }}>
+        <strong>⚙️ Configuración guardada — envío pendiente de integración</strong>
+        <p style={{ margin:'6px 0 0', color:'#7a5c00', lineHeight:1.5 }}>
+          Los ajustes se guardan aquí, pero el envío automático requiere conectar tu número de WhatsApp Business.
+          Contacta a soporte para activar el canal de envío.
+        </p>
+      </div>
 
       {items.map(item => {
         const meta = item._meta

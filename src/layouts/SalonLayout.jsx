@@ -102,6 +102,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
   const notifRef = useRef(null)
   const navRef   = useRef(null)
   const pillRef  = useRef(null)
+  const sheetRef = useRef(null)
 
   // Mueve el indicador deslizante al tab activo
   useEffect(() => {
@@ -116,6 +117,11 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
 
   useEffect(() => { localStorage.setItem('sp-theme', theme) }, [theme])
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+
+  // Reset scroll del sheet "Más" al abrir — en Android el scroll queda al fondo
+  useEffect(() => {
+    if (masOpen && sheetRef.current) sheetRef.current.scrollTop = 0
+  }, [masOpen])
 
   useEffect(() => {
     if (!tenant?.id) return
@@ -160,7 +166,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
   function SbItem({ k, label }) {
     const active = page === k
     return (
-      <button className={`sp-sb-item ${active ? 'active' : ''}`} onClick={() => nav(k)}>
+      <button className={`sp-sb-item ${active ? 'active' : ''}`} onClick={() => nav(k)} data-nav={k}>
         <span className="sp-sb-dot" />
         <Ico d={IC[k]} size={15} />
         {label}
@@ -386,7 +392,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
       {masOpen && (
         <>
           <div className="sp-sheet-overlay" onClick={() => setMasOpen(false)} />
-          <div className="sp-sheet">
+          <div className="sp-sheet" ref={sheetRef}>
             <div className="sp-sheet-handle" />
             <p className="sp-sheet-title">Menú</p>
 
@@ -394,10 +400,10 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
             {navNegocio.length > 0 && (
               <>
                 <p className="sp-mas-section">Negocio</p>
-                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16 }}>
+                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18 }}>
                   {navNegocio.map(item => (
                     <button key={item.key} className={`sp-mas-btn${page===item.key?' sp-mas-btn--active':''}`}
-                      onClick={() => nav(item.key)}
+                      onClick={() => nav(item.key)} data-nav={item.key}
                       style={page===item.key ? { background:`${col}18`, border:`1px solid ${col}50`, color:col } : {}}>
                       <Ico d={IC[item.key]} size={16} />
                       {item.label}
@@ -411,10 +417,10 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
             {navSistema.length > 0 && (
               <>
                 <p className="sp-mas-section">Sistema</p>
-                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16 }}>
+                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18 }}>
                   {navSistema.map(item => (
                     <button key={item.key} className={`sp-mas-btn${page===item.key?' sp-mas-btn--active':''}`}
-                      onClick={() => nav(item.key)}
+                      onClick={() => nav(item.key)} data-nav={item.key}
                       style={page===item.key ? { background:`${col}18`, border:`1px solid ${col}50`, color:col } : {}}>
                       <Ico d={IC[item.key]} size={16} />
                       {item.label}
@@ -426,9 +432,9 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
 
             {/* Superadmin */}
             {esSuperadmin && (
-              <div style={{ marginBottom:16 }}>
+              <div style={{ marginBottom:18 }}>
                 <p className="sp-mas-section">Administración</p>
-                <button onClick={() => nav('superadmin')}
+                <button onClick={() => nav('superadmin')} data-nav="superadmin"
                   className={`sp-mas-btn sp-mas-btn--full${page==='superadmin'?' sp-mas-btn--active':''}`}
                   style={page==='superadmin' ? { background:`${col}18`, border:`1px solid ${col}50`, color:col } : {}}>
                   <Ico d={IC.superadmin} size={16} />
@@ -480,7 +486,7 @@ export default function SalonLayout({ page, onNavigate, onNuevaCita, onSearch, c
           const active = page === item.key
           return (
             <button key={item.key} className={`sp-nav-item ${active ? 'active' : ''}`}
-              onClick={() => nav(item.key)}>
+              onClick={() => nav(item.key)} data-nav={item.key}>
               <span className="sp-nav-icon"><Ico d={IC[item.key]} size={22} /></span>
               <span>{item.label}</span>
             </button>

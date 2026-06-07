@@ -570,8 +570,14 @@ export default function SalonPortal() {
     }
     let cliId
     if (telefono.trim()) {
-      const { data: ex } = await supabase.from('clientes_agenda').select('id').eq('tenant_id', tenant.id).eq('telefono', telefono.trim()).maybeSingle()
-      if (ex) cliId = ex.id
+      const { data: ex } = await supabase.from('clientes_agenda').select('id, bloqueado_noshow').eq('tenant_id', tenant.id).eq('telefono', telefono.trim()).maybeSingle()
+      if (ex) {
+        if (tenant.noshow_bloqueo_activo === true && ex.bloqueado_noshow === true) {
+          setError('No es posible reservar en línea en este momento. Por favor comunícate directamente con el salón para agendar tu cita.')
+          setSaving(false); return
+        }
+        cliId = ex.id
+      }
     }
     if (!cliId) {
       const { data: nc, error: e } = await supabase.from('clientes_agenda').insert({ tenant_id: tenant.id, nombre: nombre.trim(), telefono: telefono.trim()||null }).select('id').single()

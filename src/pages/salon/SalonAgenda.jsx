@@ -145,7 +145,7 @@ export default function SalonAgenda() {
     try {
       const { data } = await supabase
         .from('citas')
-        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags,num_visitas,notas), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
+        .select('id, fecha_inicio, fecha_fin, estado, notas, anticipo, precio_cobrado, sede_id, profesional_id, servicio_id, cliente_id, servicios_ids, clientes_agenda(nombre,telefono,tags,num_visitas,notas,contador_noshow,bloqueado_noshow), servicios(id,nombre,precio,duracion_min), profesionales(id,nombre,color,foto_url)')
         .eq('tenant_id', tenant.id)
         .gte('fecha_inicio', `${y}-${m}-01T00:00:00`)
         .lte('fecha_inicio', `${y}-${m}-31T23:59:59`)
@@ -223,6 +223,18 @@ export default function SalonAgenda() {
     if (!selCita) return
     setActualizando(true)
     await supabase.from('citas').update({ estado: nuevoEstado }).eq('id', selCita.id)
+
+    // Registrar no-show: incrementar contador y bloquear si supera umbral
+    if (nuevoEstado === 'no_asistio' && selCita.cliente_id) {
+      const actual = selCita.clientes_agenda?.contador_noshow ?? 0
+      const nuevo  = actual + 1
+      const umbral = tenant.noshow_umbral ?? 3
+      const bloquear = (tenant.noshow_bloqueo_activo === true) && nuevo >= umbral
+      await supabase.from('clientes_agenda').update({
+        contador_noshow:  nuevo,
+        bloqueado_noshow: bloquear,
+      }).eq('id', selCita.cliente_id)
+    }
 
     // Auto-otorgar puntos de fidelidad al completar (configurable en Config)
     if (nuevoEstado === 'completada' && selCita.cliente_id) {
@@ -1704,12 +1716,19 @@ export default function SalonAgenda() {
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <p className="sp-sheet-title" style={{ margin:0 }}>Detalle cita</p>
                 {(() => {
-                  const tags = selCita.clientes_agenda?.tags || []
+                  const tags    = selCita.clientes_agenda?.tags || []
                   const visitas = selCita.clientes_agenda?.num_visitas ?? 1
-                  if (tags.includes('vip'))  return <span style={{ fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6, background:'rgba(251,191,36,0.15)', color:'#fbbf24' }}>VIP</span>
-                  if (tags.includes('star')) return <span style={{ fontSize:13 }}>⭐</span>
-                  if (visitas <= 1) return <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:6, background:'rgba(99,102,241,0.15)', color:'#818cf8' }}>✨ 1ª visita</span>
-                  return null
+                  const nosh    = selCita.clientes_agenda?.contador_noshow ?? 0
+                  const bloq    = selCita.clientes_agenda?.bloqueado_noshow === true
+                  return (
+                    <>
+                      {bloq && <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:6, background:'rgba(239,68,68,0.15)', color:'#ef4444', marginRight:4 }}>🚫 Bloqueado</span>}
+                      {!bloq && nosh > 0 && <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:6, background:'rgba(113,113,122,0.15)', color:'#a1a1aa', marginRight:4 }}>No-show ×{nosh}</span>}
+                      {tags.includes('vip')  && <span style={{ fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:6, background:'rgba(251,191,36,0.15)', color:'#fbbf24' }}>VIP</span>}
+                      {!tags.includes('vip') && tags.includes('star') && <span style={{ fontSize:13 }}>⭐</span>}
+                      {!tags.includes('vip') && !tags.includes('star') && visitas <= 1 && <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:6, background:'rgba(99,102,241,0.15)', color:'#818cf8' }}>✨ 1ª visita</span>}
+                    </>
+                  )
                 })()}
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>

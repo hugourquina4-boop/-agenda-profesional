@@ -128,17 +128,25 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
   const [fecha,       setFecha]       = useState(new Date().toISOString().slice(0,10))
   const [slot,        setSlot]        = useState(null)
   const [clienteId,   setClienteId]   = useState(null)
+  const [clienteSel,  setClienteSel]  = useState(null)
+  const [historial,   setHistorial]   = useState(null)
   const [busqCliente, setBusqCliente] = useState('')
   const [nuevoCliente,setNuevoCliente]= useState({ nombre:'', telefono:'' })
   const [modoNuevo,   setModoNuevo]   = useState(false)
   const [notasCita,   setNotasCita]   = useState('')
+  const [estadoIni,   setEstadoIni]   = useState('confirmada')
+  const [repetir,     setRepetir]     = useState(1)
 
   useEffect(() => {
-    if (clientePreId) {
+    if (clientePreId && tenant) {
       setClienteId(clientePreId)
       setBusqCliente(clientePreNombre || '')
+      supabase.from('clientes_agenda')
+        .select('id, nombre, telefono, tags, notas, contador_noshow, bloqueado_noshow')
+        .eq('tenant_id', tenant.id).eq('id', clientePreId).maybeSingle()
+        .then(({ data }) => { if (data) setClienteSel(data) })
     }
-  }, [clientePreId]) // eslint-disable-line
+  }, [clientePreId, tenant]) // eslint-disable-line
 
   useEffect(() => {
     if (profPreId) {
@@ -256,12 +264,60 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
   useEffect(() => {
     if (!tenant || busqCliente.length < 2) { setClientes([]); return }
     supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, tags, notas')
+      .select('id, nombre, telefono, tags, notas, contador_noshow, bloqueado_noshow')
       .eq('tenant_id', tenant.id)
       .or(`nombre.ilike.%${busqCliente}%,telefono.ilike.%${busqCliente}%`)
       .limit(8)
       .then(({ data }) => setClientes(data || []))
   }, [busqCliente, tenant])
+
+  // Historial reciente del cliente seleccionado (referencia AgendaPro: "Recientes")
+  useEffect(() => {
+    if (!clienteId || !tenant) { setHistorial(null); return }
+    ;(async () => {
+      const { data, count } = await supabase.from('citas')
+        .select('fecha_inicio, estado, servicios ( nombre )', { count: 'exact' })
+        .eq('tenant_id', tenant.id).eq('cliente_id', clienteId)
+        .order('fecha_inicio', { ascending: false }).limit(3)
+      setHistorial({ recientes: data || [], total: count || 0 })
+    })()
+  }, [clienteId, tenant])
+
+  // Desplaza la fecha N días manteniendo la misma hora local (sin drift de zona horaria)
+  function shiftDays(iso, days) {
+    const [date, time] = iso.split('T')
+    const d = new Date(date + 'T12:00:00')
+    d.setDate(d.getDate() + days)
+    return `${d.toISOString().slice(0,10)}T${time}`
+  }
+
+  // Verifica que el profesional no tenga otra cita solapada en ese rango
+  async function slotLibre(inicio, fin) {
+    const f = inicio.slice(0, 10)
+    const { data } = await supabase.from('citas')
+      .select('fecha_inicio, fecha_fin')
+      .eq('profesional_id', profId)
+      .gte('fecha_inicio', `${f}T00:00:00`)
+      .lte('fecha_inicio', `${f}T23:59:59`)
+      .neq('estado', 'cancelada')
+    return !(data || []).some(c => c.fecha_inicio < fin && c.fecha_fin > inicio)
+  }
+
+  function payloadCita(cliId, inicio, fin) {
+    return {
+      tenant_id:      tenant.id,
+      profesional_id: profId,
+      servicio_id:    servIds[0],
+      servicios_ids:  servIds,
+      cliente_id:     cliId,
+      fecha_inicio:   inicio,
+      fecha_fin:      fin,
+      estado:         estadoIni,
+      precio_cobrado: precioTotal || null,
+      sede_id:        profs.find(p => p.id === profId)?.sede_id || null,
+      notas:          notasCita.trim() || null,
+    }
+  }
 
   async function guardar() {
     setSaving(true)
@@ -279,21 +335,33 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
       if (!slot)           { showToast('Selecciona un horario'); setSaving(false); return }
       if (!servIds.length) { showToast('Selecciona al menos un servicio'); setSaving(false); return }
 
-      const { data: citaNew, error } = await supabase.from('citas').insert({
-        tenant_id:      tenant.id,
-        profesional_id: profId,
-        servicio_id:    servIds[0],
-        servicios_ids:  servIds,
-        cliente_id:     cliId,
-        fecha_inicio:   slot.inicio,
-        fecha_fin:      slot.fin,
-        estado:         'confirmada',
-        precio_cobrado: precioTotal || null,
-        sede_id:        profs.find(p => p.id === profId)?.sede_id || null,
-        notas:          notasCita.trim() || null,
-      }).select('id').single()
+      // Primera cita
+      const { data: citaNew, error } = await supabase.from('citas')
+        .insert(payloadCita(cliId, slot.inicio, slot.fin))
+        .select('id').single()
       if (error) throw error
-      if (citaNew?.id) supabase.functions.invoke('notificacion-cita', { body: { cita_id: citaNew.id } }).catch(() => {})
+
+      // Repetición semanal — crea las siguientes ocurrencias libres
+      let creadas = 1, omitidas = 0
+      if (repetir > 1) {
+        for (let k = 1; k < repetir; k++) {
+          const ini = shiftDays(slot.inicio, 7 * k)
+          const fin = shiftDays(slot.fin,    7 * k)
+          if (await slotLibre(ini, fin)) {
+            const { error: e2 } = await supabase.from('citas').insert(payloadCita(cliId, ini, fin))
+            if (e2) omitidas++; else creadas++
+          } else {
+            omitidas++
+          }
+        }
+      }
+
+      // Notificación WA solo si la cita queda confirmada (no en pendiente)
+      if (estadoIni === 'confirmada' && citaNew?.id) {
+        supabase.functions.invoke('notificacion-cita', { body: { cita_id: citaNew.id } }).catch(() => {})
+      }
+
+      if (repetir > 1 && omitidas > 0) showToast(`${creadas} citas creadas · ${omitidas} omitidas por cruce`, '#22c55e')
       onCreada?.()
       onClose()
     } catch (e) {
@@ -329,6 +397,33 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
               <Ico d="M6 18L18 6M6 6l12 12" size={16} />
             </button>
           </div>
+
+          {/* Estado inicial de la cita (referencia AgendaPro: badge de estado al crear) */}
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            {[
+              { v:'confirmada', l:'Confirmada', c:'#22c55e' },
+              { v:'pendiente',  l:'Pendiente',  c:'#f59e0b' },
+            ].map(e => {
+              const on = estadoIni === e.v
+              return (
+                <button key={e.v} onClick={() => setEstadoIni(e.v)} style={{
+                  flex:1, padding:'8px', borderRadius:10, cursor:'pointer',
+                  background: on ? `${e.c}1f` : 'var(--card)',
+                  border: `1.5px solid ${on ? e.c : 'var(--border)'}`,
+                  color: on ? e.c : 'var(--text-3)', fontWeight:700, fontSize:12.5,
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                }}>
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:e.c, flexShrink:0 }} />
+                  {e.l}
+                </button>
+              )
+            })}
+          </div>
+          {estadoIni === 'pendiente' && (
+            <p style={{ fontSize:11, color:'var(--text-3)', marginBottom:8, marginTop:-2 }}>
+              No se enviará confirmación por WhatsApp hasta que la marques como confirmada.
+            </p>
+          )}
 
           {/* Resumen compacto (aparece una vez hay datos) */}
           {(prof || servIds.length > 0 || slot) && (
@@ -487,6 +582,30 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
                   ))}
                 </div>
               )}
+
+              {/* Repetir — recurrencia semanal (referencia AgendaPro: "Repetir" inline) */}
+              {slot && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, flexWrap:'wrap' }}>
+                  <span style={{ fontSize:12, color:'var(--text-3)', fontWeight:600 }}>🔁 Repetir:</span>
+                  {[
+                    { v:1, l:'No' }, { v:4, l:'4 sem' }, { v:8, l:'8 sem' }, { v:12, l:'12 sem' },
+                  ].map(r => {
+                    const on = repetir === r.v
+                    return (
+                      <button key={r.v} onClick={() => setRepetir(r.v)} style={{
+                        padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', flexShrink:0,
+                        background: on ? col : 'var(--card)',
+                        color: on ? '#fff' : 'var(--text-3)', fontSize:12, fontWeight:700,
+                      }}>{r.l}</button>
+                    )
+                  })}
+                  {repetir > 1 && (
+                    <span style={{ fontSize:11, color:'var(--text-3)', width:'100%', marginTop:2 }}>
+                      Se crearán hasta {repetir} citas, una por semana, el mismo día y hora.
+                    </span>
+                  )}
+                </div>
+              )}
             </>
           )}
 
@@ -513,7 +632,7 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
                 value={busqCliente} onChange={e => setBusqCliente(e.target.value)}
                 style={{ marginBottom:8 }} />
               {clientes.map(c => (
-                <button key={c.id} onClick={() => { setClienteId(c.id); setBusqCliente(c.nombre) }} style={{
+                <button key={c.id} onClick={() => { setClienteId(c.id); setClienteSel(c); setBusqCliente(c.nombre) }} style={{
                   width:'100%', display:'flex', alignItems:'center', gap:10,
                   padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left', marginBottom:5,
                   background: clienteId === c.id ? `${col}15` : 'var(--card)',
@@ -549,6 +668,72 @@ export default function SalonNuevaCita({ onClose, onCreada, clientePreId, client
               ))}
               {busqCliente.length > 1 && clientes.length === 0 && (
                 <p style={{ fontSize:12, color:'var(--text-3)', textAlign:'center', padding:'10px 0' }}>Sin resultados</p>
+              )}
+
+              {/* Ficha del cliente seleccionado + historial (referencia AgendaPro) */}
+              {clienteId && clienteSel && (
+                <div style={{ marginTop:8, padding:'12px', borderRadius:12,
+                  background:'var(--card)', border:`1px solid ${col}40` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:38, height:38, borderRadius:11, background:`${col}25`,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontFamily:'Outfit', fontWeight:800, color:col, fontSize:16, flexShrink:0 }}>
+                      {clienteSel.nombre[0]}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{clienteSel.nombre}</div>
+                      <div style={{ fontSize:11, color:'var(--text-3)' }}>{clienteSel.telefono || 'Sin teléfono'}</div>
+                    </div>
+                    <button onClick={() => { setClienteId(null); setClienteSel(null); setHistorial(null); setBusqCliente('') }}
+                      style={{ width:30, height:30, borderRadius:9, border:'none', cursor:'pointer',
+                        background:'rgba(255,255,255,0.08)', color:'var(--text-3)',
+                        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
+                      title="Quitar cliente">
+                      <Ico d="M6 18L18 6M6 6l12 12" size={15} />
+                    </button>
+                  </div>
+
+                  {(clienteSel.bloqueado_noshow || clienteSel.contador_noshow > 0) && (
+                    <div style={{ marginTop:8, padding:'7px 10px', borderRadius:9, fontSize:11.5, fontWeight:600,
+                      background: clienteSel.bloqueado_noshow ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                      color: clienteSel.bloqueado_noshow ? '#f87171' : '#f59e0b' }}>
+                      {clienteSel.bloqueado_noshow
+                        ? `🚫 Cliente bloqueado por inasistencias (${clienteSel.contador_noshow})`
+                        : `⚠ ${clienteSel.contador_noshow} inasistencia${clienteSel.contador_noshow > 1 ? 's' : ''} previa${clienteSel.contador_noshow > 1 ? 's' : ''}`}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop:10, borderTop:'1px solid var(--border)', paddingTop:8 }}>
+                    <p style={{ fontSize:10, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
+                      textTransform:'uppercase', marginBottom:6 }}>
+                      Recientes{historial?.total ? ` · ${historial.total} en total` : ''}
+                    </p>
+                    {!historial ? (
+                      <p style={{ fontSize:11, color:'var(--text-3)' }}>Cargando…</p>
+                    ) : historial.recientes.length === 0 ? (
+                      <p style={{ fontSize:11, color:'var(--text-3)' }}>Primera cita de este cliente 🎉</p>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                        {historial.recientes.map((h, i) => {
+                          const noShow = h.estado === 'no_asistio'
+                          return (
+                            <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:11.5 }}>
+                              <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0,
+                                background: noShow ? '#ef4444' : h.estado === 'completada' ? '#22c55e' : 'var(--text-3)' }} />
+                              <span style={{ color:'var(--text-2)' }}>
+                                {new Date(h.fecha_inicio).toLocaleDateString('es-CO', { day:'numeric', month:'short', year:'numeric' })}
+                              </span>
+                              <span style={{ color:'var(--text-3)', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                {h.servicios?.nombre || '—'}
+                              </span>
+                              {noShow && <span style={{ color:'#f87171', fontWeight:700, fontSize:10 }}>NO ASISTIÓ</span>}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </>
           ) : (

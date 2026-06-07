@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useTenant } from '../../context/TenantContext'
 import SkeletonBox from '../../components/SkeletonBox'
+import { QRCodeCanvas } from 'qrcode.react'
 
 function Ico({ d, size = 18 }) {
   return (
@@ -86,7 +87,9 @@ const DEMO_ANALYTICS = {
 }
 
 function LinkReservas({ slug, col, showToast }) {
-  const url = `${window.location.origin}/reservar/${slug}`
+  const url     = `${window.location.origin}/reservar/${slug}`
+  const [showQR, setShowQR] = useState(false)
+  const qrRef   = useRef(null)
 
   function copiar() {
     navigator.clipboard.writeText(url)
@@ -94,44 +97,68 @@ function LinkReservas({ slug, col, showToast }) {
       .catch(() => showToast('No se pudo copiar', '#ef4444'))
   }
 
+  function descargarQR() {
+    const canvas = qrRef.current?.querySelector('canvas')
+    if (!canvas) return
+    const a = document.createElement('a')
+    a.href = canvas.toDataURL('image/png')
+    a.download = `reservas-${slug}.png`
+    a.click()
+  }
+
   return (
-    <div style={{
-      margin:'12px 16px 0', padding:'14px 16px', borderRadius:16,
+    <div style={{ margin:'12px 16px 0', borderRadius:16, overflow:'hidden',
       background:`linear-gradient(135deg, ${col}14, ${col}06)`,
-      boxShadow:`0 4px 24px ${col}10`,
-      display:'flex', alignItems:'center', gap:12,
-    }}>
-      <div style={{
-        width:38, height:38, borderRadius:11, background:`${col}20`,
-        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-      }}>
-        <Ico d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" size={17} style={{ color: col }} />
-      </div>
-      <div style={{ flex:1, minWidth:0 }}>
-        <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, marginBottom:2 }}>
-          TU LINK DE RESERVAS
-        </p>
-        <p style={{ fontSize:12, color:'var(--text-2)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-          {url}
-        </p>
-      </div>
-      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-        <button onClick={copiar} style={{
-          padding:'7px 12px', borderRadius:9, border:`1px solid ${col}40`,
-          background:`${col}15`, color:col, fontSize:12, fontWeight:700, cursor:'pointer',
-          whiteSpace:'nowrap',
+      boxShadow:`0 4px 24px ${col}10` }}>
+      <div style={{ padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
+        <div style={{
+          width:38, height:38, borderRadius:11, background:`${col}20`,
+          display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
         }}>
-          Copiar
-        </button>
-        <a href={url} target="_blank" rel="noopener noreferrer" style={{
-          padding:'7px 12px', borderRadius:9, border:'none',
-          background:'var(--card)', color:'var(--text-2)', fontSize:12, fontWeight:700,
-          cursor:'pointer', whiteSpace:'nowrap', textDecoration:'none',
-          display:'flex', alignItems:'center', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
-        }}>
-          Ver
-        </a>
+          <Ico d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" size={17} />
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, marginBottom:2 }}>
+            TU LINK DE RESERVAS
+          </p>
+          <p style={{ fontSize:12, color:'var(--text-2)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+            {url}
+          </p>
+        </div>
+        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+          <button onClick={copiar} style={{
+            padding:'7px 12px', borderRadius:9, border:`1px solid ${col}40`,
+            background:`${col}15`, color:col, fontSize:12, fontWeight:700, cursor:'pointer',
+            whiteSpace:'nowrap',
+          }}>Copiar</button>
+          <button onClick={() => setShowQR(v => !v)} style={{
+            padding:'7px 12px', borderRadius:9, border:'1px solid var(--border)',
+            background:'var(--card)', color:'var(--text-2)', fontSize:12, fontWeight:700,
+            cursor:'pointer', whiteSpace:'nowrap',
+          }}>QR</button>
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{
+            padding:'7px 12px', borderRadius:9, border:'none',
+            background:'var(--card)', color:'var(--text-2)', fontSize:12, fontWeight:700,
+            cursor:'pointer', whiteSpace:'nowrap', textDecoration:'none',
+            display:'flex', alignItems:'center', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',
+          }}>Ver</a>
+        </div>
       </div>
+
+      {showQR && (
+        <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+          <div ref={qrRef} style={{ background:'#fff', padding:12, borderRadius:12, display:'inline-block' }}>
+            <QRCodeCanvas value={url} size={160} level="M" marginSize={1} />
+          </div>
+          <p style={{ fontSize:11, color:'var(--text-3)', textAlign:'center', maxWidth:200 }}>
+            Pon este QR en tu local o Instagram para que los clientes agenden solos
+          </p>
+          <button onClick={descargarQR} style={{
+            padding:'8px 20px', borderRadius:10, border:`1px solid ${col}40`,
+            background:`${col}15`, color:col, fontSize:13, fontWeight:700, cursor:'pointer',
+          }}>⬇ Descargar PNG</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -15,4 +15,12 @@ export function ToastProvider({ children }) {
   return <Ctx.Provider value={{ toasts, toast }}>{children}</Ctx.Provider>
 }
 
-export const useToast = () => useContext(Ctx)
+export const useToast = () => {
+  const ctx = useContext(Ctx)
+  return {
+    ...ctx,
+    success: (msg) => ctx.toast(msg, 'success'),
+    error:   (msg) => ctx.toast(msg, 'error'),
+    info:    (msg) => ctx.toast(msg, 'info'),
+  }
+}

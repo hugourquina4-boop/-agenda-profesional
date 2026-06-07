@@ -5,7 +5,7 @@
 > URL prod: https://project-gnyy8.vercel.app
 > Superadmin panel: https://project-gnyy8.vercel.app/superadmin.html
 > Actualizado: 2026-05-20 (sesión 24)
-> **Versión actual en producción: v1.4-dev**
+> **Versión actual en producción: v1.5** (deployada 2026-06-05)
 
 ---
 
@@ -367,8 +367,8 @@ UNIQUE INDEX (tenant_id, codigo) WHERE codigo IS NOT NULL AND codigo <> ''
 |---------|--------|-----------|
 | **v1.1** | ✅ En producción (tag git: v1.1) | 17 módulos: agenda, equipo, inventario, analytics, superadmin standalone, WA automático, multi-tenant RLS completo |
 | **v1.2** | ✅ En producción (tag git: v1.2) | Panel Suscripción React completo (SalonSuperadmin), RPCs SECURITY DEFINER para auth, soft delete de negocios, v43/v44/v45 SQL |
-| **v1.3** | 📋 Planificado | Proveedores + Gastos, billing automático (Wompi), pagos en línea desde portal público |
-| **v2.0** | 📋 Futuro | Vertical psicología/salud (historial clínico, consentimientos, cuestionarios integrados), App nativa PWA en tiendas |
+| **v1.5** | ✅ En producción (deploy 2026-06-05) | NPS post-visita, tiquetera, campañas marketing, consentimientos digitales, categorías servicios con pills, bloqueos recurrentes, anti-abuso trial, hardening seguridad. SQL v82–v89 aplicados. |
+| **v2.0** | 📋 Futuro | Wompi suscripciones, vertical psicología/salud, App nativa PWA en tiendas |
 
 ---
 
@@ -424,6 +424,20 @@ v70_desvincular_usuario.sql       ✅ APLICADO (2026-05-18) — RPC desvincular_
 v71_sedes_horario.sql             ✅ APLICADO (2026-05-18) — hora_apertura + hora_cierre + dias_activos en sedes
 v72_portal_anon_tenants.sql       ✅ APLICADO — anon RLS en tenants/profesionales/servicios/horarios/sedes/paquetes/citas
 v73_movimientos_stock.sql         ✅ APLICADO — tabla movimientos_stock + RLS + índices
+```
+
+### SQL v1.5 aplicados (2026-06-05)
+```
+v82_categorias_servicios.sql ✅ APLICADO — tabla categorias_servicio + pills filtro en SalonServicios
+v82_marketing.sql            ✅ APLICADO — campañas, sellos, membresías y automatizaciones
+v83_cliente_barrio.sql       ✅ APLICADO — campo barrio en clientes_agenda
+v84_anti_abuso_trial.sql     ✅ APLICADO — bloqueo reuso trial server-side
+v85_tiquetera.sql            ✅ APLICADO — tiquetera_activa + tabla premios canjeados
+v86_nps.sql                  ✅ APLICADO — tabla nps_respuestas + token de un solo uso
+v87_security.sql             ✅ APLICADO — hardening seguridad
+v88_bloqueo_recurrente.sql   ✅ APLICADO — repeat_rule en horarios_excepcion
+v89_consentimiento.sql       ✅ APLICADO — tabla consentimientos + RLS tenant
+v91_inventario_vencimiento.sql ✅ APLICADO — fecha_vencimiento + lote en productos_salon; índice por tenant+fecha
 ```
 
 ---

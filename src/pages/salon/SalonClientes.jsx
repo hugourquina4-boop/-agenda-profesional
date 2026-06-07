@@ -299,7 +299,7 @@ export default function SalonClientes() {
 
     const offset = offsetRef.current
     const q = supabase.from('clientes_agenda')
-      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags, fuente_captacion, barrio')
+      .select('id, nombre, telefono, email, notas, servicios_interes, puntos_fidelizacion, fecha_nacimiento, created_at, num_visitas, total_gastado, ticket_promedio, ultima_visita, segmento, tipo_precio, tags, fuente_captacion, barrio, contador_noshow, bloqueado_noshow')
       .eq('tenant_id', tenant.id)
       .order('nombre')
       .range(offset, offset + PAGE_SIZE - 1)
@@ -415,6 +415,17 @@ export default function SalonClientes() {
     setSel(s => ({ ...s, notas: notasEdit.trim() || null }))
     setEditNotas(false)
     showToast('Notas guardadas')
+    cargar()
+  }
+
+  async function desbloquearNoshow() {
+    if (!sel) return
+    const { error } = await supabase.from('clientes_agenda')
+      .update({ contador_noshow: 0, bloqueado_noshow: false })
+      .eq('id', sel.id).eq('tenant_id', tenant.id)
+    if (error) { showToast('Error al desbloquear', false); return }
+    setSel(s => ({ ...s, contador_noshow: 0, bloqueado_noshow: false }))
+    showToast('Cliente desbloqueado')
     cargar()
   }
 
@@ -1169,6 +1180,14 @@ export default function SalonClientes() {
                     <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
                       background:'rgba(234,179,8,0.15)', color:'#ca8a04' }}>⭐ {sel.puntos_fidelizacion} pts</span>
                   )}
+                  {sel.bloqueado_noshow && (
+                    <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
+                      background:'rgba(239,68,68,0.15)', color:'#ef4444' }}>🚫 Bloqueado{sel.contador_noshow ? ` (${sel.contador_noshow})` : ''}</span>
+                  )}
+                  {!sel.bloqueado_noshow && sel.contador_noshow > 0 && (
+                    <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:700,
+                      background:'rgba(113,113,122,0.15)', color:'#71717a' }}>No-show ×{sel.contador_noshow}</span>
+                  )}
                   <span style={{ fontSize:12, color:'var(--text-3)' }}>
                     desde {fmtFecha(sel.created_at)}
                   </span>
@@ -1189,6 +1208,29 @@ export default function SalonClientes() {
                 {sel.tipo_precio === 'mayorista' ? 'Mayor.' : 'Normal'}
               </button>
             </div>
+
+            {sel.bloqueado_noshow && (
+              <div style={{
+                display:'flex', alignItems:'center', gap:10, marginBottom:14,
+                padding:'10px 14px', borderRadius:12,
+                background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)',
+              }}>
+                <span style={{ fontSize:18 }}>🚫</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, color:'#ef4444', fontWeight:700 }}>Bloqueado por inasistencias</div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+                    No puede reservar por el portal en línea ({sel.contador_noshow || 0} no-shows).
+                  </div>
+                </div>
+                <button onClick={desbloquearNoshow} style={{
+                  padding:'6px 12px', borderRadius:10, border:'1px solid #ef4444',
+                  background:'transparent', color:'#ef4444', fontSize:11, fontWeight:700,
+                  cursor:'pointer', flexShrink:0,
+                }}>
+                  Desbloquear
+                </button>
+              </div>
+            )}
 
             {/* Agendar cita */}
             <button onClick={() => setShowAgendarCita(true)} style={{
@@ -1867,16 +1909,26 @@ export default function SalonClientes() {
                       Sin datos de tiquetera
                     </p>
                   ) : !tq.activa ? (
-                    <div style={{ padding:'16px', borderRadius:14,
+                    <div style={{ padding:'20px 16px', borderRadius:14,
                       background:'var(--card)', border:'1px solid var(--border)',
                       textAlign:'center' }}>
                       <div style={{ fontSize:32, marginBottom:8 }}>🎟️</div>
-                      <div style={{ fontSize:13, fontWeight:700, color:'var(--text-3)' }}>
-                        La tiquetera virtual no está activada para este negocio
+                      <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
+                        Tiquetera no activada
                       </div>
-                      <div style={{ fontSize:12, color:'var(--text-3)', marginTop:6 }}>
-                        Actívala en Configuración → Tiquetera Virtual
+                      <div style={{ fontSize:13, color:'var(--text-2)', marginBottom:16, lineHeight:1.5 }}>
+                        Para usar la tiquetera de sellos ve a<br/>
+                        <strong>Configuración → sección "Tiquetera Virtual"</strong><br/>
+                        y activa el programa.
                       </div>
+                      <button
+                        style={{ padding:'8px 18px', borderRadius:8, border:'none', cursor:'pointer',
+                          background:'var(--accent)', color:'#fff', fontSize:13, fontWeight:500 }}
+                        onClick={() => {
+                          document.querySelector('[data-nav="config"]')?.click()
+                        }}>
+                        Ir a Configuración
+                      </button>
                     </div>
                   ) : (
                     <TiqueteraCard

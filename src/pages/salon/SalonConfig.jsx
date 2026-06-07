@@ -126,7 +126,8 @@ export default function SalonConfig({ onNavigate }) {
       tiquetera_lng:     tenant.tiquetera_lng     ?? '',
       tiquetera_radio_m: tenant.tiquetera_radio_m ?? 300,
       wa_agente_activo:  tenant.wa_agente_activo  ?? false,
-      whapi_token:       tenant.whapi_token       || '',
+      whapi_configurado: tenant.whapi_configurado ?? false,
+      whapi_token_nuevo: '',   // solo-escritura: nunca se lee el token del servidor
       wa_agente_nombre:  tenant.wa_agente_nombre  || '',
       wa_agente_saludo:  tenant.wa_agente_saludo  || '',
     })
@@ -167,7 +168,6 @@ export default function SalonConfig({ onNavigate }) {
       tiquetera_lng:     form.tiquetera_lng  !== '' ? Number(form.tiquetera_lng)  : null,
       tiquetera_radio_m: Number(form.tiquetera_radio_m) || 300,
       wa_agente_activo:  form.wa_agente_activo,
-      whapi_token:       form.whapi_token.trim()       || null,
       wa_agente_nombre:  form.wa_agente_nombre.trim()  || null,
       wa_agente_saludo:  form.wa_agente_saludo.trim()  || null,
       config_vertical: {
@@ -189,8 +189,25 @@ export default function SalonConfig({ onNavigate }) {
         nps_horas_espera:     Number(form.nps_horas_espera) || 2,
       },
     }).eq('id', tenant.id)
+    if (error) { setSaving(false); showToast(error.message, false); return }
+
+    // Token Whapi: solo-escritura vía RPC SECURITY DEFINER (nunca viaja al cliente).
+    // Solo se actualiza si el admin escribió un valor nuevo en el campo.
+    if (form.whapi_token_nuevo.trim()) {
+      const { data: rpc, error: rpcErr } = await supabase.rpc('salon_set_whapi_token', {
+        p_tenant_id: tenant.id,
+        p_token: form.whapi_token_nuevo.trim(),
+      })
+      if (rpcErr || rpc?.error) {
+        setSaving(false)
+        showToast('Configuración guardada, pero el token no se pudo guardar', false)
+        recargar()
+        return
+      }
+      set('whapi_token_nuevo', '')
+    }
+
     setSaving(false)
-    if (error) { showToast(error.message, false); return }
     showToast('Configuración guardada')
     recargar()
   }
@@ -924,14 +941,22 @@ export default function SalonConfig({ onNavigate }) {
           </label>
           <label style={{ fontSize:12, color:'var(--text-3)', display:'flex', flexDirection:'column', gap:4 }}>
             Token Whapi.cloud
-            <input className="sp-input" type="password" placeholder="eyJ…"
-              value={form.whapi_token}
-              onChange={e => set('whapi_token', e.target.value)}
+            <input className="sp-input" type="password"
+              placeholder={form.whapi_configurado ? '•••••••• (configurado — escribe para cambiarlo)' : 'eyJ…'}
+              value={form.whapi_token_nuevo}
+              onChange={e => set('whapi_token_nuevo', e.target.value)}
               autoComplete="off" />
-            <span style={{ fontSize:10, color:'var(--text-3)' }}>
-              Obtén el token en tu canal de whapi.cloud → Settings → Token
-            </span>
+            {form.whapi_configurado
+              ? <span style={{ fontSize:10, color:'#4ade80' }}>✓ Token configurado y guardado de forma segura en el servidor</span>
+              : <span style={{ fontSize:10, color:'var(--text-3)' }}>Obtén el token en tu canal de whapi.cloud → Settings → Token</span>}
           </label>
+
+          {form.wa_agente_activo && !form.whapi_configurado && !form.whapi_token_nuevo.trim() && (
+            <div style={{ padding:'8px 12px', borderRadius:8, fontSize:11, lineHeight:1.5,
+              background:'rgba(245,158,11,0.1)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.25)' }}>
+              ⚠️ El agente está activo pero falta el token de Whapi. No responderá hasta que lo configures.
+            </div>
+          )}
         </div>
 
         {/* Webhook URL to copy */}

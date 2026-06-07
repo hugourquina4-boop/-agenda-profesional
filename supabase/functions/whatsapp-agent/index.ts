@@ -262,16 +262,28 @@ Deno.serve(async (req) => {
       return new Response('Missing tenant', { status: 400 })
     }
 
-    // Load tenant & verify agent is active
+    // Load tenant & verify agent is active (token vive en wa_config, no en tenants)
     const { data: tenant } = await db
       .from('tenants')
-      .select('id, nombre, direccion, whapi_token, wa_agente_activo, wa_agente_nombre, wa_agente_saludo, config_vertical')
+      .select('id, nombre, direccion, wa_agente_activo, wa_agente_nombre, wa_agente_saludo, config_vertical')
       .eq('id', tenantId)
       .eq('activo', true)
       .single()
 
-    if (!tenant?.wa_agente_activo || !tenant.whapi_token) {
+    if (!tenant?.wa_agente_activo) {
       return new Response('Agent not active', { status: 200 }) // 200 to silence Whapi retries
+    }
+
+    // Read the third-party token only on the server (service_role)
+    const { data: waCfg } = await db
+      .from('wa_config')
+      .select('whapi_token')
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+
+    const whapiToken = waCfg?.whapi_token
+    if (!whapiToken) {
+      return new Response('Agent not configured', { status: 200 })
     }
 
     // Parse webhook from Whapi.cloud
@@ -429,12 +441,12 @@ Deno.serve(async (req) => {
 
     // Send response via Whapi.cloud
     const toAddress = rawFrom.includes('@') ? rawFrom : `${fromNum}@s.whatsapp.net`
-    await sendWhapi(tenant.whapi_token, toAddress, respuestaFinal)
+    await sendWhapi(whapiToken, toAddress, respuestaFinal)
 
     // If handoff: notify the salon's own WhatsApp (if configured)
     if (handoff && tenant.config_vertical?.telefono_negocio) {
       const aviso = `🤖 El cliente ${fromName} (${localPhone(fromNum)}) pidió hablar con una persona real.`
-      await sendWhapi(tenant.whapi_token, `57${tenant.config_vertical.telefono_negocio}@s.whatsapp.net`, aviso)
+      await sendWhapi(whapiToken, `57${tenant.config_vertical.telefono_negocio}@s.whatsapp.net`, aviso)
     }
 
     return new Response(JSON.stringify({ ok: true }), {
