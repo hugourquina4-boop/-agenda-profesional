@@ -113,6 +113,8 @@ export default function SalonConfig({ onNavigate }) {
       fotos_galeria:       (tenant.config_vertical?.fotos_galeria || []).concat(['','','','']).slice(0,4),
       puntos_por_visita:   tenant.puntos_por_visita   ?? 10,
       puntos_canje_min:    tenant.puntos_canje_min    ?? 50,
+      noshow_bloqueo_activo: tenant.noshow_bloqueo_activo ?? false,
+      noshow_umbral:         tenant.noshow_umbral         ?? 3,
       meta_ingresos_mes:   tenant.config_vertical?.meta_ingresos_mes ?? 0,
       link_google_reviews: tenant.config_vertical?.link_google_reviews || '',
       nps_activo:          tenant.config_vertical?.nps_activo          ?? false,
@@ -123,6 +125,10 @@ export default function SalonConfig({ onNavigate }) {
       tiquetera_lat:     tenant.tiquetera_lat     ?? '',
       tiquetera_lng:     tenant.tiquetera_lng     ?? '',
       tiquetera_radio_m: tenant.tiquetera_radio_m ?? 300,
+      wa_agente_activo:  tenant.wa_agente_activo  ?? false,
+      whapi_token:       tenant.whapi_token       || '',
+      wa_agente_nombre:  tenant.wa_agente_nombre  || '',
+      wa_agente_saludo:  tenant.wa_agente_saludo  || '',
     })
   }, [tenant])
 
@@ -152,12 +158,18 @@ export default function SalonConfig({ onNavigate }) {
       pagos_portal_activo:  form.pagos_portal_activo,
       puntos_por_visita:    Number(form.puntos_por_visita) || 10,
       puntos_canje_min:     Number(form.puntos_canje_min)  || 50,
+      noshow_bloqueo_activo: form.noshow_bloqueo_activo,
+      noshow_umbral:         Math.max(1, Number(form.noshow_umbral) || 3),
       tiquetera_activa:  form.tiquetera_activa,
       tiquetera_meta:    Number(form.tiquetera_meta)    || 10,
       tiquetera_premio:  form.tiquetera_premio.trim()   || 'Servicio gratis a elegir',
       tiquetera_lat:     form.tiquetera_lat  !== '' ? Number(form.tiquetera_lat)  : null,
       tiquetera_lng:     form.tiquetera_lng  !== '' ? Number(form.tiquetera_lng)  : null,
       tiquetera_radio_m: Number(form.tiquetera_radio_m) || 300,
+      wa_agente_activo:  form.wa_agente_activo,
+      whapi_token:       form.whapi_token.trim()       || null,
+      wa_agente_nombre:  form.wa_agente_nombre.trim()  || null,
+      wa_agente_saludo:  form.wa_agente_saludo.trim()  || null,
       config_vertical: {
         ...(tenant.config_vertical || {}),
         fotos_galeria:        form.fotos_galeria.filter(Boolean),
@@ -474,6 +486,43 @@ export default function SalonConfig({ onNavigate }) {
         </div>
         <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
           Los clientes acumulan puntos automáticamente al completar cada cita. El mínimo para canjear controla cuántos puntos se necesitan para un canje.
+        </div>
+      </Seccion>
+
+      {/* ── Control de inasistencias (no-show) ── */}
+      <Seccion titulo="Inasistencias (no-show) 🚫">
+        <Campo label="">
+          <label style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }}>
+            <div onClick={() => set('noshow_bloqueo_activo', !form.noshow_bloqueo_activo)}
+              style={{
+                width:44, height:26, borderRadius:99, flexShrink:0,
+                background: form.noshow_bloqueo_activo ? col : 'var(--border)',
+                position:'relative', transition:'background 0.2s',
+              }}>
+              <div style={{
+                position:'absolute', top:3, left: form.noshow_bloqueo_activo ? 21 : 3,
+                width:20, height:20, borderRadius:99, background:'#fff',
+                boxShadow:'0 1px 4px rgba(0,0,0,0.25)', transition:'left 0.2s',
+              }} />
+            </div>
+            <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
+              {form.noshow_bloqueo_activo ? 'Activado — bloquea reservas online tras varias inasistencias' : 'Desactivado'}
+            </span>
+          </label>
+        </Campo>
+
+        {form.noshow_bloqueo_activo && (
+          <Campo label="Inasistencias antes de bloquear">
+            <input className="sp-input" type="number" min="1" max="20"
+              value={form.noshow_umbral}
+              onChange={e => set('noshow_umbral', e.target.value)} />
+          </Campo>
+        )}
+
+        <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>
+          Cada vez que marcas una cita como <b>No asistió</b> se suma una inasistencia al cliente.
+          Al alcanzar el umbral, el cliente no podrá reservar por el portal y deberá comunicarse con el salón.
+          Puedes desbloquearlo manualmente desde su ficha en Clientes.
         </div>
       </Seccion>
 
@@ -831,6 +880,94 @@ export default function SalonConfig({ onNavigate }) {
               Agrega el enlace de Google Reviews arriba para que la encuesta incluya el link.
             </div>
           )}
+        </div>
+      </Seccion>
+
+      {/* ── Agente IA WhatsApp ────────────────────────── */}
+      <Seccion titulo="Agente IA WhatsApp 🤖">
+        {/* Toggle principal */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'14px 16px', borderRadius:14,
+          background:`linear-gradient(135deg,${col}0d,var(--card))`,
+          boxShadow:'0 2px 12px rgba(0,0,0,0.09)' }}>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>Agente activo</div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>
+              Responde WhatsApp 24/7 con IA y agenda citas automáticamente
+            </div>
+          </div>
+          <button onClick={() => set('wa_agente_activo', !form.wa_agente_activo)} style={{
+            padding:'6px 18px', borderRadius:20, border:'none', cursor:'pointer',
+            fontWeight:700, fontSize:12,
+            background: form.wa_agente_activo ? 'rgba(34,197,94,0.15)' : 'var(--border)',
+            color:       form.wa_agente_activo ? '#4ade80'              : 'var(--text-3)',
+          }}>
+            {form.wa_agente_activo ? 'Activo' : 'Inactivo'}
+          </button>
+        </div>
+
+        {/* Config fields */}
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <label style={{ fontSize:12, color:'var(--text-3)', display:'flex', flexDirection:'column', gap:4 }}>
+            Nombre del agente
+            <input className="sp-input" placeholder="Ej: Luna, Asistente, Maite…"
+              value={form.wa_agente_nombre}
+              onChange={e => set('wa_agente_nombre', e.target.value)} />
+          </label>
+          <label style={{ fontSize:12, color:'var(--text-3)', display:'flex', flexDirection:'column', gap:4 }}>
+            Saludo inicial (cuando abre conversación nueva)
+            <textarea className="sp-input" rows={2}
+              placeholder="Hola, soy el asistente de [Salón]. ¿En qué te puedo ayudar?"
+              value={form.wa_agente_saludo}
+              onChange={e => set('wa_agente_saludo', e.target.value)}
+              style={{ resize:'vertical', fontFamily:'inherit' }} />
+          </label>
+          <label style={{ fontSize:12, color:'var(--text-3)', display:'flex', flexDirection:'column', gap:4 }}>
+            Token Whapi.cloud
+            <input className="sp-input" type="password" placeholder="eyJ…"
+              value={form.whapi_token}
+              onChange={e => set('whapi_token', e.target.value)}
+              autoComplete="off" />
+            <span style={{ fontSize:10, color:'var(--text-3)' }}>
+              Obtén el token en tu canal de whapi.cloud → Settings → Token
+            </span>
+          </label>
+        </div>
+
+        {/* Webhook URL to copy */}
+        {tenant?.id && (
+          <div style={{ padding:'12px 14px', borderRadius:12,
+            background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.2)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#818cf8', marginBottom:6 }}>
+              URL del webhook para Whapi.cloud
+            </div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <code style={{ fontSize:10, color:'var(--text-3)', wordBreak:'break-all',
+                background:'rgba(0,0,0,0.2)', padding:'6px 8px', borderRadius:6, flex:1 }}>
+                {`https://unpxoamfyushsbyyziyn.supabase.co/functions/v1/whatsapp-agent?t=${tenant.id}`}
+              </code>
+              <button onClick={() => {
+                navigator.clipboard.writeText(
+                  `https://unpxoamfyushsbyyziyn.supabase.co/functions/v1/whatsapp-agent?t=${tenant.id}`
+                )
+                showToast('URL copiada')
+              }} style={{ padding:'6px 12px', borderRadius:8, border:`1px solid ${col}`,
+                background:'transparent', color:col, fontSize:11, cursor:'pointer', whiteSpace:'nowrap' }}>
+                Copiar
+              </button>
+            </div>
+            <div style={{ marginTop:8, fontSize:10, color:'var(--text-3)', lineHeight:1.6 }}>
+              En Whapi.cloud: Settings → Webhooks → agrega esta URL para el evento <strong>messages.add</strong>
+            </div>
+          </div>
+        )}
+
+        {/* Cómo funciona */}
+        <div style={{ padding:'10px 14px', borderRadius:10,
+          background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.2)',
+          fontSize:11, color:'#93c5fd', lineHeight:1.7 }}>
+          <strong>Cómo funciona:</strong> el agente recibe mensajes de tus clientes por WhatsApp, consulta tus servicios y disponibilidad en tiempo real, y agenda citas automáticamente. Si el cliente pide hablar con una persona, el agente transfiere la conversación.
+          <br />Requiere <strong>ANTHROPIC_API_KEY</strong> en los secrets de la Edge Function.
         </div>
       </Seccion>
 
