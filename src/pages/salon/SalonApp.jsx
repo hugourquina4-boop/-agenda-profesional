@@ -482,6 +482,32 @@ function AppBloqueada({ suscripcion, tenant, onSignOut }) {
           </>
         )}
 
+        {/* Contacto alternativo */}
+        <div style={{ marginBottom:12 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:1,
+            textTransform:'uppercase', textAlign:'center', marginBottom:10 }}>Contactar asesor</p>
+          <div style={{ display:'flex', gap:8 }}>
+            <a href={`https://wa.me/573155734848?text=${encodeURIComponent('Hola, necesito reactivar mi plan de Salón Pro. Negocio: ' + (tenant?.nombre || slug))}`}
+              target="_blank" rel="noopener noreferrer" style={{
+                flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                padding:'12px', borderRadius:12, textDecoration:'none',
+                background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.30)',
+                color:'#4ade80', fontWeight:700, fontSize:13,
+              }}>
+              💬 WhatsApp
+            </a>
+            <a href={`mailto:hugourquina@gmail.com?subject=${encodeURIComponent('Reactivar plan — ' + (tenant?.nombre || slug))}&body=${encodeURIComponent('Hola Hugo, necesito renovar mi plan de Salón Pro.')}`}
+              style={{
+                flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                padding:'12px', borderRadius:12, textDecoration:'none',
+                background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.25)',
+                color:'#60a5fa', fontWeight:700, fontSize:13,
+              }}>
+              ✉️ Email
+            </a>
+          </div>
+        </div>
+
         <button onClick={onSignOut} style={{
           width:'100%', padding:'13px', borderRadius:14, border:'none', cursor:'pointer',
           background:'var(--card)', boxShadow:'0 1px 6px rgba(0,0,0,0.1)',

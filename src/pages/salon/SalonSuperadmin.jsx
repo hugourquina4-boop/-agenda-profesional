@@ -1204,6 +1204,59 @@ export default function SalonSuperadmin({ onGestionar }) {
           </div>
         )}
 
+        {/* ── Alerta vencimiento próximo ──────────────────────────── */}
+        {(() => {
+          const porVencer = negocios.filter(n => {
+            const v = n.fecha_vencimiento ? new Date(n.fecha_vencimiento) : null
+            if (!v) return false
+            const d = Math.ceil((v - new Date()) / 86400000)
+            return d <= 15
+          }).sort((a, b) => {
+            const da = Math.ceil((new Date(a.fecha_vencimiento) - new Date()) / 86400000)
+            const db = Math.ceil((new Date(b.fecha_vencimiento) - new Date()) / 86400000)
+            return da - db
+          })
+          if (porVencer.length === 0) return null
+          return (
+            <div style={{ margin: '12px 16px 0', borderRadius: 14, overflow: 'hidden',
+              border: '1.5px solid rgba(249,115,22,0.45)', background: 'rgba(249,115,22,0.06)' }}>
+              <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                borderBottom: '1px solid rgba(249,115,22,0.15)', background: 'rgba(249,115,22,0.12)' }}>
+                <span style={{ fontSize: 18 }}>🔔</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#f97316' }}>
+                    {porVencer.length} negocio{porVencer.length > 1 ? 's' : ''} vence{porVencer.length > 1 ? 'n' : ''} pronto
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Requieren renovación en los próximos 15 días</div>
+                </div>
+                <button onClick={() => setTab('pagos')} style={{
+                  padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.4)',
+                  background: 'rgba(249,115,22,0.15)', color: '#f97316', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}>Ver pagos →</button>
+              </div>
+              {porVencer.map(n => {
+                const dias = Math.ceil((new Date(n.fecha_vencimiento) - new Date()) / 86400000)
+                const color = dias <= 0 ? '#ef4444' : dias <= 3 ? '#f97316' : '#f59e0b'
+                return (
+                  <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 16px', borderBottom: '1px solid rgba(249,115,22,0.08)' }}>
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.nombre}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color, flexShrink: 0 }}>
+                      {dias <= 0 ? 'VENCIDO' : `${dias}d`}
+                    </div>
+                    <button onClick={() => { setPagoModal(n); setTab('pagos') }} style={{
+                      padding: '5px 10px', borderRadius: 7, border: `1px solid ${color}40`,
+                      background: `${color}12`, color, fontSize: 11, fontWeight: 700,
+                      cursor: 'pointer', flexShrink: 0,
+                    }}>⚡ Renovar</button>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+
         {/* ── Tab bar (scrollable en móvil) ─────────────────────── */}
         <div className="sp-tabs-scroll" style={{
           gap: 0, margin: '16px 16px 0',

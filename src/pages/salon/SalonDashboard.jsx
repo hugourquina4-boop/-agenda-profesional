@@ -306,6 +306,7 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
   // Personalización dashboard
   const [dashPrefs,        setDashPrefs]        = useState({})
   const [showPersonalizar, setShowPersonalizar] = useState(false)
+  const [onboardingClosed, setOnboardingClosed] = useState(false)
 
   const PREFS_KEY = tenant ? `sp_dash_prefs_${tenant.id}` : null
 
@@ -316,6 +317,11 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
       if (stored) setDashPrefs(JSON.parse(stored))
     } catch {}
   }, [PREFS_KEY])
+
+  useEffect(() => {
+    if (!tenant?.id) return
+    if (localStorage.getItem(`ob_closed_${tenant.id}`) === '1') setOnboardingClosed(true)
+  }, [tenant?.id])
 
   function updatePref(id, val) {
     if (id === '__reset__') {
@@ -931,7 +937,11 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
           },
         ]
         const doneCount = steps.filter(s => s.done).length
-        if (doneCount === steps.length) return null
+        if (doneCount === steps.length || onboardingClosed) return null
+        const dismissOnboarding = () => {
+          if (tenant?.id) localStorage.setItem(`ob_closed_${tenant.id}`, '1')
+          setOnboardingClosed(true)
+        }
         return (
           <div style={{ margin:'16px 16px 0', borderRadius:20,
             background:`linear-gradient(135deg,${col}10,${col}05)`,
@@ -947,14 +957,22 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
                   {doneCount} de {steps.length} pasos completados
                 </div>
               </div>
-              <div style={{
-                width:44, height:44, borderRadius:'50%', flexShrink:0,
-                background: doneCount === 0 ? 'var(--border)' : `${col}20`,
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontFamily:'Outfit', fontWeight:900, fontSize:15,
-                color: doneCount === 0 ? 'var(--text-3)' : col,
-              }}>
-                {doneCount}/{steps.length}
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{
+                  width:44, height:44, borderRadius:'50%', flexShrink:0,
+                  background: doneCount === 0 ? 'var(--border)' : `${col}20`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontFamily:'Outfit', fontWeight:900, fontSize:15,
+                  color: doneCount === 0 ? 'var(--text-3)' : col,
+                }}>
+                  {doneCount}/{steps.length}
+                </div>
+                <button onClick={dismissOnboarding} title="Cerrar" style={{
+                  width:28, height:28, borderRadius:'50%', border:'none',
+                  background:'var(--border)', color:'var(--text-3)', cursor:'pointer',
+                  fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
+                  flexShrink:0,
+                }}>✕</button>
               </div>
             </div>
 
@@ -1051,19 +1069,6 @@ export default function SalonDashboard({ onNavigate, onNuevaCita }) {
           <Ico d="M9 5l7 7-7 7" size={14} />
         </button>
       )}
-
-      {/* ── Botón personalizar (acceso flotante móvil) ── */}
-      <div style={{ margin:'12px 16px 0', display:'flex', justifyContent:'flex-end' }}>
-        <button onClick={() => setShowPersonalizar(true)} style={{
-          display:'flex', alignItems:'center', gap:5,
-          padding:'6px 12px', borderRadius:20, fontSize:11, fontWeight:700,
-          background:'var(--card)', border:'1px solid var(--border)', color:'var(--text-2)',
-          cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.08)',
-        }}>
-          <Ico d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" size={13} />
-          Personalizar
-        </button>
-      </div>
 
       {/* ── Hero ─────────────────────────────────────────── */}
       <div className="sp-hero" style={{ background:`linear-gradient(135deg,${col}ee,${col}77)` }}>
