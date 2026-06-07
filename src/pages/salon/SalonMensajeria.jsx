@@ -118,6 +118,11 @@ export default function SalonMensajeria() {
   const [editMode,       setEditMode]       = useState(false)
   const [draftPl,        setDraftPl]        = useState([])
   const [savingPl,       setSavingPl]       = useState(false)
+  const [campanaOpen,    setCampanaOpen]    = useState(false)
+  const [enviandoCampana, setEnviandoCampana] = useState(false)
+  const [resultadoCampana, setResultadoCampana] = useState(null)
+  const [metricas,       setMetricas]       = useState(null)
+  const [metricasOpen,   setMetricasOpen]   = useState(false)
 
   const cargarPlantillas = useCallback(async () => {
     if (!tenant?.id) return
@@ -187,7 +192,52 @@ export default function SalonMensajeria() {
     setLoading(false)
   }, [tenant?.id])
 
-  useEffect(() => { cargar(); cargarPlantillas() }, [cargar, cargarPlantillas])
+  const cargarMetricas = useCallback(async () => {
+    if (!tenant?.id) return
+    const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const [{ data: logs }, { data: citas30 }] = await Promise.all([
+      supabase
+        .from('wa_envios_log')
+        .select('tipo')
+        .eq('tenant_id', tenant.id)
+        .gte('created_at', hace30),
+      // Citas de los últimos 30 días ya pasadas (completadas o no_asistio) para comparar no-show
+      supabase
+        .from('citas')
+        .select('estado, recordatorio_24h_enviado')
+        .eq('tenant_id', tenant.id)
+        .in('estado', ['completada', 'no_asistio'])
+        .gte('fecha_inicio', hace30),
+    ])
+
+    // Conteo de envíos por tipo
+    const porTipo = { confirmacion: 0, recordatorio_24h: 0, recordatorio_1h: 0, cumpleanos: 0, campana: 0, agente: 0 }
+    ;(logs || []).forEach(l => { if (l.tipo in porTipo) porTipo[l.tipo]++ })
+    const totalEnvios = (logs || []).length
+
+    // No-show: con recordatorio vs sin recordatorio
+    let conRecTotal = 0, conRecNoShow = 0, sinRecTotal = 0, sinRecNoShow = 0
+    ;(citas30 || []).forEach(c => {
+      const noShow = c.estado === 'no_asistio'
+      if (c.recordatorio_24h_enviado) {
+        conRecTotal++; if (noShow) conRecNoShow++
+      } else {
+        sinRecTotal++; if (noShow) sinRecNoShow++
+      }
+    })
+    const pct = (n, d) => d > 0 ? Math.round((n / d) * 100) : null
+
+    setMetricas({
+      porTipo,
+      totalEnvios,
+      noshow: {
+        conRec: { total: conRecTotal, noShow: conRecNoShow, pct: pct(conRecNoShow, conRecTotal) },
+        sinRec: { total: sinRecTotal, noShow: sinRecNoShow, pct: pct(sinRecNoShow, sinRecTotal) },
+      },
+    })
+  }, [tenant?.id])
+
+  useEffect(() => { cargar(); cargarPlantillas(); cargarMetricas() }, [cargar, cargarPlantillas, cargarMetricas])
 
   const clientesFiltrados = clientes.filter(c => {
     const telefono = c.telefono?.replace(/\D/g, '') || ''
@@ -219,17 +269,49 @@ export default function SalonMensajeria() {
     setSheetOpen(true)
   }
 
+  function sustituir(texto, cliente) {
+    return texto
+      .replace(/{{nombre}}/g, cliente.nombre.split(' ')[0])
+      .replace(/{{negocio}}/g, tenant?.nombre || 'el salón')
+      .replace(/{{direccion}}/g, tenant?.direccion || '')
+  }
+
   function enviarWA(template) {
     if (!clienteSel) return
-    const texto = template.texto
-      .replace(/{{nombre}}/g, clienteSel.nombre.split(' ')[0])
-      .replace(/{{negocio}}/g, tenant?.nombre || 'el salón')
+    const texto = sustituir(template.texto, clienteSel)
     const tel = clienteSel.telefono.replace(/\D/g, '')
     const num = tel.startsWith('57') ? tel : `57${tel}`
     const url = `https://wa.me/${num}?text=${encodeURIComponent(texto)}`
     window.open(url, '_blank', 'noopener')
     setEnviados(e => ({ ...e, [clienteSel.id]: true }))
     setSheetOpen(false)
+  }
+
+  async function enviarCampanaMasiva(template) {
+    if (!clientesFiltrados.length || enviandoCampana) return
+    setEnviandoCampana(true)
+    setResultadoCampana(null)
+    const { data, error } = await supabase.functions.invoke('enviar-campana', {
+      body: {
+        tenant_id: tenant.id,
+        mensaje:   template.texto,
+        clientes:  clientesFiltrados.map(c => ({
+          id:       c.id,
+          telefono: c.telefono,
+          nombre:   c.nombre,
+        })),
+      },
+    })
+    setEnviandoCampana(false)
+    if (error || data?.error) {
+      setResultadoCampana({ error: data?.error || 'Error al enviar la campaña' })
+    } else {
+      setResultadoCampana({ enviados: data.enviados, fallidos: data.fallidos })
+      const map = {}
+      clientesFiltrados.forEach(c => { map[c.id] = true })
+      setEnviados(e => ({ ...e, ...map }))
+    }
+    setCampanaOpen(false)
   }
 
   return (
@@ -247,6 +329,113 @@ export default function SalonMensajeria() {
           Envía mensajes WA a tus clientes
         </p>
       </div>
+
+      {/* Métricas de WhatsApp (últimos 30 días) */}
+      {metricas && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <div style={{
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: 14, overflow: 'hidden',
+          }}>
+            <button
+              onClick={() => setMetricasOpen(o => !o)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
+              }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>📊</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                  WhatsApp · últimos 30 días
+                </span>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: col,
+                  background: `${col}1a`, borderRadius: 8, padding: '2px 8px',
+                }}>
+                  {metricas.totalEnvios} envíos
+                </span>
+              </span>
+              <span style={{
+                color: 'var(--text-3)', fontSize: 12,
+                transform: metricasOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s',
+              }}>▼</span>
+            </button>
+
+            {metricasOpen && (
+              <div style={{ padding: '0 16px 16px' }}>
+                {/* Envíos automáticos por tipo */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { k: 'confirmacion',     label: 'Confirmaciones',   emoji: '✅' },
+                    { k: 'recordatorio_24h', label: 'Recordatorio 24h', emoji: '📅' },
+                    { k: 'recordatorio_1h',  label: 'Recordatorio 1h',  emoji: '⏰' },
+                    { k: 'cumpleanos',       label: 'Cumpleaños',       emoji: '🎂' },
+                    { k: 'campana',          label: 'Campañas',         emoji: '📢' },
+                    { k: 'agente',           label: 'Agente IA',        emoji: '🤖' },
+                  ].map(({ k, label, emoji }) => (
+                    <div key={k} style={{
+                      background: 'var(--bg)', borderRadius: 10, padding: '10px 12px',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <span style={{ fontSize: 16 }}>{emoji}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)', lineHeight: 1 }}>
+                          {metricas.porTipo[k] || 0}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Comparación de no-show: con vs sin recordatorio */}
+                <div style={{
+                  borderTop: '1px solid var(--border)', paddingTop: 12,
+                }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', margin: '0 0 8px' }}>
+                    Impacto en inasistencias (no-show)
+                  </p>
+                  {(metricas.noshow.conRec.total + metricas.noshow.sinRec.total) === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
+                      Aún no hay suficientes citas pasadas para comparar.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      {[
+                        { d: metricas.noshow.conRec, label: 'Con recordatorio', good: true },
+                        { d: metricas.noshow.sinRec, label: 'Sin recordatorio', good: false },
+                      ].map(({ d, label, good }) => {
+                        const clr = d.pct === null ? 'var(--text-3)'
+                          : d.pct >= 20 ? '#ef4444' : d.pct >= 10 ? '#f59e0b' : '#22c55e'
+                        return (
+                          <div key={label} style={{
+                            background: 'var(--bg)', borderRadius: 10, padding: '10px 12px',
+                            border: `1px solid ${good ? '#22c55e33' : 'var(--border)'}`,
+                          }}>
+                            <div style={{ fontWeight: 800, fontSize: 20, color: clr, lineHeight: 1 }}>
+                              {d.pct === null ? '—' : `${d.pct}%`}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3 }}>{label}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>
+                              {d.noShow} de {d.total} faltaron
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {metricas.noshow.conRec.pct !== null && metricas.noshow.sinRec.pct !== null &&
+                   metricas.noshow.sinRec.pct > metricas.noshow.conRec.pct && (
+                    <p style={{ fontSize: 11, color: '#22c55e', margin: '8px 0 0', fontWeight: 600 }}>
+                      ✓ El recordatorio reduce el no-show en {metricas.noshow.sinRec.pct - metricas.noshow.conRec.pct} puntos.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Buscador */}
       <div style={{ padding: '0 16px 10px' }}>
@@ -322,17 +511,45 @@ export default function SalonMensajeria() {
         </div>
       )}
 
-      {/* Stats */}
-      <div style={{ padding: '0 16px 14px' }}>
+      {/* Stats + Campaña masiva */}
+      <div style={{ padding: '0 16px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? 's' : ''} con teléfono
           {Object.keys(enviados).length > 0 && (
             <span style={{ marginLeft: 8, color: col, fontWeight: 600 }}>
-              · {Object.keys(enviados).length} mensaje{Object.keys(enviados).length !== 1 ? 's' : ''} enviado{Object.keys(enviados).length !== 1 ? 's' : ''}
+              · {Object.keys(enviados).length} enviado{Object.keys(enviados).length !== 1 ? 's' : ''}
             </span>
           )}
         </span>
+        {clientesFiltrados.length > 0 && (
+          <button
+            onClick={() => { setResultadoCampana(null); setCampanaOpen(true) }}
+            style={{
+              flexShrink: 0, padding: '7px 14px', borderRadius: 20,
+              border: `1.5px solid ${col}60`, background: `${col}15`,
+              color: col, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            📢 Campaña masiva
+          </button>
+        )}
       </div>
+
+      {/* Resultado de campaña */}
+      {resultadoCampana && (
+        <div style={{
+          margin: '0 16px 12px', padding: '12px 14px', borderRadius: 12,
+          background: resultadoCampana.error ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+          border: `1px solid ${resultadoCampana.error ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
+          fontSize: 13, color: resultadoCampana.error ? '#ef4444' : '#16a34a', fontWeight: 600,
+        }}>
+          {resultadoCampana.error
+            ? `⚠️ ${resultadoCampana.error}`
+            : `✅ Campaña enviada — ${resultadoCampana.enviados} enviados${resultadoCampana.fallidos > 0 ? `, ${resultadoCampana.fallidos} fallidos` : ''}`
+          }
+        </div>
+      )}
 
       {/* Lista clientes */}
       {loading ? (
@@ -417,6 +634,66 @@ export default function SalonMensajeria() {
         </div>
       )}
 
+      {/* Sheet: Campaña masiva */}
+      {campanaOpen && (
+        <>
+          <div className="sp-sheet-overlay" onClick={() => setCampanaOpen(false)} />
+          <div className="sp-sheet">
+            <div className="sp-sheet-handle" />
+            <p className="sp-sheet-title">📢 Campaña masiva</p>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px' }}>
+              Elige una plantilla para enviar a los{' '}
+              <strong style={{ color: col }}>{clientesFiltrados.length} clientes</strong>{' '}
+              del filtro activo vía WhatsApp API.
+            </p>
+
+            {enviandoCampana ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 0' }}>
+                <div className="sp-spinner" />
+                <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Enviando mensajes…</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(plantillas.length ? plantillas : TEMPLATES).map((t, idx) => (
+                  <button
+                    key={t.id || idx}
+                    onClick={() => enviarCampanaMasiva(t)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                      padding: '14px 16px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
+                      background: 'rgba(128,128,128,0.06)', border: '1px solid rgba(128,128,128,0.12)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 18 }}>{t.emoji}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{t.titulo}</span>
+                    </div>
+                    <p style={{
+                      margin: 0, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5,
+                      overflow: 'hidden', display: '-webkit-box',
+                      WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}>
+                      {t.texto.replace(/{{nombre}}/g, 'Cliente').replace(/{{negocio}}/g, tenant?.nombre || 'el salón')}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setCampanaOpen(false)}
+              style={{
+                marginTop: 14, width: '100%', padding: '13px', borderRadius: 14,
+                background: 'transparent', border: '1px solid var(--border)',
+                color: 'var(--text-3)', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Sheet plantillas */}
       {sheetOpen && clienteSel && (
         <>
@@ -434,7 +711,9 @@ export default function SalonMensajeria() {
                 </button>
               </div>
               <p style={{ fontSize:12, color:'var(--text-3)', margin:'0 0 14px' }}>
-                Usa {'{{nombre}}'} y {'{{negocio}}'} como variables.
+                Variables: <code style={{ background:'rgba(128,128,128,0.1)', borderRadius:4, padding:'1px 4px' }}>{'{{nombre}}'}</code>{' '}
+                <code style={{ background:'rgba(128,128,128,0.1)', borderRadius:4, padding:'1px 4px' }}>{'{{negocio}}'}</code>{' '}
+                <code style={{ background:'rgba(128,128,128,0.1)', borderRadius:4, padding:'1px 4px' }}>{'{{direccion}}'}</code>
               </p>
 
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -537,9 +816,7 @@ export default function SalonMensajeria() {
                       overflow: 'hidden', display: '-webkit-box',
                       WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                     }}>
-                      {t.texto
-                        .replace(/{{nombre}}/g, clienteSel.nombre.split(' ')[0])
-                        .replace(/{{negocio}}/g, tenant?.nombre || 'el salón')}
+                      {sustituir(t.texto, clienteSel)}
                     </p>
                   </button>
                 ))}

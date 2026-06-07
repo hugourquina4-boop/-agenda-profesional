@@ -58,11 +58,11 @@ Deno.serve(async (req) => {
     const { data: cita, error } = await db
       .from('citas')
       .select(`
-        id, fecha_inicio, fecha_fin, estado,
+        id, tenant_id, fecha_inicio, fecha_fin, estado,
         clientes_agenda ( nombre, telefono ),
         profesionales   ( nombre ),
         servicios       ( nombre, precio ),
-        tenants         ( nombre, whatsapp )
+        tenants         ( nombre, whatsapp, direccion )
       `)
       .eq('id', cita_id)
       .single()
@@ -82,14 +82,28 @@ Deno.serve(async (req) => {
 
     // ── Mensaje al CLIENTE ─────────────────────────────────────────
     if (cliente?.telefono) {
+      const precioLine = serv?.precio > 0
+        ? `💰 Valor: $${Number(serv.precio).toLocaleString('es-CO')}\n`
+        : ''
+      const dirLine = tenant?.direccion
+        ? `📍 ${tenant.direccion}\n🗺️ https://maps.google.com/?q=${encodeURIComponent(tenant.direccion)}\n`
+        : ''
       const msgCliente =
-        `✅ *Cita confirmada en ${tenant?.nombre || 'el salón'}*\n\n` +
+        `✅ *Cita confirmada — ${tenant?.nombre || 'el salón'}*\n\n` +
         `👤 Profesional: ${prof?.nombre || '—'}\n` +
         `✂️ Servicio: ${serv?.nombre || '—'}\n` +
+        `${precioLine}` +
         `📅 Fecha: ${fecha}\n` +
-        `🕐 Hora: ${hora}\n\n` +
-        `Si necesitas cancelar o reagendar, responde este mensaje. ¡Te esperamos! 💫`
+        `🕐 Hora: ${hora}\n` +
+        `${dirLine}\n` +
+        `Para cancelar o reagendar, responde este mensaje. ¡Te esperamos! 💫`
       resultados.cliente = await enviarWA(cliente.telefono, msgCliente)
+      try {
+        await db.from('wa_envios_log').insert({
+          tenant_id: (cita as any).tenant_id, tipo: 'confirmacion',
+          telefono: cliente.telefono, cita_id: cita.id,
+        })
+      } catch (_) { /* no interrumpir por fallo de log */ }
     }
 
     // ── Notificación al SALÓN ──────────────────────────────────────

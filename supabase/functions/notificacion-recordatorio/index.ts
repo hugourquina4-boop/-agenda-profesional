@@ -46,18 +46,25 @@ Deno.serve(async (req) => {
 
   const [res24h, res1h] = await Promise.all([
     db.from('citas')
-      .select('id, fecha_inicio, clientes_agenda(nombre,telefono), profesionales(nombre), servicios(nombre), tenants(nombre)')
+      .select('id, tenant_id, fecha_inicio, clientes_agenda(nombre,telefono), profesionales(nombre), servicios(nombre), tenants(nombre,direccion)')
       .gte('fecha_inicio', mananaInicio)
       .lte('fecha_inicio', mananaFin)
       .in('estado', ['confirmada', 'pendiente'])
       .eq('recordatorio_24h_enviado', false),
     db.from('citas')
-      .select('id, fecha_inicio, clientes_agenda(nombre,telefono), profesionales(nombre), servicios(nombre), tenants(nombre)')
+      .select('id, tenant_id, fecha_inicio, clientes_agenda(nombre,telefono), profesionales(nombre), servicios(nombre), tenants(nombre,direccion)')
       .gte('fecha_inicio', en55min.toISOString())
       .lte('fecha_inicio', en75min.toISOString())
       .in('estado', ['confirmada', 'pendiente'])
       .eq('recordatorio_1h_enviado', false),
   ])
+
+  // Registra el envío en wa_envios_log (best-effort, no bloquea el flujo)
+  async function logEnvio(tenantId: string, tipo: string, telefono: string, citaId: string) {
+    try {
+      await db.from('wa_envios_log').insert({ tenant_id: tenantId, tipo, telefono, cita_id: citaId })
+    } catch (_) { /* no interrumpir envíos por fallo de log */ }
+  }
 
   let enviados24h = 0
   let enviados1h  = 0
@@ -69,18 +76,23 @@ Deno.serve(async (req) => {
     const ten  = (c as any).tenants
     if (!cli?.telefono) continue
 
+    const dirLine24 = ten?.direccion
+      ? `📍 ${ten.direccion}\n🗺️ https://maps.google.com/?q=${encodeURIComponent(ten.direccion)}\n`
+      : ''
     const msg =
-      `📅 *Recordatorio de tu cita mañana*\n\n` +
+      `📅 *Recordatorio — tu cita es mañana*\n\n` +
       `Salón: ${ten?.nombre || '—'}\n` +
       `Profesional: ${prof?.nombre || '—'}\n` +
       `Servicio: ${serv?.nombre || '—'}\n` +
       `Día: ${fmtFecha(c.fecha_inicio)}\n` +
-      `Hora: ${fmtHora(c.fecha_inicio)}\n\n` +
+      `Hora: ${fmtHora(c.fecha_inicio)}\n` +
+      `${dirLine24}\n` +
       `Si necesitas cancelar, responde este mensaje. ¡Te esperamos! ✂️`
 
     const ok = await enviarWA(cli.telefono, msg)
     if (ok) {
       await db.from('citas').update({ recordatorio_24h_enviado: true }).eq('id', c.id)
+      await logEnvio((c as any).tenant_id, 'recordatorio_24h', cli.telefono, c.id)
       enviados24h++
     }
   }
@@ -92,17 +104,22 @@ Deno.serve(async (req) => {
     const ten  = (c as any).tenants
     if (!cli?.telefono) continue
 
+    const dirLine1h = ten?.direccion
+      ? `📍 ${ten.direccion}\n🗺️ https://maps.google.com/?q=${encodeURIComponent(ten.direccion)}\n`
+      : ''
     const msg =
       `⏰ *Tu cita es en 1 hora*\n\n` +
       `Salón: ${ten?.nombre || '—'}\n` +
       `Profesional: ${prof?.nombre || '—'}\n` +
       `Servicio: ${serv?.nombre || '—'}\n` +
-      `Hora: ${fmtHora(c.fecha_inicio)}\n\n` +
+      `Hora: ${fmtHora(c.fecha_inicio)}\n` +
+      `${dirLine1h}\n` +
       `¡Te esperamos! ✂️`
 
     const ok = await enviarWA(cli.telefono, msg)
     if (ok) {
       await db.from('citas').update({ recordatorio_1h_enviado: true }).eq('id', c.id)
+      await logEnvio((c as any).tenant_id, 'recordatorio_1h', cli.telefono, c.id)
       enviados1h++
     }
   }

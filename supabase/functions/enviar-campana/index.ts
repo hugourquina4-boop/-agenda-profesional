@@ -112,7 +112,16 @@ Deno.serve(async (req) => {
       })
 
       const ok = await enviarWA(c.telefono, texto)
-      if (ok) enviados++; else fallidos++
+      if (ok) {
+        enviados++
+        try {
+          await db.from('wa_envios_log').insert({
+            tenant_id, tipo: 'campana', telefono: c.telefono,
+          })
+        } catch (_) { /* no interrumpir por fallo de log */ }
+      } else {
+        fallidos++
+      }
 
       // Pausa mínima para evitar rate limit de la API de Meta
       await new Promise(r => setTimeout(r, 200))

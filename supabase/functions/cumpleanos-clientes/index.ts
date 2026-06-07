@@ -43,6 +43,11 @@ Deno.serve(async (req) => {
       await db.from('clientes_agenda')
         .update({ cumpleanos_ultimo_envio: hoy })
         .eq('id', c.id)
+      try {
+        await db.from('wa_envios_log').insert({
+          tenant_id: c.tenant_id, tipo: 'cumpleanos', telefono: c.telefono,
+        })
+      } catch (_) { /* no interrumpir por fallo de log */ }
       enviados++
     }
   }
